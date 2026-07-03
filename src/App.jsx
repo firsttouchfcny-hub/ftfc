@@ -104,7 +104,7 @@ export default function App() {
     (p) => p.deviceId === deviceId || p.name.toLowerCase() === playerName.toLowerCase()
   );
   const myGearKey = myListEntry?.gear || null;
-  const gearOpen  = isGearOpen();
+  const gearOpen  = isGearOpen(amAdmin);
 
   // ── My standing (so players don't scan the whole list) ─────────────────────
   const flatList = buildFlatList(session?.players || []);
@@ -171,7 +171,7 @@ export default function App() {
   }, [session, playerName, deviceId, suspended, isAdmin, playerProfile, ensureSession]);
 
   const handleTakeGear = useCallback(async (gearKey) => {
-    if (!playerName || suspended || !isGearOpen()) return;
+    if (!playerName || suspended || !isGearOpen(amAdmin)) return;
 
     const players = session?.players || [];
     const mine = players.find(
@@ -353,7 +353,7 @@ export default function App() {
             {playerName && (
               <div className="gear-bar">
                 <div className="gear-bar-title">
-                  🎒 Gear Volunteers{!gearOpen && <span className="gear-bar-note"> · opens 12:00 PM</span>}
+                  🎒 Gear Volunteers{!gearOpen && <span className="gear-bar-note"> · opens {amAdmin ? '10:00 AM' : '12:00 PM'}</span>}
                 </div>
                 <div className="gear-tiles">
                   {GEAR_TYPES.map((g) => {

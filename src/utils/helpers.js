@@ -87,9 +87,10 @@ export function canAdminSignUp(session) {
   return getRollCallPhase() === 'admins-only';
 }
 
-// Gear tiles open at noon ET and stay open (per slot) until filled.
-export function isGearOpen() {
-  return getEasternNow().hour >= GEAR_OPEN_HOUR_ET;
+// Gear tiles open at noon ET (10 AM for admins) and stay open per slot until filled.
+export function isGearOpen(amAdmin = false) {
+  const openHour = amAdmin ? RESET_HOUR_ET : GEAR_OPEN_HOUR_ET;
+  return getEasternNow().hour >= openHour;
 }
 
 export function gearIcon(key) {
