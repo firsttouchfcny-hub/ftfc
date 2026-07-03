@@ -7,6 +7,7 @@ import {
 import {
   normalizeName, parseNames, calculateSuspensionEnd,
   formatDateShort, getCurrentYear, buildFlatList,
+  getRollCallPhase, isRollCallOpen,
 } from '../utils/helpers';
 
 export default function AdminPanel({ session, today, adminName }) {
@@ -85,14 +86,19 @@ export default function AdminPanel({ session, today, adminName }) {
 
   // ── Roll call ─────────────────────────────────────────────────────────────
 
-  const handleToggleRollCall = async () => {
+  // Roll call follows the Eastern-time schedule (opens 3 PM) unless an admin
+  // overrides it for the day. Override is stored per-session, so it auto-resets.
+  const setRollOverride = async (value) => {
     try {
-      const newState = !session?.isOpen;
       const ref = await getOrCreateSession();
-      await updateDoc(ref, { isOpen: newState });
-      flash(newState ? '✅ Roll call opened' : '🔴 Roll call closed');
+      await updateDoc(ref, { override: value });
+      flash(
+        value === 'open'   ? '✅ Roll call forced open'   :
+        value === 'closed' ? '🔴 Roll call forced closed' :
+                             '↩️ Back to automatic schedule'
+      );
     } catch (err) {
-      fireError('Toggle roll call', err);
+      fireError('Set roll call', err);
     }
   };
 
@@ -250,6 +256,11 @@ export default function AdminPanel({ session, today, adminName }) {
 
   const mainPlayers = buildFlatList(session?.players || []).filter((p) => p.isMainEntry);
 
+  const phase    = getRollCallPhase();           // closed | admins-only | open
+  const rollOpen = isRollCallOpen(session);
+  const override = session?.override || null;    // 'open' | 'closed' | null
+  const stateLabel = rollOpen ? 'OPEN' : phase === 'admins-only' ? 'ADMINS ONLY' : 'CLOSED';
+
   return (
     <div className="admin-panel">
       <h3 className="admin-panel-title">⚙️ Admin Panel</h3>
@@ -259,13 +270,26 @@ export default function AdminPanel({ session, today, adminName }) {
       {/* Roll Call */}
       <div className="admin-block">
         <h4>Roll Call</h4>
+        <p className="admin-hint">
+          Auto: resets 10:00 AM ET · opens to all 3:00 PM ET · now{' '}
+          <strong>{stateLabel}</strong>
+          {override && <span> (manual override: {override})</span>}
+        </p>
         <div className="btn-row">
-          <button
-            className={`btn ${session?.isOpen ? 'btn-danger' : 'btn-success'}`}
-            onClick={handleToggleRollCall}
-          >
-            {session?.isOpen ? 'Close Roll Call' : 'Open Roll Call'}
-          </button>
+          {!rollOpen ? (
+            <button className="btn btn-success" onClick={() => setRollOverride('open')}>
+              Open Now
+            </button>
+          ) : (
+            <button className="btn btn-danger" onClick={() => setRollOverride('closed')}>
+              Close Now
+            </button>
+          )}
+          {override && (
+            <button className="btn btn-ghost" onClick={() => setRollOverride(null)}>
+              Back to Auto
+            </button>
+          )}
           <button className="btn btn-danger" onClick={handleResetList}>
             Reset List
           </button>

@@ -8,9 +8,13 @@ import AdminLogin  from './components/AdminLogin';
 import PlayerList  from './components/PlayerList';
 import AdminPanel  from './components/AdminPanel';
 import Rules       from './components/Rules';
+import PhoneVerify from './components/PhoneVerify';
 import {
   getSessionDate, getTomorrow, getDeviceId, normalizeName,
-  isSuspended, formatDate,
+  isSuspended, formatDate, formatTimeET,
+  getRollCallPhase, isRollCallOpen, canAdminSignUp,
+  GEAR_TYPES, isGearOpen, gearTakenCount,
+  buildFlatList, MATCH1_MAX, MATCH2_MAX, MATCH2_MIN_CONFIRM,
 } from './utils/helpers';
 
 export default function App() {
@@ -23,6 +27,7 @@ export default function App() {
   const [isAdmin,       setIsAdmin]       = useState(() => localStorage.getItem('ftfc_is_admin') === 'true');
   const [showNameEntry, setShowNameEntry] = useState(() => !localStorage.getItem('ftfc_player_name'));
   const [showEditName,    setShowEditName]    = useState(false);
+  const [showPhoneVerify, setShowPhoneVerify] = useState(false);
   const [showAdminLogin,  setShowAdminLogin]  = useState(false);
   const [showAdminPanel,  setShowAdminPanel]  = useState(false);
 
@@ -30,6 +35,13 @@ export default function App() {
   const [session,       setSession]       = useState(null);
   const [playerProfile, setPlayerProfile] = useState(null);
   const [loading,       setLoading]       = useState(true);
+  const [, setClockTick] = useState(0); // re-render so time-based open/close updates live
+
+  // Re-evaluate Eastern-time state (10 AM reset, 3 PM open) without a manual refresh.
+  useEffect(() => {
+    const id = setInterval(() => setClockTick((t) => t + 1), 30000);
+    return () => clearInterval(id);
+  }, []);
 
   // Listen to the player-facing session (today before noon, tomorrow after)
   useEffect(() => {
@@ -81,6 +93,44 @@ export default function App() {
   );
   const isOnList      = !!myEntry || onListByName;
 
+  // ── Time-based roll-call state (Eastern) ───────────────────────────────────
+  const phase    = getRollCallPhase();                       // closed | admins-only | open
+  const amAdmin  = isAdmin || playerProfile?.isAdmin || false;
+  const rollOpen = isRollCallOpen(session);                  // open to everyone?
+  const iCanSignUp = amAdmin ? canAdminSignUp(session) : rollOpen;
+
+  // ── Gear (equipment volunteering) ──────────────────────────────────────────
+  const myListEntry = session?.players?.find(
+    (p) => p.deviceId === deviceId || p.name.toLowerCase() === playerName.toLowerCase()
+  );
+  const myGearKey = myListEntry?.gear || null;
+  const gearOpen  = isGearOpen();
+
+  // ── My standing (so players don't scan the whole list) ─────────────────────
+  const flatList = buildFlatList(session?.players || []);
+  const myFlatIndex = flatList.findIndex(
+    (p) => p.isMainEntry &&
+      (p.deviceId === deviceId || p.name.toLowerCase() === playerName.toLowerCase())
+  );
+  const myPosition = myFlatIndex >= 0 ? myFlatIndex + 1 : null;
+
+  let myStatus = null;
+  if (myPosition != null) {
+    if (myPosition <= MATCH1_MAX) {
+      myStatus = { cls: 'playing', main: "✅ YOU'RE PLAYING",
+        sub: `Match 1 · #${myPosition} of ${MATCH2_MAX}` };
+    } else if (myPosition <= MATCH2_MAX) {
+      const confirmed = flatList.length >= MATCH2_MIN_CONFIRM;
+      myStatus = confirmed
+        ? { cls: 'playing', main: "✅ YOU'RE PLAYING", sub: `Match 2 · #${myPosition} of ${MATCH2_MAX}` }
+        : { cls: 'pending', main: "🟡 YOU'RE IN — Match 2",
+            sub: `needs ${MATCH2_MIN_CONFIRM - flatList.length} more to confirm Match 2` };
+    } else {
+      myStatus = { cls: 'bench', main: '🪑 BENCH',
+        sub: `#${myPosition - MATCH2_MAX} in line — waiting for a spot` };
+    }
+  }
+
   // ── Actions ───────────────────────────────────────────────────────────────
 
   const ensureSession = useCallback(async () => {
@@ -93,7 +143,10 @@ export default function App() {
   }, [today]);
 
   const handleSignIn = useCallback(async (plusOnes = 0) => {
-    if (!session?.isOpen || !playerName || suspended) return;
+    const playerCanSignUp = (isAdmin || playerProfile?.isAdmin)
+      ? canAdminSignUp(session)
+      : isRollCallOpen(session);
+    if (!playerCanSignUp || !playerName || suspended) return;
 
     const profile = playerProfile;
     const playerIsAdmin = isAdmin || profile?.isAdmin || false;
@@ -117,13 +170,61 @@ export default function App() {
     await updateDoc(ref, { players: [...currentPlayers, entry] });
   }, [session, playerName, deviceId, suspended, isAdmin, playerProfile, ensureSession]);
 
+  const handleTakeGear = useCallback(async (gearKey) => {
+    if (!playerName || suspended || !isGearOpen()) return;
+
+    const players = session?.players || [];
+    const mine = players.find(
+      (p) => p.deviceId === deviceId || p.name.toLowerCase() === playerName.toLowerCase()
+    );
+    if (mine?.gear) return; // one gear item per person
+
+    const type = GEAR_TYPES.find((g) => g.key === gearKey);
+    if (!type || gearTakenCount(players, gearKey) >= type.slots) return; // slot full
+
+    const ref = await ensureSession();
+    let newPlayers;
+    if (mine) {
+      // Already on the list → attach gear (sort pins them to the top).
+      newPlayers = players.map((p) => (p.id === mine.id ? { ...p, gear: gearKey } : p));
+    } else {
+      // Taking gear also signs you up for the next game, even before 3 PM.
+      newPlayers = [...players, {
+        id: crypto.randomUUID(),
+        name: playerName,
+        deviceId,
+        isAdmin: amAdmin,
+        plusOnes: 0,
+        gear: gearKey,
+        signedUpAt: Date.now(),
+      }];
+    }
+    await updateDoc(ref, { players: newPlayers });
+  }, [session, playerName, deviceId, suspended, amAdmin, ensureSession]);
+
   const handleSignOut = useCallback(async () => {
     if (!session || !playerName) return;
+    // #5 — confirm before dropping
+    if (!window.confirm('Out — are you sure? This removes you from the list.')) return;
+
     const ref = doc(db, 'sessions', today);
-    const newPlayers = (session.players || []).filter(
+    const players = session.players || [];
+    const removed = players.filter(
+      (p) => p.deviceId === deviceId || p.name.toLowerCase() === playerName.toLowerCase()
+    );
+    const newPlayers = players.filter(
       (p) => p.deviceId !== deviceId && p.name.toLowerCase() !== playerName.toLowerCase()
     );
-    await updateDoc(ref, { players: newPlayers });
+
+    const updates = { players: newPlayers };
+    // #7 — record the drop (clears automatically when the session rolls over at 10 AM)
+    if (removed.length > 0) {
+      updates.drops = [
+        ...(session.drops || []),
+        { name: removed[0].name, deviceId, at: Date.now() },
+      ];
+    }
+    await updateDoc(ref, updates);
   }, [session, playerName, deviceId, today]);
 
   const handleNameSave = async (name) => {
@@ -209,8 +310,12 @@ export default function App() {
             {/* Status bar */}
             <div className="status-bar">
               <span className="date-label">{todayLabel}</span>
-              <span className={`roll-status ${session?.isOpen ? 'open' : 'closed'}`}>
-                {session?.isOpen ? '🟢 Roll call open' : '🔴 Roll call closed'}
+              <span className={`roll-status ${rollOpen ? 'open' : phase === 'admins-only' ? 'admins' : 'closed'}`}>
+                {rollOpen
+                  ? '🟢 Roll call open'
+                  : phase === 'admins-only'
+                    ? '🟡 Admins only · opens 3:00 PM'
+                    : '🔴 Roll call closed'}
               </span>
             </div>
 
@@ -219,13 +324,19 @@ export default function App() {
               <div className="you-row">
                 <span className="you-row-label">
                   Signed in as <strong>{playerName}</strong>
+                  {playerProfile?.phoneVerified && (
+                    <span className="badge badge-verified" title="Phone verified">✓ verified</span>
+                  )}
                 </span>
-                <button
-                  className="btn btn-ghost btn-sm"
-                  onClick={() => setShowEditName(true)}
-                >
-                  Edit
-                </button>
+                <div className="you-row-actions">
+                  {/* Phone verification hidden until the phone-auth phase (PhoneVerify.jsx kept in tree) */}
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => setShowEditName(true)}
+                  >
+                    Edit
+                  </button>
+                </div>
               </div>
             )}
 
@@ -238,6 +349,35 @@ export default function App() {
               </div>
             )}
 
+            {/* Take gear */}
+            {playerName && (
+              <div className="gear-bar">
+                <div className="gear-bar-title">
+                  🎒 Gear Volunteers{!gearOpen && <span className="gear-bar-note"> · opens 12:00 PM</span>}
+                </div>
+                <div className="gear-tiles">
+                  {GEAR_TYPES.map((g) => {
+                    const taken = gearTakenCount(session?.players, g.key);
+                    const full  = taken >= g.slots;
+                    const mineHere = myGearKey === g.key;
+                    const disabled = !gearOpen || full || (!!myGearKey && !mineHere) || suspended;
+                    return (
+                      <button
+                        key={g.key}
+                        className={`gear-tile${mineHere ? ' mine' : ''}${full && !mineHere ? ' full' : ''}`}
+                        onClick={() => handleTakeGear(g.key)}
+                        disabled={disabled}
+                      >
+                        <span className="gear-tile-icon">{g.icon}</span>
+                        <span className="gear-tile-label">{g.label}</span>
+                        <span className="gear-tile-count">{taken}/{g.slots}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Signup buttons */}
             {playerName && (
               <div className="action-bar">
@@ -246,14 +386,14 @@ export default function App() {
                     <button
                       className="btn btn-in"
                       onClick={() => handleSignIn(0)}
-                      disabled={!session?.isOpen || suspended}
+                      disabled={!iCanSignUp || suspended}
                     >
                       In
                     </button>
                     <button
                       className="btn btn-in-plus"
                       onClick={() => handleSignIn(1)}
-                      disabled={!session?.isOpen || suspended}
+                      disabled={!iCanSignUp || suspended}
                     >
                       In +1
                     </button>
@@ -263,9 +403,23 @@ export default function App() {
                     Out
                   </button>
                 )}
-                {!session?.isOpen && !isOnList && (
-                  <p className="action-hint">Roll call opens at 3:00 PM</p>
+                {!iCanSignUp && !isOnList && (
+                  <p className="action-hint">
+                    {phase === 'admins-only'
+                      ? 'Opens to everyone at 3:00 PM'
+                      : phase === 'closed'
+                        ? 'Sign-up opens at 10:00 AM'
+                        : 'Roll call is closed'}
+                  </p>
                 )}
+              </div>
+            )}
+
+            {/* My standing */}
+            {myStatus && (
+              <div className={`my-status my-status-${myStatus.cls}`}>
+                <span className="my-status-main">{myStatus.main}</span>
+                <span className="my-status-sub">{myStatus.sub}</span>
               </div>
             )}
 
@@ -274,7 +428,23 @@ export default function App() {
               session={session}
               deviceId={deviceId}
               playerName={playerName}
+              isOpen={rollOpen}
             />
+
+            {/* Drops today (#7) */}
+            {session?.drops?.length > 0 && (
+              <div className="drops-log">
+                <div className="drops-log-title">
+                  📤 Drops today <span className="count-badge">{session.drops.length}</span>
+                </div>
+                {[...session.drops].sort((a, b) => b.at - a.at).map((d, i) => (
+                  <div key={`${d.deviceId}-${d.at}-${i}`} className="drops-log-row">
+                    <span className="drops-log-name">{d.name}</span>
+                    <span className="drops-log-time">{formatTimeET(d.at)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Rules */}
             <Rules />
@@ -324,6 +494,12 @@ export default function App() {
           onSave={handleNameSave}
           initialName={playerName}
           onClose={() => setShowEditName(false)}
+        />
+      )}
+      {showPhoneVerify && (
+        <PhoneVerify
+          playerName={playerName}
+          onClose={() => setShowPhoneVerify(false)}
         />
       )}
       {showAdminLogin && (

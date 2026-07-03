@@ -1,10 +1,9 @@
-import { buildFlatList } from '../utils/helpers';
+import {
+  buildFlatList, gearIcon,
+  MATCH1_MAX, MATCH2_MAX, MATCH2_MIN_CONFIRM,
+} from '../utils/helpers';
 
-const MATCH1_MAX = 18;
-const MATCH2_MAX = 36;
-const MATCH2_MIN_CONFIRM = 30;
-
-export default function PlayerList({ session, deviceId, playerName }) {
+export default function PlayerList({ session, deviceId, playerName, isOpen }) {
   const players = session?.players || [];
   const flat = buildFlatList(players);
   const total = flat.length;
@@ -19,7 +18,7 @@ export default function PlayerList({ session, deviceId, playerName }) {
   if (total === 0) {
     return (
       <div className="list-empty">
-        {session?.isOpen
+        {isOpen
           ? 'No players yet — be the first to sign in!'
           : 'Roll call is not open yet.'}
       </div>
@@ -36,6 +35,7 @@ export default function PlayerList({ session, deviceId, playerName }) {
         <span className="player-pos">{position}</span>
         <span className="player-name-cell">
           {isOwn && <span className="green-dot" title="You" />}
+          {player.gear && <span className="gear-name-icon" title={player.gear}>{gearIcon(player.gear)}</span>}
           <span className="player-name-text">{player.name}</span>
           {player.isAdmin && <span className="badge badge-admin">admin</span>}
           {!player.isMainEntry && <span className="badge badge-plus">+1</span>}
