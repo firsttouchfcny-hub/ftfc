@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { db } from './firebase/config';
 import {
-  doc, onSnapshot, setDoc, getDoc, updateDoc,
+  doc, onSnapshot, setDoc, getDoc, updateDoc, runTransaction,
 } from 'firebase/firestore';
 import NameEntry   from './components/NameEntry';
 import AdminLogin  from './components/AdminLogin';
@@ -133,99 +133,95 @@ export default function App() {
 
   // ── Actions ───────────────────────────────────────────────────────────────
 
-  const ensureSession = useCallback(async () => {
-    const ref = doc(db, 'sessions', today);
-    const snap = await getDoc(ref);
-    if (!snap.exists()) {
-      await setDoc(ref, { date: today, isOpen: false, players: [], createdAt: Date.now() });
-    }
-    return ref;
-  }, [today]);
-
   const handleSignIn = useCallback(async (plusOnes = 0) => {
     const playerCanSignUp = (isAdmin || playerProfile?.isAdmin)
       ? canAdminSignUp(session)
       : isRollCallOpen(session);
     if (!playerCanSignUp || !playerName || suspended) return;
 
-    const profile = playerProfile;
-    const playerIsAdmin = isAdmin || profile?.isAdmin || false;
-
-    const entry = {
-      id: crypto.randomUUID(),
-      name: playerName,
-      deviceId,
-      isAdmin: playerIsAdmin,
-      plusOnes,
-      signedUpAt: Date.now(),
-    };
-
-    const currentPlayers = session.players || [];
-    // Prevent duplicate by deviceId or name
-    if (currentPlayers.some(
-      (p) => p.deviceId === deviceId || p.name.toLowerCase() === playerName.toLowerCase()
-    )) return;
-
-    const ref = await ensureSession();
-    await updateDoc(ref, { players: [...currentPlayers, entry] });
-  }, [session, playerName, deviceId, suspended, isAdmin, playerProfile, ensureSession]);
+    const playerIsAdmin = isAdmin || playerProfile?.isAdmin || false;
+    const ref = doc(db, 'sessions', today);
+    try {
+      // Atomic: read the live list inside a transaction so we never clobber
+      // concurrent sign-ups with a stale in-browser copy.
+      await runTransaction(db, async (tx) => {
+        const snap = await tx.get(ref);
+        const players = snap.exists() ? (snap.data().players || []) : [];
+        if (players.some(
+          (p) => p.deviceId === deviceId || p.name.toLowerCase() === playerName.toLowerCase()
+        )) return; // already on the list
+        const entry = {
+          id: crypto.randomUUID(), name: playerName, deviceId,
+          isAdmin: playerIsAdmin, plusOnes, signedUpAt: Date.now(),
+        };
+        if (snap.exists()) tx.update(ref, { players: [...players, entry] });
+        else tx.set(ref, { date: today, isOpen: false, players: [entry], createdAt: Date.now() });
+      });
+    } catch (err) {
+      console.error('[FTFC] sign-in failed:', err);
+    }
+  }, [session, playerName, deviceId, suspended, isAdmin, playerProfile, today]);
 
   const handleTakeGear = useCallback(async (gearKey) => {
     if (!playerName || suspended || !isGearOpen(amAdmin)) return;
-
-    const players = session?.players || [];
-    const mine = players.find(
-      (p) => p.deviceId === deviceId || p.name.toLowerCase() === playerName.toLowerCase()
-    );
-    if (mine?.gear) return; // one gear item per person
-
     const type = GEAR_TYPES.find((g) => g.key === gearKey);
-    if (!type || gearTakenCount(players, gearKey) >= type.slots) return; // slot full
+    if (!type) return;
 
-    const ref = await ensureSession();
-    let newPlayers;
-    if (mine) {
-      // Already on the list → attach gear (sort pins them to the top).
-      newPlayers = players.map((p) => (p.id === mine.id ? { ...p, gear: gearKey } : p));
-    } else {
-      // Taking gear also signs you up for the next game, even before 3 PM.
-      newPlayers = [...players, {
-        id: crypto.randomUUID(),
-        name: playerName,
-        deviceId,
-        isAdmin: amAdmin,
-        plusOnes: 0,
-        gear: gearKey,
-        signedUpAt: Date.now(),
-      }];
+    const ref = doc(db, 'sessions', today);
+    try {
+      // Atomic: read the live list so a gear tap can't wipe other signups.
+      await runTransaction(db, async (tx) => {
+        const snap = await tx.get(ref);
+        const players = snap.exists() ? (snap.data().players || []) : [];
+        const mine = players.find(
+          (p) => p.deviceId === deviceId || p.name.toLowerCase() === playerName.toLowerCase()
+        );
+        if (mine?.gear) return;                                   // one gear item per person
+        if (gearTakenCount(players, gearKey) >= type.slots) return; // slot already full
+        const newPlayers = mine
+          ? players.map((p) => (p.id === mine.id ? { ...p, gear: gearKey } : p))
+          : [...players, {
+              id: crypto.randomUUID(), name: playerName, deviceId,
+              isAdmin: amAdmin, plusOnes: 0, gear: gearKey, signedUpAt: Date.now(),
+            }];
+        if (snap.exists()) tx.update(ref, { players: newPlayers });
+        else tx.set(ref, { date: today, isOpen: false, players: newPlayers, createdAt: Date.now() });
+      });
+    } catch (err) {
+      console.error('[FTFC] take-gear failed:', err);
     }
-    await updateDoc(ref, { players: newPlayers });
-  }, [session, playerName, deviceId, suspended, amAdmin, ensureSession]);
+  }, [playerName, deviceId, suspended, amAdmin, today]);
 
   const handleSignOut = useCallback(async () => {
-    if (!session || !playerName) return;
+    if (!playerName) return;
     // #5 — confirm before dropping
     if (!window.confirm('Out — are you sure? This removes you from the list.')) return;
 
     const ref = doc(db, 'sessions', today);
-    const players = session.players || [];
-    const removed = players.filter(
-      (p) => p.deviceId === deviceId || p.name.toLowerCase() === playerName.toLowerCase()
-    );
-    const newPlayers = players.filter(
-      (p) => p.deviceId !== deviceId && p.name.toLowerCase() !== playerName.toLowerCase()
-    );
-
-    const updates = { players: newPlayers };
-    // #7 — record the drop (clears automatically when the session rolls over at 10 AM)
-    if (removed.length > 0) {
-      updates.drops = [
-        ...(session.drops || []),
-        { name: removed[0].name, deviceId, at: Date.now() },
-      ];
+    try {
+      // Atomic: remove only self against the live list, and log the drop.
+      await runTransaction(db, async (tx) => {
+        const snap = await tx.get(ref);
+        if (!snap.exists()) return;
+        const data = snap.data();
+        const players = data.players || [];
+        const removed = players.filter(
+          (p) => p.deviceId === deviceId || p.name.toLowerCase() === playerName.toLowerCase()
+        );
+        if (removed.length === 0) return;
+        const newPlayers = players.filter(
+          (p) => p.deviceId !== deviceId && p.name.toLowerCase() !== playerName.toLowerCase()
+        );
+        tx.update(ref, {
+          players: newPlayers,
+          // #7 — record the drop (clears when the session rolls over at 10 AM)
+          drops: [...(data.drops || []), { name: removed[0].name, deviceId, at: Date.now() }],
+        });
+      });
+    } catch (err) {
+      console.error('[FTFC] sign-out failed:', err);
     }
-    await updateDoc(ref, updates);
-  }, [session, playerName, deviceId, today]);
+  }, [playerName, deviceId, today]);
 
   const handleNameSave = async (name) => {
     const previousName = playerName;
