@@ -306,6 +306,7 @@ body {
   flex-shrink: 0;
 }
 .badge-admin  { background: #7b1fa2; color: #fff; }
+.badge-priority { background: var(--orange); color: #fff; }
 .badge-plus   { background: #e0e0e0; color: #555; }
 .badge-undone { background: #9e9e9e; color: #fff; }
 

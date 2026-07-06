@@ -38,6 +38,7 @@ export default function PlayerList({ session, deviceId, playerName, isOpen }) {
           {player.gear && <span className="gear-name-icon" title={player.gear}>{gearIcon(player.gear)}</span>}
           <span className="player-name-text">{player.name}</span>
           {player.isAdmin && <span className="badge badge-admin">admin</span>}
+          {player.priority && !player.isAdmin && <span className="badge badge-priority">priority</span>}
           {!player.isMainEntry && <span className="badge badge-plus">+1</span>}
         </span>
       </div>

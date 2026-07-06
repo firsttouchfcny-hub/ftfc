@@ -196,12 +196,15 @@ export function buildFlatList(players) {
     return i === -1 ? 99 : i;
   };
 
+  // Admins and per-day priority players both pin below gear, above everyone.
+  const pinned = (p) => (p.isAdmin || p.priority) ? 0 : 1;
+
   const sorted = [...players].sort((a, b) => {
     const ar = gearRank(a), br = gearRank(b);
     if (ar !== br) return ar - br;                          // gear-takers first (goal→bibs→balls)
     if (ar !== 99) return (a.signedUpAt || 0) - (b.signedUpAt || 0); // same gear → earliest claim
-    if (a.isAdmin && !b.isAdmin) return -1;                 // then admins
-    if (!a.isAdmin && b.isAdmin) return 1;
+    const ap = pinned(a), bp = pinned(b);
+    if (ap !== bp) return ap - bp;                          // then admins + priority
     return (a.signedUpAt || 0) - (b.signedUpAt || 0);       // then by signup time
   });
 

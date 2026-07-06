@@ -160,22 +160,17 @@ export default function AdminPanel({ session, today, adminName }) {
     }
   };
 
-  const handleToggleAdmin = async (playerId, name, current) => {
+  // Priority is per-day only: it pins the player to the top of THIS session's
+  // list. It does NOT grant admin credentials (those come only from the
+  // password login) and never touches the player's profile.
+  const handleTogglePriority = async (playerId, current) => {
     try {
-      const newVal = !current;
       const newPlayers = (session?.players || []).map((p) =>
-        p.id === playerId ? { ...p, isAdmin: newVal } : p
+        p.id === playerId ? { ...p, priority: !current } : p
       );
       await updateSession({ players: newPlayers });
-      const profileRef = doc(db, 'players', normalizeName(name));
-      const snap = await getDoc(profileRef);
-      if (snap.exists()) {
-        await updateDoc(profileRef, { isAdmin: newVal });
-      } else {
-        await setDoc(profileRef, { name, isAdmin: newVal, suspendedUntil: null, createdAt: Date.now() });
-      }
     } catch (err) {
-      fireError('Toggle admin', err);
+      fireError('Toggle priority', err);
     }
   };
 
@@ -321,6 +316,7 @@ export default function AdminPanel({ session, today, adminName }) {
                 <span className="admin-player-name">
                   {p.name}
                   {p.isAdmin && <span className="badge badge-admin">admin</span>}
+                  {p.priority && <span className="badge badge-priority">priority</span>}
                 </span>
                 <div className="admin-controls">
                   <label className="ctrl-label">
@@ -338,10 +334,10 @@ export default function AdminPanel({ session, today, adminName }) {
                   <label className="ctrl-label">
                     <input
                       type="checkbox"
-                      checked={p.isAdmin || false}
-                      onChange={() => handleToggleAdmin(p.id, p.name, p.isAdmin)}
+                      checked={p.priority || false}
+                      onChange={() => handleTogglePriority(p.id, p.priority)}
                     />
-                    Admin
+                    Priority
                   </label>
                   <button
                     className="btn btn-sm btn-danger"
