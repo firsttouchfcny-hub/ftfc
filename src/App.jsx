@@ -38,9 +38,19 @@ export default function App() {
   const [, setClockTick] = useState(0); // re-render so time-based open/close updates live
 
   // Re-evaluate Eastern-time state (10 AM reset, 3 PM open) without a manual refresh.
+  // The interval covers foreground; visibility/focus covers phones returning from
+  // the background (where mobile browsers pause timers) so they flip immediately.
   useEffect(() => {
-    const id = setInterval(() => setClockTick((t) => t + 1), 30000);
-    return () => clearInterval(id);
+    const tick = () => setClockTick((t) => t + 1);
+    const id = setInterval(tick, 30000);
+    const onWake = () => { if (!document.hidden) tick(); };
+    document.addEventListener('visibilitychange', onWake);
+    window.addEventListener('focus', onWake);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', onWake);
+      window.removeEventListener('focus', onWake);
+    };
   }, []);
 
   // Listen to the player-facing session (today before noon, tomorrow after)

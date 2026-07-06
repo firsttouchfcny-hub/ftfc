@@ -72,13 +72,15 @@ export function getRollCallPhase() {
   return 'open';
 }
 
-// Effective open state. An admin may override the schedule for the day via
-// session.override ('open' | 'closed'); otherwise it follows the 3 PM rule.
+// Effective open state. An admin override ('open' | 'closed') only applies
+// within the phase it was set in (session.overridePhase), so it can never block
+// a later scheduled transition — e.g. a morning "Close" can't stop the 3 PM
+// auto-open. Otherwise the schedule (opens at 3 PM ET) rules.
 export function isRollCallOpen(session) {
+  const phase = getRollCallPhase();
   const ov = session?.override;
-  if (ov === 'open') return true;
-  if (ov === 'closed') return false;
-  return getRollCallPhase() === 'open';
+  if (ov && session?.overridePhase === phase) return ov === 'open';
+  return phase === 'open';
 }
 
 // Admins may sign up during the admins-only window as well as when fully open.

@@ -91,7 +91,9 @@ export default function AdminPanel({ session, today, adminName }) {
   const setRollOverride = async (value) => {
     try {
       const ref = await getOrCreateSession();
-      await updateDoc(ref, { override: value });
+      // Tag the override with the current phase so it auto-expires at the next
+      // scheduled transition (a morning "Close" won't block the 3 PM open).
+      await updateDoc(ref, { override: value, overridePhase: value ? getRollCallPhase() : null });
       flash(
         value === 'open'   ? '✅ Roll call forced open'   :
         value === 'closed' ? '🔴 Roll call forced closed' :
@@ -253,7 +255,9 @@ export default function AdminPanel({ session, today, adminName }) {
 
   const phase    = getRollCallPhase();           // closed | admins-only | open
   const rollOpen = isRollCallOpen(session);
-  const override = session?.override || null;    // 'open' | 'closed' | null
+  // An override only counts while we're still in the phase it was set in.
+  const overrideActive = session?.override && session?.overridePhase === phase
+    ? session.override : null;                   // 'open' | 'closed' | null
   const stateLabel = rollOpen ? 'OPEN' : phase === 'admins-only' ? 'ADMINS ONLY' : 'CLOSED';
 
   return (
@@ -268,7 +272,7 @@ export default function AdminPanel({ session, today, adminName }) {
         <p className="admin-hint">
           Auto: resets 10:00 AM ET · opens to all 3:00 PM ET · now{' '}
           <strong>{stateLabel}</strong>
-          {override && <span> (manual override: {override})</span>}
+          {overrideActive && <span> (manual override: {overrideActive})</span>}
         </p>
         <div className="btn-row">
           {!rollOpen ? (
@@ -280,7 +284,7 @@ export default function AdminPanel({ session, today, adminName }) {
               Close Now
             </button>
           )}
-          {override && (
+          {overrideActive && (
             <button className="btn btn-ghost" onClick={() => setRollOverride(null)}>
               Back to Auto
             </button>
