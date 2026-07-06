@@ -15,6 +15,7 @@ export const GEAR_OPEN_HOUR_ET = 12; // 12 PM ET — gear tiles become tappable
 export const MATCH1_MAX = 18;
 export const MATCH2_MAX = 36;
 export const MATCH2_MIN_CONFIRM = 30; // total signups needed before Match 2 is confirmed
+export const GAME2_CUTOFF_HOUR_ET = 21; // 9 PM ET — if Match 2 is still short, it's off
 
 // Equipment a player can volunteer for, in priority order (top of the list).
 export const GEAR_TYPES = [
@@ -102,6 +103,15 @@ export function gearIcon(key) {
 // How many of each gear type are currently claimed on a session.
 export function gearTakenCount(players, key) {
   return (players || []).filter((p) => p.gear === key).length;
+}
+
+// Match 2 status given the total signups:
+//   'confirmed' → enough players, Match 2 is on
+//   'on-hold'   → short, but before the 9 PM ET cutoff (still might fill)
+//   'off'       → short and past 9 PM ET → Match 2 is cancelled
+export function getMatch2State(totalPlayers) {
+  if (totalPlayers >= MATCH2_MIN_CONFIRM) return 'confirmed';
+  return getEasternNow().hour >= GAME2_CUTOFF_HOUR_ET ? 'off' : 'on-hold';
 }
 
 // Always returns tomorrow's date — used by admin roll call so it

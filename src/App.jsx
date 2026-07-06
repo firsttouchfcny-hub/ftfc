@@ -14,7 +14,7 @@ import {
   isSuspended, formatDate, formatTimeET,
   getRollCallPhase, isRollCallOpen, canAdminSignUp,
   GEAR_TYPES, isGearOpen, gearTakenCount,
-  buildFlatList, MATCH1_MAX, MATCH2_MAX, MATCH2_MIN_CONFIRM,
+  buildFlatList, MATCH1_MAX, MATCH2_MAX, MATCH2_MIN_CONFIRM, getMatch2State,
 } from './utils/helpers';
 
 export default function App() {
@@ -130,11 +130,17 @@ export default function App() {
       myStatus = { cls: 'playing', main: "✅ YOU'RE PLAYING",
         sub: `Match 1 · #${myPosition} of ${MATCH2_MAX}` };
     } else if (myPosition <= MATCH2_MAX) {
-      const confirmed = flatList.length >= MATCH2_MIN_CONFIRM;
-      myStatus = confirmed
-        ? { cls: 'playing', main: "✅ YOU'RE PLAYING", sub: `Match 2 · #${myPosition} of ${MATCH2_MAX}` }
-        : { cls: 'pending', main: "🟡 YOU'RE IN — Match 2",
-            sub: `needs ${MATCH2_MIN_CONFIRM - flatList.length} more to confirm Match 2` };
+      const m2 = getMatch2State(flatList.length);
+      if (m2 === 'confirmed') {
+        myStatus = { cls: 'playing', main: "✅ YOU'RE PLAYING", sub: `Match 2 · #${myPosition} of ${MATCH2_MAX}` };
+      } else if (m2 === 'off') {
+        myStatus = { cls: 'off', main: '⛔ NO MATCH 2 — NOT PLAYING',
+          sub: "Match 2 didn't reach enough players" };
+      } else {
+        const need = MATCH2_MIN_CONFIRM - flatList.length;
+        myStatus = { cls: 'pending', main: '🟡 MATCH 2 ON HOLD',
+          sub: `waiting for ${need} more player${need === 1 ? '' : 's'} · decides at 9 PM` };
+      }
     } else {
       myStatus = { cls: 'bench', main: '🪑 BENCH',
         sub: `#${myPosition - MATCH2_MAX} in line — waiting for a spot` };

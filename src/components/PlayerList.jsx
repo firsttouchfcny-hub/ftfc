@@ -1,5 +1,5 @@
 import {
-  buildFlatList, gearIcon,
+  buildFlatList, gearIcon, getMatch2State,
   MATCH1_MAX, MATCH2_MAX, MATCH2_MIN_CONFIRM,
 } from '../utils/helpers';
 
@@ -12,7 +12,7 @@ export default function PlayerList({ session, deviceId, playerName, isOpen }) {
   const match2 = flat.slice(MATCH1_MAX, MATCH2_MAX);
   const bench  = flat.slice(MATCH2_MAX);
 
-  const match2Confirmed = total >= MATCH2_MIN_CONFIRM;
+  const match2State = getMatch2State(total);   // 'confirmed' | 'on-hold' | 'off'
   const spotsNeeded = MATCH2_MIN_CONFIRM - total;
 
   if (total === 0) {
@@ -59,13 +59,15 @@ export default function PlayerList({ session, deviceId, playerName, isOpen }) {
       {/* Match 2 */}
       {(match2.length > 0 || total >= MATCH1_MAX) && (
         <div className="match-block">
-          <div className={`match-label match2${!match2Confirmed ? ' unconfirmed' : ''}`}>
-            ⚽ Match 2
-            {match2Confirmed
+          <div className={`match-label match2${match2State === 'off' ? ' cancelled' : match2State !== 'confirmed' ? ' unconfirmed' : ''}`}>
+            {match2State === 'off' ? '🚫 Match 2 — NO GAME' : '⚽ Match 2'}
+            {match2State === 'confirmed'
               ? <span className="match-count">{match2.length} / 18</span>
-              : match2.length > 0
-                ? <span className="match-note">need {spotsNeeded} more to confirm</span>
-                : <span className="match-note">need {MATCH2_MIN_CONFIRM - MATCH1_MAX} players to unlock</span>}
+              : match2State === 'off'
+                ? <span className="match-note">canceled — not enough players</span>
+                : match2.length > 0
+                  ? <span className="match-note">on hold · need {spotsNeeded} more · decides 9 PM</span>
+                  : <span className="match-note">need {MATCH2_MIN_CONFIRM - MATCH1_MAX} players to unlock</span>}
           </div>
           {match2.map((p, i) => renderRow(p, MATCH1_MAX + i + 1))}
           {match2.length === 0 && (

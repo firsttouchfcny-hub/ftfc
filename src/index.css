@@ -144,6 +144,7 @@ body {
 .my-status-playing { background: var(--green-light); color: var(--green-dark); }
 .my-status-pending { background: var(--orange-light); color: var(--orange); }
 .my-status-bench   { background: var(--blue-light);  color: #1565c0; }
+.my-status-off     { background: #37474f; color: #eceff1; }
 
 /* ── Signed-in identity row ────────────────────────────────────────────── */
 .you-row {
@@ -265,6 +266,7 @@ body {
 .match-label.match1      { background: var(--green); color: #fff; }
 .match-label.match2      { background: #388e3c; color: #fff; }
 .match-label.match2.unconfirmed { background: #7b8d4a; }
+.match-label.match2.cancelled   { background: #455a64; color: #cfd8dc; }
 .match-label.bench       { background: #78909c; color: #fff; }
 
 .match-count { margin-left: auto; background: rgba(255,255,255,.25); border-radius: 20px; padding: 1px 8px; font-size: .8rem; }
