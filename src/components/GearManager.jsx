@@ -1,0 +1,337 @@
+import { useState, useEffect } from 'react';
+import { doc, onSnapshot, runTransaction } from 'firebase/firestore';
+import { db } from '../firebase/config';
+import {
+  GEAR_TYPE_ORDER, GEAR_DEFS, gearIcon, gearLabel,
+  isGearOpen, gearTakeDate, returnDateOptions,
+  availableToTake, pickFreeSet, coverageForMorning,
+  bringersFor, takersFor, gearRiskAlert, myCommitments, upcomingMornings,
+} from '../utils/gear';
+
+const LEDGER = doc(db, 'gear', 'ledger');
+
+function fmtDay(key) {
+  return new Date(key + 'T12:00:00').toLocaleDateString('en-US', {
+    weekday: 'short', month: 'short', day: 'numeric',
+  });
+}
+
+// Ensure the gear bringer is auto-confirmed on their return-date lineup (#2).
+async function autoConfirmBringer(returnDate, { name, deviceId, isAdmin, gearType }) {
+  const ref = doc(db, 'sessions', returnDate);
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    const players = snap.exists() ? (snap.data().players || []) : [];
+    const mine = players.find(
+      (p) => p.deviceId === deviceId || p.name.toLowerCase() === name.toLowerCase()
+    );
+    let next;
+    if (mine) {
+      next = players.map((p) => (p === mine ? { ...p, gearBringer: gearType } : p));
+    } else {
+      next = [...players, {
+        id: crypto.randomUUID(), name, deviceId, isAdmin: !!isAdmin,
+        plusOnes: 0, gearBringer: gearType, signedUpAt: Date.now(),
+      }];
+    }
+    if (snap.exists()) tx.update(ref, { players: next });
+    else tx.set(ref, { date: returnDate, isOpen: false, players: next, createdAt: Date.now() });
+  });
+}
+
+export default function GearManager({ playerName, deviceId, amAdmin, suspended, adminName }) {
+  const [commitments, setCommitments] = useState([]);
+  const [pickerType, setPickerType] = useState(null); // type mid-return-date-pick
+  const [busy, setBusy] = useState(false);
+  const [showSchedule, setShowSchedule] = useState(false);
+  const [showAdmin, setShowAdmin] = useState(false);
+
+  useEffect(() => {
+    const unsub = onSnapshot(LEDGER, (snap) => {
+      setCommitments(snap.exists() ? (snap.data().commitments || []) : []);
+    }, () => setCommitments([]));
+    return unsub;
+  }, []);
+
+  const takeDate = gearTakeDate();
+  const open = isGearOpen();
+  const coverage = coverageForMorning(commitments, takeDate);
+  const risk = gearRiskAlert(commitments);
+  const mine = myCommitments(commitments, deviceId, playerName);
+
+  // ── Player: claim a set + return date (atomic) ────────────────────────────
+  const claimGear = async (type, returnDate) => {
+    if (!playerName || suspended || !isGearOpen() || busy) return;
+    setBusy(true);
+    try {
+      let assignedSet = null;
+      await runTransaction(db, async (tx) => {
+        const snap = await tx.get(LEDGER);
+        const cs = snap.exists() ? (snap.data().commitments || []) : [];
+        const setId = pickFreeSet(cs, type, takeDate);
+        if (!setId) return; // lost the race — no set free
+        assignedSet = setId;
+        const entry = {
+          id: crypto.randomUUID(), type, setId,
+          takerName: playerName, takerDeviceId: deviceId, takerIsAdmin: !!amAdmin,
+          takeDate, returnDate, status: 'committed', returnedOnTime: null,
+          createdAt: Date.now(), source: 'player',
+        };
+        if (snap.exists()) tx.update(LEDGER, { commitments: [...cs, entry] });
+        else tx.set(LEDGER, { commitments: [entry] });
+      });
+      if (assignedSet) {
+        await autoConfirmBringer(returnDate, {
+          name: playerName, deviceId, isAdmin: amAdmin, gearType: type,
+        });
+      }
+    } catch (err) {
+      console.error('[FTFC] claim gear failed:', err);
+    } finally {
+      setBusy(false);
+      setPickerType(null);
+    }
+  };
+
+  const cancelCommitment = async (id) => {
+    if (busy) return;
+    if (!window.confirm('Cancel this gear commitment?')) return;
+    setBusy(true);
+    try {
+      await runTransaction(db, async (tx) => {
+        const snap = await tx.get(LEDGER);
+        if (!snap.exists()) return;
+        const cs = snap.data().commitments || [];
+        tx.update(LEDGER, { commitments: cs.filter((c) => c.id !== id) });
+      });
+    } catch (err) {
+      console.error('[FTFC] cancel gear failed:', err);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // ── Admin actions (#6) ────────────────────────────────────────────────────
+  const patchCommitment = async (id, patch) => {
+    setBusy(true);
+    try {
+      await runTransaction(db, async (tx) => {
+        const snap = await tx.get(LEDGER);
+        if (!snap.exists()) return;
+        const cs = snap.data().commitments || [];
+        tx.update(LEDGER, {
+          commitments: cs.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+        });
+      });
+    } catch (err) {
+      console.error('[FTFC] admin gear update failed:', err);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const markReturned = (id, onTime) =>
+    patchCommitment(id, {
+      status: 'returned', returnedOnTime: onTime, returnedAt: Date.now(),
+      returnedBy: adminName || 'admin',
+    });
+
+  const reassign = (c) => {
+    const name = window.prompt(`Reassign ${gearLabel(c.type)} (currently ${c.takerName}) to:`, c.takerName);
+    if (!name || !name.trim()) return;
+    patchCommitment(c.id, { takerName: name.trim(), takerDeviceId: null, source: adminName || 'admin' });
+  };
+
+  const addManual = async (type, takerName, returnDate) => {
+    if (!takerName.trim()) return;
+    setBusy(true);
+    try {
+      await runTransaction(db, async (tx) => {
+        const snap = await tx.get(LEDGER);
+        const cs = snap.exists() ? (snap.data().commitments || []) : [];
+        const setId = pickFreeSet(cs, type, takeDate) || `${type}-override`;
+        const entry = {
+          id: crypto.randomUUID(), type, setId,
+          takerName: takerName.trim(), takerDeviceId: null, takerIsAdmin: false,
+          takeDate, returnDate, status: 'committed', returnedOnTime: null,
+          createdAt: Date.now(), source: adminName || 'admin',
+        };
+        if (snap.exists()) tx.update(LEDGER, { commitments: [...cs, entry] });
+        else tx.set(LEDGER, { commitments: [entry] });
+      });
+      await autoConfirmBringer(returnDate, {
+        name: takerName.trim(), deviceId: `admin-gear-${crypto.randomUUID()}`,
+        isAdmin: false, gearType: type,
+      });
+    } catch (err) {
+      console.error('[FTFC] manual add failed:', err);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!playerName) return null;
+
+  return (
+    <div className="gear-panel">
+      {/* Risk alert (#5) */}
+      {risk && (
+        <div className="gear-risk">
+          ⚠️ <strong>GEAR AT RISK</strong> for {fmtDay(takeDate)} —{' '}
+          {risk.map((m) => `${gearIcon(m.type)} ${gearLabel(m.type)} (${m.have}/${m.need})`).join(', ')} still needed.
+        </div>
+      )}
+
+      <div className="gear-panel-head">
+        <span className="gear-panel-title">🎒 Gear for {fmtDay(takeDate)}</span>
+        <span className="gear-coverage">
+          {GEAR_TYPE_ORDER.map((t) => (
+            <span key={t} className={`gear-chip ${coverage.status[t].ok ? 'ok' : 'short'}`}>
+              {gearIcon(t)} {coverage.status[t].have}/{coverage.status[t].need}
+            </span>
+          ))}
+        </span>
+      </div>
+
+      {/* Volunteer to take (#1, #4) */}
+      {!open ? (
+        <p className="gear-note">Gear sign-up opens at 11:00 AM.</p>
+      ) : pickerType ? (
+        <div className="gear-picker">
+          <p className="gear-note">
+            When will you bring the {gearLabel(pickerType).toLowerCase()} back?
+          </p>
+          <div className="gear-date-row">
+            {returnDateOptions(takeDate, pickerType).map((rd) => (
+              <button key={rd} className="btn btn-primary btn-sm" disabled={busy}
+                onClick={() => claimGear(pickerType, rd)}>
+                {fmtDay(rd)}
+              </button>
+            ))}
+            <button className="btn btn-ghost btn-sm" onClick={() => setPickerType(null)}>Cancel</button>
+          </div>
+        </div>
+      ) : (
+        <div className="gear-take-row">
+          {GEAR_TYPE_ORDER.map((t) => {
+            const left = availableToTake(commitments, t, takeDate);
+            const disabled = suspended || left <= 0;
+            return (
+              <button key={t} className="gear-take-btn" disabled={disabled}
+                onClick={() => setPickerType(t)}>
+                <span className="gear-take-icon">{gearIcon(t)}</span>
+                <span className="gear-take-label">Take {gearLabel(t)}</span>
+                <span className="gear-take-left">{left > 0 ? `${left} available` : 'none left'}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* My commitments */}
+      {mine.length > 0 && (
+        <div className="gear-mine">
+          {mine.map((c) => (
+            <div key={c.id} className="gear-mine-row">
+              <span>{gearIcon(c.type)} You're bringing <strong>{gearLabel(c.type)}</strong> back {fmtDay(c.returnDate)}</span>
+              <button className="btn btn-ghost btn-sm" onClick={() => cancelCommitment(c.id)}>Cancel</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Daily schedule (#3) */}
+      <button className="btn btn-ghost btn-full btn-sm" onClick={() => setShowSchedule(!showSchedule)}>
+        {showSchedule ? '▲ Hide gear schedule' : '📅 Gear schedule (next days)'}
+      </button>
+      {showSchedule && (
+        <div className="gear-schedule">
+          {upcomingMornings(6).map((m) => {
+            const bring = bringersFor(commitments, m);
+            const take = takersFor(commitments, m);
+            const cov = coverageForMorning(commitments, m);
+            return (
+              <div key={m} className="gear-day">
+                <div className="gear-day-head">
+                  <strong>{fmtDay(m)}</strong>
+                  {GEAR_TYPE_ORDER.map((t) => (
+                    <span key={t} className={`gear-chip sm ${cov.status[t].ok ? 'ok' : 'short'}`}>
+                      {gearIcon(t)}{cov.status[t].have}/{cov.status[t].need}
+                    </span>
+                  ))}
+                </div>
+                <div className="gear-day-body">
+                  <div><span className="gear-role">Bringing in:</span>{' '}
+                    {bring.length ? bring.map((c) => `${gearIcon(c.type)} ${c.takerName}`).join(', ') : '—'}
+                  </div>
+                  <div><span className="gear-role">Taking home:</span>{' '}
+                    {take.length ? take.map((c) => `${gearIcon(c.type)} ${c.takerName}`).join(', ') : '—'}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Admin management (#6) */}
+      {amAdmin && (
+        <>
+          <button className="btn btn-ghost btn-full btn-sm" onClick={() => setShowAdmin(!showAdmin)}>
+            {showAdmin ? '▲ Hide gear admin' : '⚙️ Gear admin'}
+          </button>
+          {showAdmin && (
+            <GearAdmin
+              commitments={commitments} busy={busy} takeDate={takeDate}
+              onMarkReturned={markReturned} onReassign={reassign}
+              onRemove={cancelCommitment} onAdd={addManual}
+            />
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function GearAdmin({ commitments, busy, takeDate, onMarkReturned, onReassign, onRemove, onAdd }) {
+  const [addType, setAddType] = useState('goal');
+  const [addName, setAddName] = useState('');
+  const [addReturn, setAddReturn] = useState(returnDateOptions(takeDate, 'goal')[0]);
+  const live = commitments.filter((c) => c.status === 'committed');
+
+  return (
+    <div className="gear-admin">
+      <div className="gear-admin-add">
+        <select value={addType} onChange={(e) => {
+          setAddType(e.target.value);
+          setAddReturn(returnDateOptions(takeDate, e.target.value)[0]);
+        }}>
+          {GEAR_TYPE_ORDER.map((t) => <option key={t} value={t}>{gearLabel(t)}</option>)}
+        </select>
+        <input placeholder="Player name" value={addName} onChange={(e) => setAddName(e.target.value)} />
+        <select value={addReturn} onChange={(e) => setAddReturn(e.target.value)}>
+          {returnDateOptions(takeDate, addType).map((rd) => <option key={rd} value={rd}>{fmtDay(rd)}</option>)}
+        </select>
+        <button className="btn btn-primary btn-sm" disabled={busy || !addName.trim()}
+          onClick={() => { onAdd(addType, addName, addReturn); setAddName(''); }}>Assign</button>
+      </div>
+
+      {live.length === 0 ? (
+        <p className="gear-note">No active gear commitments.</p>
+      ) : live.map((c) => (
+        <div key={c.id} className="gear-admin-row">
+          <span className="gear-admin-info">
+            {gearIcon(c.type)} <strong>{c.takerName}</strong> · take {fmtDay(c.takeDate)} → back {fmtDay(c.returnDate)}
+            <span className="gear-admin-set"> [{c.setId}]</span>
+          </span>
+          <div className="gear-admin-actions">
+            <button className="btn btn-sm btn-success" disabled={busy} onClick={() => onMarkReturned(c.id, true)}>Returned</button>
+            <button className="btn btn-sm btn-warning" disabled={busy} onClick={() => onMarkReturned(c.id, false)}>Late</button>
+            <button className="btn btn-sm btn-ghost" disabled={busy} onClick={() => onReassign(c)}>Reassign</button>
+            <button className="btn btn-sm btn-danger" disabled={busy} onClick={() => onRemove(c.id)}>✕</button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}

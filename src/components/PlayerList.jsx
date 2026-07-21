@@ -1,7 +1,8 @@
 import {
-  buildFlatList, gearIcon, getMatch2State,
+  buildFlatList, getMatch2State,
   MATCH1_MAX, MATCH2_MAX, MATCH2_MIN_CONFIRM,
 } from '../utils/helpers';
+import { gearIcon } from '../utils/gear';
 
 export default function PlayerList({ session, deviceId, playerName, isOpen }) {
   const players = session?.players || [];
@@ -35,7 +36,7 @@ export default function PlayerList({ session, deviceId, playerName, isOpen }) {
         <span className="player-pos">{position}</span>
         <span className="player-name-cell">
           {isOwn && <span className="green-dot" title="You" />}
-          {player.gear && <span className="gear-name-icon" title={player.gear}>{gearIcon(player.gear)}</span>}
+          {player.gearBringer && <span className="gear-name-icon" title={`Bringing ${player.gearBringer}`}>{gearIcon(player.gearBringer)}</span>}
           <span className="player-name-text">{player.name}</span>
           {player.isAdmin && <span className="badge badge-admin">admin</span>}
           {player.priority && !player.isAdmin && <span className="badge badge-priority">priority</span>}

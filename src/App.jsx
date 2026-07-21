@@ -9,11 +9,11 @@ import PlayerList  from './components/PlayerList';
 import AdminPanel  from './components/AdminPanel';
 import Rules       from './components/Rules';
 import PhoneVerify from './components/PhoneVerify';
+import GearManager from './components/GearManager';
 import {
   getSessionDate, getTomorrow, getDeviceId, normalizeName,
   isSuspended, formatDate, formatTimeET,
   getRollCallPhase, isRollCallOpen, canAdminSignUp,
-  GEAR_TYPES, isGearOpen, gearTakenCount,
   buildFlatList, MATCH1_MAX, MATCH2_MAX, MATCH2_MIN_CONFIRM, getMatch2State,
 } from './utils/helpers';
 
@@ -109,13 +109,6 @@ export default function App() {
   const rollOpen = isRollCallOpen(session);                  // open to everyone?
   const iCanSignUp = amAdmin ? canAdminSignUp(session) : rollOpen;
 
-  // ── Gear (equipment volunteering) ──────────────────────────────────────────
-  const myListEntry = session?.players?.find(
-    (p) => p.deviceId === deviceId || p.name.toLowerCase() === playerName.toLowerCase()
-  );
-  const myGearKey = myListEntry?.gear || null;
-  const gearOpen  = isGearOpen(amAdmin);
-
   // ── My standing (so players don't scan the whole list) ─────────────────────
   const flatList = buildFlatList(session?.players || []);
   const myFlatIndex = flatList.findIndex(
@@ -177,36 +170,6 @@ export default function App() {
       console.error('[FTFC] sign-in failed:', err);
     }
   }, [session, playerName, deviceId, suspended, isAdmin, playerProfile, today]);
-
-  const handleTakeGear = useCallback(async (gearKey) => {
-    if (!playerName || suspended || !isGearOpen(amAdmin)) return;
-    const type = GEAR_TYPES.find((g) => g.key === gearKey);
-    if (!type) return;
-
-    const ref = doc(db, 'sessions', today);
-    try {
-      // Atomic: read the live list so a gear tap can't wipe other signups.
-      await runTransaction(db, async (tx) => {
-        const snap = await tx.get(ref);
-        const players = snap.exists() ? (snap.data().players || []) : [];
-        const mine = players.find(
-          (p) => p.deviceId === deviceId || p.name.toLowerCase() === playerName.toLowerCase()
-        );
-        if (mine?.gear) return;                                   // one gear item per person
-        if (gearTakenCount(players, gearKey) >= type.slots) return; // slot already full
-        const newPlayers = mine
-          ? players.map((p) => (p.id === mine.id ? { ...p, gear: gearKey } : p))
-          : [...players, {
-              id: crypto.randomUUID(), name: playerName, deviceId,
-              isAdmin: amAdmin, plusOnes: 0, gear: gearKey, signedUpAt: Date.now(),
-            }];
-        if (snap.exists()) tx.update(ref, { players: newPlayers });
-        else tx.set(ref, { date: today, isOpen: false, players: newPlayers, createdAt: Date.now() });
-      });
-    } catch (err) {
-      console.error('[FTFC] take-gear failed:', err);
-    }
-  }, [playerName, deviceId, suspended, amAdmin, today]);
 
   const handleSignOut = useCallback(async () => {
     if (!playerName) return;
@@ -361,34 +324,14 @@ export default function App() {
               </div>
             )}
 
-            {/* Take gear */}
-            {playerName && (
-              <div className="gear-bar">
-                <div className="gear-bar-title">
-                  🎒 Gear Volunteers{!gearOpen && <span className="gear-bar-note"> · opens {amAdmin ? '10:00 AM' : '12:00 PM'}</span>}
-                </div>
-                <div className="gear-tiles">
-                  {GEAR_TYPES.map((g) => {
-                    const taken = gearTakenCount(session?.players, g.key);
-                    const full  = taken >= g.slots;
-                    const mineHere = myGearKey === g.key;
-                    const disabled = !gearOpen || full || (!!myGearKey && !mineHere) || suspended;
-                    return (
-                      <button
-                        key={g.key}
-                        className={`gear-tile${mineHere ? ' mine' : ''}${full && !mineHere ? ' full' : ''}`}
-                        onClick={() => handleTakeGear(g.key)}
-                        disabled={disabled}
-                      >
-                        <span className="gear-tile-icon">{g.icon}</span>
-                        <span className="gear-tile-label">{g.label}</span>
-                        <span className="gear-tile-count">{taken}/{g.slots}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+            {/* Gear management */}
+            <GearManager
+              playerName={playerName}
+              deviceId={deviceId}
+              amAdmin={amAdmin}
+              suspended={suspended}
+              adminName={playerName}
+            />
 
             {/* Signup buttons */}
             {playerName && (

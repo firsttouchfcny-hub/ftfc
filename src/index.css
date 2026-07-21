@@ -96,36 +96,74 @@ body {
 .drops-log-name { color: var(--text); }
 .drops-log-time { color: var(--text-muted); }
 
-/* ── Take gear ─────────────────────────────────────────────────────────── */
-.gear-bar {
+/* ── Gear management ───────────────────────────────────────────────────── */
+.gear-panel {
   background: var(--surface);
   border-radius: var(--radius);
   padding: 10px 14px;
   box-shadow: var(--shadow);
-}
-.gear-bar-title { font-size: .85rem; font-weight: 600; color: var(--text); margin-bottom: 8px; }
-.gear-bar-note { color: var(--text-muted); font-weight: 400; }
-.gear-tiles { display: flex; gap: 8px; }
-.gear-tile {
-  flex: 1;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  padding: 10px 6px;
-  border: 1.5px solid var(--border);
+  gap: 8px;
+}
+.gear-risk {
+  background: var(--red-light);
+  color: var(--red);
+  border: 1.5px solid var(--red);
   border-radius: var(--radius);
-  background: var(--bg);
-  cursor: pointer;
-  font: inherit;
+  padding: 10px 12px;
+  font-size: .85rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.gear-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.gear-panel-title { font-size: .9rem; font-weight: 700; color: var(--text); }
+.gear-coverage { display: flex; gap: 5px; }
+.gear-chip {
+  font-size: .78rem; font-weight: 600; padding: 2px 7px; border-radius: 999px;
+  background: var(--border); color: var(--text);
+}
+.gear-chip.sm { font-size: .7rem; padding: 1px 6px; }
+.gear-chip.ok    { background: var(--green-light); color: var(--green); }
+.gear-chip.short { background: var(--red-light);   color: var(--red); }
+.gear-note { font-size: .8rem; color: var(--text-muted); }
+
+.gear-take-row { display: flex; gap: 8px; }
+.gear-take-btn {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 10px 6px; border: 1.5px solid var(--border); border-radius: var(--radius);
+  background: var(--bg); cursor: pointer; font: inherit;
   transition: border-color .15s, background .15s;
 }
-.gear-tile:disabled { cursor: default; opacity: .45; }
-.gear-tile.mine { border-color: var(--green); background: var(--green-light); opacity: 1; }
-.gear-tile.full { opacity: .45; }
-.gear-tile-icon  { font-size: 1.5rem; line-height: 1; }
-.gear-tile-label { font-size: .72rem; color: var(--text-muted); }
-.gear-tile-count { font-size: .8rem; font-weight: 600; color: var(--text); }
+.gear-take-btn:disabled { cursor: default; opacity: .45; }
+.gear-take-btn:not(:disabled):hover { border-color: var(--green); background: var(--green-light); }
+.gear-take-icon  { font-size: 1.5rem; line-height: 1; }
+.gear-take-label { font-size: .74rem; font-weight: 600; color: var(--text); }
+.gear-take-left  { font-size: .68rem; color: var(--text-muted); }
+
+.gear-picker { background: var(--bg); border-radius: var(--radius); padding: 8px 10px; }
+.gear-date-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+
+.gear-mine { display: flex; flex-direction: column; gap: 4px; }
+.gear-mine-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  font-size: .82rem; background: var(--green-light); border-radius: var(--radius); padding: 6px 10px;
+}
+
+.gear-schedule { display: flex; flex-direction: column; gap: 6px; }
+.gear-day { border: 1px solid var(--border); border-radius: var(--radius); padding: 6px 10px; }
+.gear-day-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 3px; }
+.gear-day-body { font-size: .8rem; color: var(--text); }
+.gear-role { color: var(--text-muted); font-size: .74rem; }
+
+.gear-admin { display: flex; flex-direction: column; gap: 6px; background: var(--bg); border-radius: var(--radius); padding: 8px 10px; }
+.gear-admin-add { display: flex; gap: 5px; flex-wrap: wrap; }
+.gear-admin-add input, .gear-admin-add select { padding: 5px 7px; border: 1px solid var(--border); border-radius: 6px; font: inherit; font-size: .8rem; }
+.gear-admin-add input { flex: 1; min-width: 90px; }
+.gear-admin-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; border-top: 1px solid var(--border); padding-top: 6px; }
+.gear-admin-info { font-size: .8rem; }
+.gear-admin-set { color: var(--text-muted); font-size: .72rem; }
+.gear-admin-actions { display: flex; gap: 4px; flex-wrap: wrap; }
 .gear-name-icon { font-size: 1rem; }
 
 /* ── My standing banner ────────────────────────────────────────────────── */

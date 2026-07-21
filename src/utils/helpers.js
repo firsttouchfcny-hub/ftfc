@@ -9,20 +9,12 @@ export function getToday() {
 // Eastern-time hours that drive the daily cycle (America/New_York).
 export const RESET_HOUR_ET = 10;  // 10 AM ET — list resets to the next game
 export const OPEN_HOUR_ET  = 15;  // 3 PM ET — roll call opens to everyone
-export const GEAR_OPEN_HOUR_ET = 12; // 12 PM ET — gear tiles become tappable
 
 // Roster sizing: two matches of 18 = 36 play; rest are bench.
 export const MATCH1_MAX = 18;
 export const MATCH2_MAX = 36;
 export const MATCH2_MIN_CONFIRM = 30; // total signups needed before Match 2 is confirmed
 export const GAME2_CUTOFF_HOUR_ET = 21; // 9 PM ET — if Match 2 is still short, it's off
-
-// Equipment a player can volunteer for, in priority order (top of the list).
-export const GEAR_TYPES = [
-  { key: 'goal',  icon: '🥅', label: 'Goals', slots: 2 },
-  { key: 'bibs',  icon: '🧺', label: 'Bibs',  slots: 1 },
-  { key: 'balls', icon: '⚽', label: 'Balls', slots: 1 },
-];
 
 // Current wall-clock in America/New_York, regardless of the device's timezone.
 // Returns { hour, minute, dateKey }. Handles DST automatically via Intl.
@@ -88,21 +80,6 @@ export function isRollCallOpen(session) {
 export function canAdminSignUp(session) {
   if (isRollCallOpen(session)) return true;
   return getRollCallPhase() === 'admins-only';
-}
-
-// Gear tiles open at noon ET (10 AM for admins) and stay open per slot until filled.
-export function isGearOpen(amAdmin = false) {
-  const openHour = amAdmin ? RESET_HOUR_ET : GEAR_OPEN_HOUR_ET;
-  return getEasternNow().hour >= openHour;
-}
-
-export function gearIcon(key) {
-  return GEAR_TYPES.find((g) => g.key === key)?.icon || '';
-}
-
-// How many of each gear type are currently claimed on a session.
-export function gearTakenCount(players, key) {
-  return (players || []).filter((p) => p.gear === key).length;
 }
 
 // Match 2 status given the total signups:
@@ -202,9 +179,11 @@ export function getCurrentYear() {
 export function buildFlatList(players) {
   if (!players || players.length === 0) return [];
 
+  // Gear bringers pin to the very top (they carry the gear to the game).
+  const GEAR_ORDER = ['goal', 'balls', 'bibs'];
   const gearRank = (p) => {
-    if (!p.gear) return 99;
-    const i = GEAR_TYPES.findIndex((g) => g.key === p.gear);
+    if (!p.gearBringer) return 99;
+    const i = GEAR_ORDER.indexOf(p.gearBringer);
     return i === -1 ? 99 : i;
   };
 
@@ -213,8 +192,8 @@ export function buildFlatList(players) {
 
   const sorted = [...players].sort((a, b) => {
     const ar = gearRank(a), br = gearRank(b);
-    if (ar !== br) return ar - br;                          // gear-takers first (goal→bibs→balls)
-    if (ar !== 99) return (a.signedUpAt || 0) - (b.signedUpAt || 0); // same gear → earliest claim
+    if (ar !== br) return ar - br;                          // gear bringers first
+    if (ar !== 99) return (a.signedUpAt || 0) - (b.signedUpAt || 0); // same gear → earliest
     const ap = pinned(a), bp = pinned(b);
     if (ap !== bp) return ap - bp;                          // then admins + priority
     return (a.signedUpAt || 0) - (b.signedUpAt || 0);       // then by signup time
