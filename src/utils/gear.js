@@ -94,8 +94,13 @@ function setBusyForTakeOn(commitments, setId, D) {
 }
 
 // How many sets of a type can still be taken home after the game on `takeDate`.
+// Only `need` sets are physically AT each game (goals 2, balls 1, bibs 1) — the
+// spare sets are elsewhere in rotation — so at most `need` can be taken home,
+// regardless of how many sets exist in total.
 export function availableToTake(commitments, type, takeDate) {
-  return setsForType(type).filter((s) => !setBusyForTakeOn(commitments, s.id, takeDate)).length;
+  const atGame = gearNeed(type);
+  const alreadyTaking = takersFor(commitments, takeDate).filter((c) => c.type === type).length;
+  return Math.max(0, atGame - alreadyTaking);
 }
 
 // Pick a concrete free physical set of the type for a take on `takeDate`.
