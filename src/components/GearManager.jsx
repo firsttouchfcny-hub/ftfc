@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { doc, onSnapshot, runTransaction } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import {
-  GEAR_TYPE_ORDER, GEAR_DEFS, gearIcon, gearLabel,
+  GEAR_TYPE_ORDER, GEAR_DEFS, gearIcon, gearLabel, gearNeed,
   isGearOpen, gearTakeDate, returnDateOptions, todayKey,
   availableReturnDates, returnSlotsLeft,
   availableToTake, pickFreeSet, coverageForMorning,
@@ -236,20 +236,27 @@ export default function GearManager({ playerName, deviceId, amAdmin, suspended, 
         <div className="gear-bring-title">📥 Bringing gear</div>
         {upcomingMornings(3).map((m) => {
           const bring = bringersFor(commitments, m);
-          const cov = coverageForMorning(commitments, m);
           return (
             <div key={m} className="gear-bring-day">
-              <span className="gear-bring-date">{fmtDay(m)}</span>
-              <span className="gear-bring-people">
-                {bring.map((c) => (
-                  <span key={c.id} className="gear-bring-person">{gearIcon(c.type)} {c.takerName}</span>
-                ))}
-                {cov.missing.map((mm) => (
-                  <span key={mm.type} className="gear-bring-missing">
-                    {gearIcon(mm.type)} needed{mm.need - mm.have > 1 ? ` ×${mm.need - mm.have}` : ''}
-                  </span>
-                ))}
-              </span>
+              <div className="gear-bring-date">{fmtDay(m)}</div>
+              <div className="gear-bring-types">
+                {GEAR_TYPE_ORDER.map((t) => {
+                  const names = bring.filter((c) => c.type === t).map((c) => c.takerName);
+                  const short = gearNeed(t) - names.length;
+                  return (
+                    <div key={t} className="gear-bring-type">
+                      <span className="gear-bring-ticon">{gearIcon(t)}</span>
+                      <span className="gear-bring-names">
+                        {names.length > 0 && <span className="gear-bring-name">{names.join(' · ')}</span>}
+                        {short > 0 && (
+                          <span className="gear-bring-missing">needed{short > 1 ? ` ×${short}` : ''}</span>
+                        )}
+                        {names.length === 0 && short <= 0 && <span className="gear-bring-none">—</span>}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           );
         })}

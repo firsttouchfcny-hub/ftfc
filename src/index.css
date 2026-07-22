@@ -119,16 +119,20 @@ body {
 .gear-bring-banner {
   background: var(--blue-light);
   border-radius: var(--radius);
-  padding: 8px 12px;
+  padding: 10px 12px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px;
 }
-.gear-bring-title { font-size: .8rem; font-weight: 700; color: #1565c0; }
-.gear-bring-day { display: flex; gap: 8px; align-items: baseline; font-size: .8rem; }
-.gear-bring-date { font-weight: 600; color: var(--text); min-width: 74px; flex-shrink: 0; }
-.gear-bring-people { display: flex; flex-wrap: wrap; gap: 4px 10px; }
-.gear-bring-person { color: var(--text); }
+.gear-bring-title { font-size: .82rem; font-weight: 700; color: #1565c0; }
+.gear-bring-day { background: var(--surface); border-radius: 8px; padding: 7px 10px; }
+.gear-bring-date { font-size: .8rem; font-weight: 700; color: var(--text); margin-bottom: 5px; }
+.gear-bring-types { display: flex; flex-direction: column; gap: 3px; }
+.gear-bring-type { display: flex; align-items: baseline; gap: 8px; font-size: .82rem; }
+.gear-bring-ticon { width: 1.4rem; flex-shrink: 0; text-align: center; }
+.gear-bring-names { display: flex; flex-wrap: wrap; gap: 3px 10px; }
+.gear-bring-name { color: var(--text); }
+.gear-bring-none { color: var(--text-muted); }
 .gear-bring-missing { color: var(--red); font-weight: 600; }
 .gear-name-icon.taker { opacity: .8; font-size: .82rem; }
 
