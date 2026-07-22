@@ -287,10 +287,10 @@ export default function GearManager({ playerName, deviceId, amAdmin, suspended, 
           const single = opts.length === 1;
           return (
             <div className="gear-picker">
-              <p className="gear-note">
+              <p className={single ? 'gear-warn' : 'gear-note'}>
                 {single ? (
-                  <>Take {gearLabel(pickerType).toLowerCase()} home — you'll bring them back{' '}
-                    <strong>{fmtDay(opts[0])}</strong> (the next game).</>
+                  <>⚠️ You must bring the {gearLabel(pickerType).toLowerCase()} back{' '}
+                    <strong>{fmtDay(opts[0])}</strong> — the very next game. Take them home?</>
                 ) : (
                   <>When will you bring the {gearLabel(pickerType).toLowerCase()} back?</>
                 )}
@@ -299,7 +299,7 @@ export default function GearManager({ playerName, deviceId, amAdmin, suspended, 
                 {opts.map((rd) => (
                   <button key={rd} className="btn btn-primary btn-sm" disabled={busy}
                     onClick={() => claimGear(pickerType, rd)}>
-                    {single ? `Confirm — bring back ${fmtDay(rd)}` : fmtDay(rd)}
+                    {single ? `Yes — I'll bring them ${fmtDay(rd)}` : fmtDay(rd)}
                   </button>
                 ))}
                 <button className="btn btn-ghost btn-sm" onClick={() => setPickerType(null)}>Cancel</button>
