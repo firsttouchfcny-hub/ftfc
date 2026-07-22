@@ -31,7 +31,7 @@ export const GEAR_SETS = [
 //   goals / balls → tomorrow or the day after (2-day window)
 //   bibs          → any day within the next 5 days
 export const GEAR_DEFS = {
-  goal:  { icon: '🥅', label: 'Goals',         need: 2, returnWindow: 2 },
+  goal:  { icon: '🥅', label: 'Goals',         need: 2, returnWindow: 1 },
   balls: { icon: '⚽', label: 'Balls & cones', need: 1, returnWindow: 1 },
   bibs:  { icon: '🧺', label: 'Bibs',          need: 1, returnWindow: 5 },
 };
