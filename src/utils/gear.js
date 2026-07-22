@@ -11,17 +11,19 @@ import {
 export const GEAR_OPEN_HOUR_ET  = 11; // 11 AM ET — gear volunteering opens
 export const GEAR_ALERT_HOUR_ET = 18; // 6 PM ET the night before — risk flag
 
-// The physical sets the club owns: 2 goals + 1 balls/cones + 5 rotating bib sets.
-// Only 1 bib set is needed per game (GEAR_DEFS.bibs.need), but 5 exist and rotate.
+// The physical sets the club owns: 2 goals + 2 balls/cones + 5 rotating bib sets.
+// Per-game need is set in GEAR_DEFS (goals 2, balls 1, bibs 1) — balls and bibs
+// have spare sets that rotate.
 export const GEAR_SETS = [
-  { id: 'goal-a', type: 'goal' },
-  { id: 'goal-b', type: 'goal' },
-  { id: 'balls',  type: 'balls' },
-  { id: 'bibs-1', type: 'bibs' },
-  { id: 'bibs-2', type: 'bibs' },
-  { id: 'bibs-3', type: 'bibs' },
-  { id: 'bibs-4', type: 'bibs' },
-  { id: 'bibs-5', type: 'bibs' },
+  { id: 'goal-a',  type: 'goal' },
+  { id: 'goal-b',  type: 'goal' },
+  { id: 'balls-1', type: 'balls' },
+  { id: 'balls-2', type: 'balls' },
+  { id: 'bibs-1',  type: 'bibs' },
+  { id: 'bibs-2',  type: 'bibs' },
+  { id: 'bibs-3',  type: 'bibs' },
+  { id: 'bibs-4',  type: 'bibs' },
+  { id: 'bibs-5',  type: 'bibs' },
 ];
 
 // Per-type definitions. returnWindow = how many days out a return date may be.
