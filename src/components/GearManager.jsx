@@ -247,10 +247,10 @@ export default function GearManager({ playerName, deviceId, amAdmin, suspended, 
                     <div key={t} className="gear-bring-type">
                       <span className="gear-bring-ticon">{gearIcon(t)}</span>
                       <span className="gear-bring-names">
-                        {names.length > 0 && <span className="gear-bring-name">{names.join(' · ')}</span>}
                         {short > 0 && (
                           <span className="gear-bring-missing">needed{short > 1 ? ` ×${short}` : ''}</span>
                         )}
+                        {names.length > 0 && <span className="gear-bring-name">{names.join(' · ')}</span>}
                         {names.length === 0 && short <= 0 && <span className="gear-bring-none">—</span>}
                       </span>
                     </div>
