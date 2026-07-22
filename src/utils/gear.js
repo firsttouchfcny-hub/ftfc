@@ -209,3 +209,11 @@ export function upcomingMornings(count = 6) {
   for (let i = 1; i < count; i++) out.push(addGameDays(out[i - 1], 1));
   return out;
 }
+
+// The next `count` game days strictly AFTER `dateKey` (for admin back-date box).
+export function gameDaysAfter(dateKey, count = 7) {
+  const out = [];
+  let d = dateKey;
+  for (let i = 0; i < count; i++) { d = nextGameDay(d); out.push(d); }
+  return out;
+}

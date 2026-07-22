@@ -3,7 +3,7 @@ import { doc, onSnapshot, runTransaction } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import {
   GEAR_TYPE_ORDER, GEAR_DEFS, gearIcon, gearLabel, gearNeed,
-  isGearOpen, gearTakeDate, returnDateOptions, todayKey,
+  isGearOpen, gearTakeDate, todayKey, gameDaysAfter,
   availableReturnDates, returnSlotsLeft,
   availableToTake, pickFreeSet, coverageForMorning,
   bringersFor, takersFor, gearBringingAlert, gearTakingAlert,
@@ -170,16 +170,17 @@ export default function GearManager({ playerName, deviceId, amAdmin, suspended, 
 
   // mode: 'take'  → they take it home after the upcoming game, bring back on date
   //       'held'  → they ALREADY have it (seeded starting state), brings back on date
-  const addManual = async (type, takerName, date, mode) => {
+  const addManual = async (type, takerName, backDate, mode, takeOn) => {
     if (!takerName.trim()) return;
     const held = mode === 'held';
+    const useTake = held ? todayKey() : (takeOn || takeDate); // held = out now; take = chosen day
     setBusy(true);
     try {
       let ok = false;
       await runTransaction(db, async (tx) => {
         const snap = await tx.get(LEDGER);
         const cs = snap.exists() ? (snap.data().commitments || []) : [];
-        let setId = pickFreeSet(cs, type, held ? todayKey() : takeDate);
+        let setId = pickFreeSet(cs, type, useTake);
         if (!setId) {
           if (held) return;            // no free physical set to mark as held
           setId = `${type}-override`;  // admin force for a take
@@ -188,7 +189,7 @@ export default function GearManager({ playerName, deviceId, amAdmin, suspended, 
         const entry = {
           id: crypto.randomUUID(), type, setId,
           takerName: takerName.trim(), takerDeviceId: null, takerIsAdmin: false,
-          takeDate: held ? todayKey() : takeDate, returnDate: date, held,
+          takeDate: useTake, returnDate: backDate, held,
           status: 'committed', returnedOnTime: null,
           createdAt: Date.now(), source: adminName || 'admin',
         };
@@ -198,10 +199,10 @@ export default function GearManager({ playerName, deviceId, amAdmin, suspended, 
       if (ok) {
         const who = { name: takerName.trim(), deviceId: `admin-gear-${crypto.randomUUID()}`, isAdmin: false };
         if (held) {
-          await setGearRole(date, who, 'bringer', type);   // brings it back only
+          await setGearRole(backDate, who, 'bringer', type);   // brings it back only
         } else {
-          await setGearRole(takeDate, who, 'taker', type);
-          await setGearRole(date, who, 'bringer', type);
+          await setGearRole(useTake, who, 'taker', type);
+          await setGearRole(backDate, who, 'bringer', type);
         }
       }
     } catch (err) {
@@ -390,46 +391,46 @@ export default function GearManager({ playerName, deviceId, amAdmin, suspended, 
 function GearAdmin({ commitments, busy, takeDate, onMarkReturned, onReassign, onRemove, onAdd }) {
   const [addType, setAddType] = useState('goal');
   const [addName, setAddName] = useState('');
-  const bringDays = upcomingMornings(7); // admins pick any of the next 7 game days, no cap
-  const takeDays = availableReturnDates(commitments, addType, takeDate);
-  const takeOpts = takeDays.length ? takeDays : returnDateOptions(takeDate, addType);
-  const [bringDate, setBringDate] = useState(bringDays[0]);
-  const [returnDate, setReturnDate] = useState(takeOpts[0]);
+  const days = upcomingMornings(7); // next 7 game days — admins pick any, no caps
+  const [bringDate, setBringDate] = useState(days[0]);
+  const [takeOn, setTakeOn] = useState(days[0]);
+  const [backDate, setBackDate] = useState(gameDaysAfter(days[0], 1)[0]);
   const live = commitments.filter((c) => c.status === 'committed');
 
-  const changeType = (t) => {
-    setAddType(t);
-    const rd = availableReturnDates(commitments, t, takeDate);
-    setReturnDate((rd[0] || returnDateOptions(takeDate, t)[0]));
-  };
+  const changeTakeOn = (d) => { setTakeOn(d); setBackDate(gameDaysAfter(d, 1)[0]); };
 
   return (
     <div className="gear-admin">
       <div className="gear-admin-add">
-        <select value={addType} onChange={(e) => changeType(e.target.value)}>
+        <select value={addType} onChange={(e) => setAddType(e.target.value)}>
           {GEAR_TYPE_ORDER.map((t) => <option key={t} value={t}>{gearLabel(t)}</option>)}
         </select>
         <input placeholder="Player name" value={addName} onChange={(e) => setAddName(e.target.value)} />
       </div>
       <div className="gear-admin-add">
-        <span className="gear-admin-lbl">Bringing gear in on:</span>
+        <span className="gear-admin-lbl">Bring in on:</span>
         <select value={bringDate} onChange={(e) => setBringDate(e.target.value)}>
-          {bringDays.map((d) => <option key={d} value={d}>{fmtDay(d)}</option>)}
+          {days.map((d) => <option key={d} value={d}>{fmtDay(d)}</option>)}
         </select>
         <button className="btn btn-success btn-sm" disabled={busy || !addName.trim()}
           onClick={() => { onAdd(addType, addName, bringDate, 'held'); setAddName(''); }}>Assign bring</button>
       </div>
       <div className="gear-admin-add">
-        <span className="gear-admin-lbl">Or taking home after {fmtDay(takeDate)}, back:</span>
-        <select value={returnDate} onChange={(e) => setReturnDate(e.target.value)}>
-          {takeOpts.map((d) => <option key={d} value={d}>{fmtDay(d)}</option>)}
+        <span className="gear-admin-lbl">Take home on:</span>
+        <select value={takeOn} onChange={(e) => changeTakeOn(e.target.value)}>
+          {days.map((d) => <option key={d} value={d}>{fmtDay(d)}</option>)}
+        </select>
+        <span className="gear-admin-lbl">back:</span>
+        <select value={backDate} onChange={(e) => setBackDate(e.target.value)}>
+          {gameDaysAfter(takeOn, 7).map((d) => <option key={d} value={d}>{fmtDay(d)}</option>)}
         </select>
         <button className="btn btn-primary btn-sm" disabled={busy || !addName.trim()}
-          onClick={() => { onAdd(addType, addName, returnDate, 'take'); setAddName(''); }}>Assign take</button>
+          onClick={() => { onAdd(addType, addName, backDate, 'take', takeOn); setAddName(''); }}>Assign take</button>
       </div>
       <p className="gear-note">
-        Admin assignments are free — <strong>Assign bring</strong> puts a set on that day with no "take" required.
-        The take→return rule only applies to players signing themselves up.
+        Free-form for admins. <strong>Assign bring</strong> = just brings a set that day (no take).
+        <strong> Assign take</strong> = takes home on one day, brings back on another. The caps/windows only
+        apply to players signing themselves up.
       </p>
 
       {live.length === 0 ? (
