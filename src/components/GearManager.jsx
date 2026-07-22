@@ -4,7 +4,7 @@ import { db } from '../firebase/config';
 import {
   GEAR_TYPE_ORDER, GEAR_DEFS, gearIcon, gearLabel, gearNeed,
   isGearOpen, gearTakeDate, returnDateOptions, todayKey,
-  availableReturnDates, returnSlotsLeft,
+  availableReturnDates, availableBringDates, returnSlotsLeft,
   availableToTake, pickFreeSet, coverageForMorning,
   bringersFor, takersFor, gearBringingAlert, gearTakingAlert,
   myCommitments, upcomingMornings,
@@ -390,34 +390,46 @@ export default function GearManager({ playerName, deviceId, amAdmin, suspended, 
 function GearAdmin({ commitments, busy, takeDate, onMarkReturned, onReassign, onRemove, onAdd }) {
   const [addType, setAddType] = useState('goal');
   const [addName, setAddName] = useState('');
-  const openDays = availableReturnDates(commitments, addType, takeDate);
-  const [addReturn, setAddReturn] = useState(returnDateOptions(takeDate, 'goal')[0]);
+  const bringDays = availableBringDates(commitments, addType, takeDate);
+  const takeDays = availableReturnDates(commitments, addType, takeDate);
+  const takeOpts = takeDays.length ? takeDays : returnDateOptions(takeDate, addType);
+  const [bringDate, setBringDate] = useState(bringDays[0] || takeDate);
+  const [returnDate, setReturnDate] = useState(takeOpts[0]);
   const live = commitments.filter((c) => c.status === 'committed');
-  const dateChoices = openDays.length ? openDays : returnDateOptions(takeDate, addType);
+
+  const changeType = (t) => {
+    setAddType(t);
+    setBringDate(availableBringDates(commitments, t, takeDate)[0] || takeDate);
+    const rd = availableReturnDates(commitments, t, takeDate);
+    setReturnDate((rd[0] || returnDateOptions(takeDate, t)[0]));
+  };
 
   return (
     <div className="gear-admin">
       <div className="gear-admin-add">
-        <select value={addType} onChange={(e) => {
-          setAddType(e.target.value);
-          const next = availableReturnDates(commitments, e.target.value, takeDate);
-          setAddReturn((next[0] || returnDateOptions(takeDate, e.target.value)[0]));
-        }}>
+        <select value={addType} onChange={(e) => changeType(e.target.value)}>
           {GEAR_TYPE_ORDER.map((t) => <option key={t} value={t}>{gearLabel(t)}</option>)}
         </select>
         <input placeholder="Player name" value={addName} onChange={(e) => setAddName(e.target.value)} />
-        <select value={addReturn} onChange={(e) => setAddReturn(e.target.value)}>
-          {dateChoices.map((rd) => <option key={rd} value={rd}>{fmtDay(rd)}</option>)}
+      </div>
+      <div className="gear-admin-add">
+        <span className="gear-admin-lbl">Already has it — brings back:</span>
+        {bringDays.length ? (
+          <select value={bringDate} onChange={(e) => setBringDate(e.target.value)}>
+            {bringDays.map((d) => <option key={d} value={d}>{fmtDay(d)}</option>)}
+          </select>
+        ) : <span className="gear-note">all days full</span>}
+        <button className="btn btn-success btn-sm" disabled={busy || !addName.trim() || !bringDays.length}
+          onClick={() => { onAdd(addType, addName, bringDate, 'held'); setAddName(''); }}>Has it</button>
+      </div>
+      <div className="gear-admin-add">
+        <span className="gear-admin-lbl">Takes home after {fmtDay(takeDate)} — back:</span>
+        <select value={returnDate} onChange={(e) => setReturnDate(e.target.value)}>
+          {takeOpts.map((d) => <option key={d} value={d}>{fmtDay(d)}</option>)}
         </select>
         <button className="btn btn-primary btn-sm" disabled={busy || !addName.trim()}
-          onClick={() => { onAdd(addType, addName, addReturn, 'take'); setAddName(''); }}>Assign (takes)</button>
-        <button className="btn btn-success btn-sm" disabled={busy || !addName.trim()}
-          onClick={() => { onAdd(addType, addName, addReturn, 'held'); setAddName(''); }}>Has it (brings back)</button>
+          onClick={() => { onAdd(addType, addName, returnDate, 'take'); setAddName(''); }}>Assign</button>
       </div>
-      <p className="gear-note">
-        <strong>Assign</strong> = they'll take it home after the next game.{' '}
-        <strong>Has it</strong> = they already hold it — seeds the set as out, they bring it back on the date.
-      </p>
 
       {live.length === 0 ? (
         <p className="gear-note">No active gear commitments.</p>

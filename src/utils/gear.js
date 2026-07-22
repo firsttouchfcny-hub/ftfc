@@ -83,6 +83,20 @@ export function availableReturnDates(commitments, type, takeDate) {
     .filter((r) => returnSlotsLeft(commitments, type, r) > 0);
 }
 
+// Bring-back dates for gear ALREADY held (admin "has it" onboarding): unlike a
+// fresh take, it can come back as early as the very next game (`fromGame`),
+// then across the window — capped at need/day.
+export function availableBringDates(commitments, type, fromGame) {
+  const days = GEAR_DEFS[type]?.returnWindow || 2;
+  const out = [];
+  let d = fromGame;
+  for (let i = 0; i < days && d; i++) {
+    if (returnSlotsLeft(commitments, type, d) > 0) out.push(d);
+    d = nextGameDay(d);
+  }
+  return out;
+}
+
 const isLive = (c) => c && c.status === 'committed';
 
 // A set is "out" (with someone, not at the field) on the morning of D when a
