@@ -284,18 +284,24 @@ export default function GearManager({ playerName, deviceId, amAdmin, suspended, 
       ) : pickerType ? (
         (() => {
           const opts = availableReturnDates(commitments, pickerType, takeDate);
+          const fixed = GEAR_DEFS[pickerType].returnWindow === 1;
           return (
             <div className="gear-picker">
               <p className="gear-note">
-                When will you bring the {gearLabel(pickerType).toLowerCase()} back?
-                {opts.length === 1 &&
-                  <strong> Only {fmtDay(opts[0])} is open — the other days are full, so you'll need to bring it back then.</strong>}
+                {fixed ? (
+                  <>Take {gearLabel(pickerType).toLowerCase()} home — you must bring them back{' '}
+                    <strong>{fmtDay(opts[0])}</strong> (the next game).</>
+                ) : (
+                  <>When will you bring the {gearLabel(pickerType).toLowerCase()} back?
+                    {opts.length === 1 &&
+                      <strong> Only {fmtDay(opts[0])} is open — you'll need to bring it back then.</strong>}</>
+                )}
               </p>
               <div className="gear-date-row">
                 {opts.map((rd) => (
                   <button key={rd} className="btn btn-primary btn-sm" disabled={busy}
                     onClick={() => claimGear(pickerType, rd)}>
-                    {fmtDay(rd)}
+                    {fixed ? `Confirm — bring back ${fmtDay(rd)}` : fmtDay(rd)}
                   </button>
                 ))}
                 <button className="btn btn-ghost btn-sm" onClick={() => setPickerType(null)}>Cancel</button>
@@ -310,19 +316,9 @@ export default function GearManager({ playerName, deviceId, amAdmin, suspended, 
             const openDays = availableReturnDates(commitments, t, takeDate).length;
             const owned = mine.some((c) => c.type === t);
             const disabled = suspended || owned || left <= 0 || openDays === 0;
-            // Fixed-return gear (balls: returnWindow 1) skips the date picker —
-            // it always comes back the next game day.
-            const onTake = () => {
-              if (GEAR_DEFS[t].returnWindow === 1) {
-                const opts = availableReturnDates(commitments, t, takeDate);
-                if (opts.length) claimGear(t, opts[0]);
-              } else {
-                setPickerType(t);
-              }
-            };
             return (
               <button key={t} className="gear-take-btn" disabled={disabled}
-                onClick={onTake}>
+                onClick={() => setPickerType(t)}>
                 <span className="gear-take-icon">{gearIcon(t)}</span>
                 <span className="gear-take-label">Take {gearLabel(t)}</span>
                 <span className="gear-take-left">
