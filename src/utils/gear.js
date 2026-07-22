@@ -128,18 +128,29 @@ export function takersFor(commitments, morning) {
   return (commitments || []).filter((c) => isLive(c) && !c.held && c.takeDate === morning);
 }
 
-// Prominent risk flag: from 6 PM the night before through the game morning, if
-// the upcoming game's gear requirements aren't covered. An alert, not a lockout.
-export function gearRiskAlert(commitments) {
+// BRINGING alert — the next game is short of people bringing gear IN. Shows as
+// soon as the app targets that game (the 10 AM list reset) and persists until
+// it's filled. Because bringers are auto-added on commit, this is known early.
+export function gearBringingAlert(commitments) {
   const takeDate = gearTakeDate();
-  const et = getEasternNow();
-  const nightBefore = addDaysToKey(takeDate, -1);
-  const inWindow =
-    (et.dateKey === nightBefore && et.hour >= GEAR_ALERT_HOUR_ET) ||
-    et.dateKey === takeDate;
-  if (!inWindow) return null;
   const cov = coverageForMorning(commitments, takeDate);
-  return cov.covered ? null : cov.missing;
+  return cov.covered ? null : { date: takeDate, missing: cov.missing };
+}
+
+// TAKING alert (from 6 PM ET) — after the upcoming game, gear must be taken HOME
+// to reach the following game. Flags types too few people are carrying home, so
+// the day after won't be stranded. An alert, not a lockout.
+export function gearTakingAlert(commitments) {
+  if (getEasternNow().hour < GEAR_ALERT_HOUR_ET) return null;
+  const takeDate = gearTakeDate();
+  const carried = takersFor(commitments, takeDate);
+  const missing = [];
+  for (const type of GEAR_TYPE_ORDER) {
+    const have = carried.filter((c) => c.type === type).length;
+    const need = gearNeed(type);
+    if (have < need) missing.push({ type, have, need });
+  }
+  return missing.length ? { date: takeDate, missing } : null;
 }
 
 export function isFridayKey(dateKey) {

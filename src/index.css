@@ -132,6 +132,8 @@ body {
 .gear-bring-missing { color: var(--red); font-weight: 600; }
 .gear-name-icon.taker { opacity: .8; font-size: .82rem; }
 
+.gear-risk-take { background: var(--orange-light); color: var(--orange); border-color: var(--orange); }
+
 .gear-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 .gear-panel-title { font-size: .9rem; font-weight: 700; color: var(--text); }
 .gear-coverage { display: flex; gap: 5px; }

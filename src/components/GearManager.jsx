@@ -6,7 +6,8 @@ import {
   isGearOpen, gearTakeDate, returnDateOptions, todayKey,
   availableReturnDates, returnSlotsLeft,
   availableToTake, pickFreeSet, coverageForMorning,
-  bringersFor, takersFor, gearRiskAlert, myCommitments, upcomingMornings,
+  bringersFor, takersFor, gearBringingAlert, gearTakingAlert,
+  myCommitments, upcomingMornings,
 } from '../utils/gear';
 
 const LEDGER = doc(db, 'gear', 'ledger');
@@ -66,7 +67,8 @@ export default function GearManager({ playerName, deviceId, amAdmin, suspended, 
   const takeDate = gearTakeDate();
   const open = isGearOpen();
   const coverage = coverageForMorning(commitments, takeDate);
-  const risk = gearRiskAlert(commitments);
+  const bringingRisk = gearBringingAlert(commitments);
+  const takingRisk = gearTakingAlert(commitments);
   const mine = myCommitments(commitments, deviceId, playerName);
 
   // ── Player: claim a set + return date (atomic) ────────────────────────────
@@ -213,11 +215,19 @@ export default function GearManager({ playerName, deviceId, amAdmin, suspended, 
 
   return (
     <div className="gear-panel">
-      {/* Risk alert (#5) */}
-      {risk && (
+      {/* Bringing alert — from the 10 AM list reset (#5) */}
+      {bringingRisk && (
         <div className="gear-risk">
-          ⚠️ <strong>GEAR AT RISK</strong> for {fmtDay(takeDate)} —{' '}
-          {risk.map((m) => `${gearIcon(m.type)} ${gearLabel(m.type)} (${m.have}/${m.need})`).join(', ')} still needed.
+          ⚠️ <strong>GEAR AT RISK</strong> for {fmtDay(bringingRisk.date)} — no one bringing{' '}
+          {bringingRisk.missing.map((m) => `${gearIcon(m.type)} ${gearLabel(m.type)} (${m.have}/${m.need})`).join(', ')}.
+        </div>
+      )}
+      {/* Taking alert — from 6 PM: gear not being carried to the next game */}
+      {takingRisk && (
+        <div className="gear-risk gear-risk-take">
+          ⏳ <strong>NOBODY TAKING GEAR HOME</strong> after {fmtDay(takingRisk.date)} —{' '}
+          {takingRisk.missing.map((m) => `${gearIcon(m.type)} ${gearLabel(m.type)} (${m.have}/${m.need})`).join(', ')}{' '}
+          won't reach the next game.
         </div>
       )}
 
