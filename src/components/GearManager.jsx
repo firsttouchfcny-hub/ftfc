@@ -309,29 +309,37 @@ export default function GearManager({ playerName, deviceId, amAdmin, suspended, 
             </div>
           );
         })()
-      ) : (
-        <div className="gear-take-row">
-          {GEAR_TYPE_ORDER.map((t) => {
-            const left = availableToTake(commitments, t, takeDate);
-            const openDays = availableReturnDates(commitments, t, takeDate).length;
-            const owned = mine.some((c) => c.type === t);
-            const disabled = suspended || owned || left <= 0 || openDays === 0;
-            return (
-              <button key={t} className="gear-take-btn" disabled={disabled}
-                onClick={() => setPickerType(t)}>
-                <span className="gear-take-icon">{gearIcon(t)}</span>
-                <span className="gear-take-label">Take {gearLabel(t)}</span>
-                <span className="gear-take-left">
-                  {owned ? 'already yours'
-                    : left <= 0 ? 'none left'
-                    : openDays === 0 ? 'no open days'
-                    : `${left} available`}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      )}
+      ) : (() => {
+        // Goals & bibs are priority — balls open up only once they're taken.
+        const priorityPending =
+          availableToTake(commitments, 'goal', takeDate) > 0 ||
+          availableToTake(commitments, 'bibs', takeDate) > 0;
+        return (
+          <div className="gear-take-row">
+            {GEAR_TYPE_ORDER.map((t) => {
+              const left = availableToTake(commitments, t, takeDate);
+              const openDays = availableReturnDates(commitments, t, takeDate).length;
+              const owned = mine.some((c) => c.type === t);
+              const ballsBlocked = t === 'balls' && priorityPending;
+              const disabled = suspended || owned || left <= 0 || openDays === 0 || ballsBlocked;
+              return (
+                <button key={t} className="gear-take-btn" disabled={disabled}
+                  onClick={() => setPickerType(t)}>
+                  <span className="gear-take-icon">{gearIcon(t)}</span>
+                  <span className="gear-take-label">Take {gearLabel(t)}</span>
+                  <span className="gear-take-left">
+                    {owned ? 'already yours'
+                      : ballsBlocked ? ''
+                      : left <= 0 ? 'none left'
+                      : openDays === 0 ? 'no open days'
+                      : `${left} available`}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        );
+      })()}
 
       {/* My commitments */}
       {mine.length > 0 && (
