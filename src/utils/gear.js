@@ -11,12 +11,17 @@ import {
 export const GEAR_OPEN_HOUR_ET  = 11; // 11 AM ET — gear volunteering opens
 export const GEAR_ALERT_HOUR_ET = 18; // 6 PM ET the night before — risk flag
 
-// The physical sets the club owns. 2 goals + 1 balls/cones + 1 bibs.
+// The physical sets the club owns: 2 goals + 1 balls/cones + 5 rotating bib sets.
+// Only 1 bib set is needed per game (GEAR_DEFS.bibs.need), but 5 exist and rotate.
 export const GEAR_SETS = [
   { id: 'goal-a', type: 'goal' },
   { id: 'goal-b', type: 'goal' },
   { id: 'balls',  type: 'balls' },
-  { id: 'bibs',   type: 'bibs' },
+  { id: 'bibs-1', type: 'bibs' },
+  { id: 'bibs-2', type: 'bibs' },
+  { id: 'bibs-3', type: 'bibs' },
+  { id: 'bibs-4', type: 'bibs' },
+  { id: 'bibs-5', type: 'bibs' },
 ];
 
 // Per-type definitions. returnWindow = how many days out a return date may be.
@@ -37,6 +42,9 @@ export function setsForType(type) { return GEAR_SETS.filter((s) => s.type === ty
 // Gear volunteering opens at 11 AM ET (same open-hour gate style as the roll
 // call; there is no separate close — a new game's window begins each day).
 export function isGearOpen() { return getEasternNow().hour >= GEAR_OPEN_HOUR_ET; }
+
+// Today's date key in Eastern time (used to mark already-held gear as out now).
+export function todayKey() { return getEasternNow().dateKey; }
 
 // The next 7 AM game (Mon–Fri) — the game players take gear home from.
 export function gearTakeDate() {
@@ -96,7 +104,7 @@ export function bringersFor(commitments, morning) {
   return (commitments || []).filter((c) => isLive(c) && c.returnDate === morning);
 }
 export function takersFor(commitments, morning) {
-  return (commitments || []).filter((c) => isLive(c) && c.takeDate === morning);
+  return (commitments || []).filter((c) => isLive(c) && !c.held && c.takeDate === morning);
 }
 
 // Prominent risk flag: from 6 PM the night before through the game morning, if

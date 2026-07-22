@@ -3,7 +3,7 @@ import { doc, onSnapshot, runTransaction } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import {
   GEAR_TYPE_ORDER, GEAR_DEFS, gearIcon, gearLabel,
-  isGearOpen, gearTakeDate, returnDateOptions,
+  isGearOpen, gearTakeDate, returnDateOptions, todayKey,
   availableToTake, pickFreeSet, coverageForMorning,
   bringersFor, takersFor, gearRiskAlert, myCommitments, upcomingMornings,
 } from '../utils/gear';
@@ -164,26 +164,42 @@ export default function GearManager({ playerName, deviceId, amAdmin, suspended, 
     patchCommitment(c.id, { takerName: name.trim(), takerDeviceId: null, source: adminName || 'admin' });
   };
 
-  const addManual = async (type, takerName, returnDate) => {
+  // mode: 'take'  → they take it home after the upcoming game, bring back on date
+  //       'held'  → they ALREADY have it (seeded starting state), brings back on date
+  const addManual = async (type, takerName, date, mode) => {
     if (!takerName.trim()) return;
+    const held = mode === 'held';
     setBusy(true);
     try {
+      let ok = false;
       await runTransaction(db, async (tx) => {
         const snap = await tx.get(LEDGER);
         const cs = snap.exists() ? (snap.data().commitments || []) : [];
-        const setId = pickFreeSet(cs, type, takeDate) || `${type}-override`;
+        let setId = pickFreeSet(cs, type, held ? todayKey() : takeDate);
+        if (!setId) {
+          if (held) return;            // no free physical set to mark as held
+          setId = `${type}-override`;  // admin force for a take
+        }
+        ok = true;
         const entry = {
           id: crypto.randomUUID(), type, setId,
           takerName: takerName.trim(), takerDeviceId: null, takerIsAdmin: false,
-          takeDate, returnDate, status: 'committed', returnedOnTime: null,
+          takeDate: held ? todayKey() : takeDate, returnDate: date, held,
+          status: 'committed', returnedOnTime: null,
           createdAt: Date.now(), source: adminName || 'admin',
         };
         if (snap.exists()) tx.update(LEDGER, { commitments: [...cs, entry] });
         else tx.set(LEDGER, { commitments: [entry] });
       });
-      const who = { name: takerName.trim(), deviceId: `admin-gear-${crypto.randomUUID()}`, isAdmin: false };
-      await setGearRole(takeDate, who, 'taker', type);
-      await setGearRole(returnDate, who, 'bringer', type);
+      if (ok) {
+        const who = { name: takerName.trim(), deviceId: `admin-gear-${crypto.randomUUID()}`, isAdmin: false };
+        if (held) {
+          await setGearRole(date, who, 'bringer', type);   // brings it back only
+        } else {
+          await setGearRole(takeDate, who, 'taker', type);
+          await setGearRole(date, who, 'bringer', type);
+        }
+      }
     } catch (err) {
       console.error('[FTFC] manual add failed:', err);
     } finally {
@@ -361,8 +377,14 @@ function GearAdmin({ commitments, busy, takeDate, onMarkReturned, onReassign, on
           {returnDateOptions(takeDate, addType).map((rd) => <option key={rd} value={rd}>{fmtDay(rd)}</option>)}
         </select>
         <button className="btn btn-primary btn-sm" disabled={busy || !addName.trim()}
-          onClick={() => { onAdd(addType, addName, addReturn); setAddName(''); }}>Assign</button>
+          onClick={() => { onAdd(addType, addName, addReturn, 'take'); setAddName(''); }}>Assign (takes)</button>
+        <button className="btn btn-success btn-sm" disabled={busy || !addName.trim()}
+          onClick={() => { onAdd(addType, addName, addReturn, 'held'); setAddName(''); }}>Has it (brings back)</button>
       </div>
+      <p className="gear-note">
+        <strong>Assign</strong> = they'll take it home after the next game.{' '}
+        <strong>Has it</strong> = they already hold it — seeds the set as out, they bring it back on the date.
+      </p>
 
       {live.length === 0 ? (
         <p className="gear-note">No active gear commitments.</p>
