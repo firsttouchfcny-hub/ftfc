@@ -390,7 +390,7 @@ export default function GearManager({ playerName, deviceId, amAdmin, suspended, 
 function GearAdmin({ commitments, busy, takeDate, onMarkReturned, onReassign, onRemove, onAdd }) {
   const [addType, setAddType] = useState('goal');
   const [addName, setAddName] = useState('');
-  const bringDays = upcomingMornings(15); // admins pick ANY upcoming game day, no cap
+  const bringDays = upcomingMornings(7); // admins pick any of the next 7 game days, no cap
   const takeDays = availableReturnDates(commitments, addType, takeDate);
   const takeOpts = takeDays.length ? takeDays : returnDateOptions(takeDate, addType);
   const [bringDate, setBringDate] = useState(bringDays[0]);
