@@ -46,6 +46,27 @@ export function addDaysToKey(dateKey, days) {
   return `${dt.getUTCFullYear()}-${mm}-${dd}`;
 }
 
+// Games run Monday–Friday only. Weekday is timezone-independent when the key is
+// anchored at noon UTC (avoids DST edges). 0=Sun … 6=Sat → game day is 1–5.
+export function isGameDay(dateKey) {
+  const day = new Date(dateKey + 'T12:00:00Z').getUTCDay();
+  return day >= 1 && day <= 5;
+}
+
+// The next game day strictly after `dateKey` (skips Sat/Sun).
+export function nextGameDay(dateKey) {
+  let d = addDaysToKey(dateKey, 1);
+  while (!isGameDay(d)) d = addDaysToKey(d, 1);
+  return d;
+}
+
+// Advance `n` game days forward from `dateKey` (n>=1 lands on a weekday).
+export function addGameDays(dateKey, n) {
+  let d = dateKey;
+  for (let i = 0; i < n; i++) d = nextGameDay(d);
+  return d;
+}
+
 // The game date the app is focused on, in Eastern time:
 //   Before 10 AM ET  → today's game (last night's locked roster)
 //   10 AM ET or later → tomorrow's game (the list has reset for the next day)

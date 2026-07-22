@@ -3,7 +3,10 @@
 // Kept separate from the roll call: gear opens at 11 AM ET and is not tied to
 // the 3 PM roll-call open/close.
 
-import { getEasternNow, addDaysToKey, getSessionDate } from './helpers.js';
+import {
+  getEasternNow, addDaysToKey, getSessionDate,
+  isGameDay, nextGameDay, addGameDays,
+} from './helpers.js';
 
 export const GEAR_OPEN_HOUR_ET  = 11; // 11 AM ET — gear volunteering opens
 export const GEAR_ALERT_HOUR_ET = 18; // 6 PM ET the night before — risk flag
@@ -35,14 +38,19 @@ export function setsForType(type) { return GEAR_SETS.filter((s) => s.type === ty
 // call; there is no separate close — a new game's window begins each day).
 export function isGearOpen() { return getEasternNow().hour >= GEAR_OPEN_HOUR_ET; }
 
-// The next 7 AM game — the game players take gear home from.
-export function gearTakeDate() { return getSessionDate(); }
+// The next 7 AM game (Mon–Fri) — the game players take gear home from.
+export function gearTakeDate() {
+  const base = getSessionDate();
+  return isGameDay(base) ? base : nextGameDay(base);
+}
 
-// Return-date options for a take on `takeDate` of a given type.
+// Return-date options for a take on `takeDate` of a given type. The window is
+// counted in GAME DAYS (skips weekends) — goals/balls give the next 2 game days,
+// bibs the next 5.
 export function returnDateOptions(takeDate, type) {
   const days = GEAR_DEFS[type]?.returnWindow || 2;
   const opts = [];
-  for (let i = 1; i <= days; i++) opts.push(addDaysToKey(takeDate, i));
+  for (let i = 1; i <= days; i++) opts.push(addGameDays(takeDate, i));
   return opts;
 }
 
@@ -114,11 +122,10 @@ export function myCommitments(commitments, deviceId, name) {
   );
 }
 
-// The next `count` game mornings starting from the upcoming game — for the
-// day-by-day gear schedule view.
+// The next `count` game mornings (Mon–Fri) starting from the upcoming game —
+// for the day-by-day gear schedule view.
 export function upcomingMornings(count = 6) {
-  const start = gearTakeDate();
-  const out = [];
-  for (let i = 0; i < count; i++) out.push(addDaysToKey(start, i));
+  const out = [gearTakeDate()];
+  for (let i = 1; i < count; i++) out.push(addGameDays(out[i - 1], 1));
   return out;
 }
