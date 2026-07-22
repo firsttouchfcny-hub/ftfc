@@ -4,6 +4,7 @@ import { db } from '../firebase/config';
 import {
   GEAR_TYPE_ORDER, GEAR_DEFS, gearIcon, gearLabel,
   isGearOpen, gearTakeDate, returnDateOptions, todayKey,
+  availableReturnDates, returnSlotsLeft,
   availableToTake, pickFreeSet, coverageForMorning,
   bringersFor, takersFor, gearRiskAlert, myCommitments, upcomingMornings,
 } from '../utils/gear';
@@ -84,6 +85,7 @@ export default function GearManager({ playerName, deviceId, amAdmin, suspended, 
              (c.takerName || '').toLowerCase() === playerName.toLowerCase())
         );
         if (alreadyHas) return;
+        if (returnSlotsLeft(cs, type, returnDate) <= 0) return; // that day filled up
         const setId = pickFreeSet(cs, type, takeDate);
         if (!setId) return; // lost the race — no set free
         assignedSet = setId;
@@ -258,33 +260,44 @@ export default function GearManager({ playerName, deviceId, amAdmin, suspended, 
       {!open ? (
         <p className="gear-note">Gear sign-up opens at 11:00 AM.</p>
       ) : pickerType ? (
-        <div className="gear-picker">
-          <p className="gear-note">
-            When will you bring the {gearLabel(pickerType).toLowerCase()} back?
-          </p>
-          <div className="gear-date-row">
-            {returnDateOptions(takeDate, pickerType).map((rd) => (
-              <button key={rd} className="btn btn-primary btn-sm" disabled={busy}
-                onClick={() => claimGear(pickerType, rd)}>
-                {fmtDay(rd)}
-              </button>
-            ))}
-            <button className="btn btn-ghost btn-sm" onClick={() => setPickerType(null)}>Cancel</button>
-          </div>
-        </div>
+        (() => {
+          const opts = availableReturnDates(commitments, pickerType, takeDate);
+          return (
+            <div className="gear-picker">
+              <p className="gear-note">
+                When will you bring the {gearLabel(pickerType).toLowerCase()} back?
+                {opts.length === 1 &&
+                  <strong> Only {fmtDay(opts[0])} is open — the other days are full, so you'll need to bring it back then.</strong>}
+              </p>
+              <div className="gear-date-row">
+                {opts.map((rd) => (
+                  <button key={rd} className="btn btn-primary btn-sm" disabled={busy}
+                    onClick={() => claimGear(pickerType, rd)}>
+                    {fmtDay(rd)}
+                  </button>
+                ))}
+                <button className="btn btn-ghost btn-sm" onClick={() => setPickerType(null)}>Cancel</button>
+              </div>
+            </div>
+          );
+        })()
       ) : (
         <div className="gear-take-row">
           {GEAR_TYPE_ORDER.map((t) => {
             const left = availableToTake(commitments, t, takeDate);
+            const openDays = availableReturnDates(commitments, t, takeDate).length;
             const owned = mine.some((c) => c.type === t);
-            const disabled = suspended || owned || left <= 0;
+            const disabled = suspended || owned || left <= 0 || openDays === 0;
             return (
               <button key={t} className="gear-take-btn" disabled={disabled}
                 onClick={() => setPickerType(t)}>
                 <span className="gear-take-icon">{gearIcon(t)}</span>
                 <span className="gear-take-label">Take {gearLabel(t)}</span>
                 <span className="gear-take-left">
-                  {owned ? 'already yours' : left > 0 ? `${left} available` : 'none left'}
+                  {owned ? 'already yours'
+                    : left <= 0 ? 'none left'
+                    : openDays === 0 ? 'no open days'
+                    : `${left} available`}
                 </span>
               </button>
             );
@@ -360,21 +373,24 @@ export default function GearManager({ playerName, deviceId, amAdmin, suspended, 
 function GearAdmin({ commitments, busy, takeDate, onMarkReturned, onReassign, onRemove, onAdd }) {
   const [addType, setAddType] = useState('goal');
   const [addName, setAddName] = useState('');
+  const openDays = availableReturnDates(commitments, addType, takeDate);
   const [addReturn, setAddReturn] = useState(returnDateOptions(takeDate, 'goal')[0]);
   const live = commitments.filter((c) => c.status === 'committed');
+  const dateChoices = openDays.length ? openDays : returnDateOptions(takeDate, addType);
 
   return (
     <div className="gear-admin">
       <div className="gear-admin-add">
         <select value={addType} onChange={(e) => {
           setAddType(e.target.value);
-          setAddReturn(returnDateOptions(takeDate, e.target.value)[0]);
+          const next = availableReturnDates(commitments, e.target.value, takeDate);
+          setAddReturn((next[0] || returnDateOptions(takeDate, e.target.value)[0]));
         }}>
           {GEAR_TYPE_ORDER.map((t) => <option key={t} value={t}>{gearLabel(t)}</option>)}
         </select>
         <input placeholder="Player name" value={addName} onChange={(e) => setAddName(e.target.value)} />
         <select value={addReturn} onChange={(e) => setAddReturn(e.target.value)}>
-          {returnDateOptions(takeDate, addType).map((rd) => <option key={rd} value={rd}>{fmtDay(rd)}</option>)}
+          {dateChoices.map((rd) => <option key={rd} value={rd}>{fmtDay(rd)}</option>)}
         </select>
         <button className="btn btn-primary btn-sm" disabled={busy || !addName.trim()}
           onClick={() => { onAdd(addType, addName, addReturn, 'take'); setAddName(''); }}>Assign (takes)</button>

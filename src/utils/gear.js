@@ -11,12 +11,14 @@ import {
 export const GEAR_OPEN_HOUR_ET  = 11; // 11 AM ET — gear volunteering opens
 export const GEAR_ALERT_HOUR_ET = 18; // 6 PM ET the night before — risk flag
 
-// The physical sets the club owns: 2 goals + 2 balls/cones + 5 rotating bib sets.
-// Per-game need is set in GEAR_DEFS (goals 2, balls 1, bibs 1) — balls and bibs
-// have spare sets that rotate.
+// The physical sets the club owns: 4 goals + 2 balls/cones + 5 rotating bib sets.
+// Per-game need is set in GEAR_DEFS (goals 2, balls 1, bibs 1); the spare sets
+// (goals 4>2, balls 2>1, bibs 5>1) are the slack that lets sets skip games.
 export const GEAR_SETS = [
-  { id: 'goal-a',  type: 'goal' },
-  { id: 'goal-b',  type: 'goal' },
+  { id: 'goal-1',  type: 'goal' },
+  { id: 'goal-2',  type: 'goal' },
+  { id: 'goal-3',  type: 'goal' },
+  { id: 'goal-4',  type: 'goal' },
   { id: 'balls-1', type: 'balls' },
   { id: 'balls-2', type: 'balls' },
   { id: 'bibs-1',  type: 'bibs' },
@@ -62,6 +64,23 @@ export function returnDateOptions(takeDate, type) {
   const opts = [];
   for (let i = 1; i <= days; i++) opts.push(addGameDays(takeDate, i));
   return opts;
+}
+
+// How many more people may still choose `morning` as a bring-back date for this
+// type — capped at the daily need (goals 2/day, balls & bibs 1/day). A day is
+// "full" at 0 slots left.
+export function returnSlotsLeft(commitments, type, morning) {
+  const brought = (commitments || []).filter(
+    (c) => isLive(c) && c.type === type && c.returnDate === morning
+  ).length;
+  return gearNeed(type) - brought;
+}
+
+// The bring-back dates still open for a take on `takeDate`: window days that
+// aren't already full. None selected → full window; days fill up → fewer options.
+export function availableReturnDates(commitments, type, takeDate) {
+  return returnDateOptions(takeDate, type)
+    .filter((r) => returnSlotsLeft(commitments, type, r) > 0);
 }
 
 const isLive = (c) => c && c.status === 'committed';
