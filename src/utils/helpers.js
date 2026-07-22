@@ -200,11 +200,12 @@ export function getCurrentYear() {
 export function buildFlatList(players) {
   if (!players || players.length === 0) return [];
 
-  // Gear bringers pin to the very top (they carry the gear to the game).
+  // Gear people (bringing in or taking home) pin to the very top.
   const GEAR_ORDER = ['goal', 'balls', 'bibs'];
   const gearRank = (p) => {
-    if (!p.gearBringer) return 99;
-    const i = GEAR_ORDER.indexOf(p.gearBringer);
+    const g = p.gearBringer || p.gearTaker;
+    if (!g) return 99;
+    const i = GEAR_ORDER.indexOf(g);
     return i === -1 ? 99 : i;
   };
 

@@ -16,26 +16,35 @@ function fmtDay(key) {
   });
 }
 
-// Ensure the gear bringer is auto-confirmed on their return-date lineup (#2).
-async function autoConfirmBringer(returnDate, { name, deviceId, isAdmin, gearType }) {
-  const ref = doc(db, 'sessions', returnDate);
+// Auto-confirm a gear person on a given day's lineup, tagged with their role:
+//   'bringer' → they carry the set IN that morning (their return date)
+//   'taker'   → they take the set HOME after that morning's game (their take date)
+// Pass type=null to clear the marker (used when a commitment is cancelled).
+async function setGearRole(dateKey, { name, deviceId, isAdmin }, role, type) {
+  const field = role === 'bringer' ? 'gearBringer' : 'gearTaker';
+  const ref = doc(db, 'sessions', dateKey);
   await runTransaction(db, async (tx) => {
     const snap = await tx.get(ref);
     const players = snap.exists() ? (snap.data().players || []) : [];
     const mine = players.find(
       (p) => p.deviceId === deviceId || p.name.toLowerCase() === name.toLowerCase()
     );
+    if (type == null) { // clear
+      if (!mine || !mine[field]) return;
+      tx.update(ref, { players: players.map((p) => (p === mine ? { ...p, [field]: null } : p)) });
+      return;
+    }
     let next;
     if (mine) {
-      next = players.map((p) => (p === mine ? { ...p, gearBringer: gearType } : p));
+      next = players.map((p) => (p === mine ? { ...p, [field]: type } : p));
     } else {
       next = [...players, {
         id: crypto.randomUUID(), name, deviceId, isAdmin: !!isAdmin,
-        plusOnes: 0, gearBringer: gearType, signedUpAt: Date.now(),
+        plusOnes: 0, [field]: type, signedUpAt: Date.now(),
       }];
     }
     if (snap.exists()) tx.update(ref, { players: next });
-    else tx.set(ref, { date: returnDate, isOpen: false, players: next, createdAt: Date.now() });
+    else tx.set(ref, { date: dateKey, isOpen: false, players: next, createdAt: Date.now() });
   });
 }
 
@@ -81,9 +90,9 @@ export default function GearManager({ playerName, deviceId, amAdmin, suspended, 
         else tx.set(LEDGER, { commitments: [entry] });
       });
       if (assignedSet) {
-        await autoConfirmBringer(returnDate, {
-          name: playerName, deviceId, isAdmin: amAdmin, gearType: type,
-        });
+        const who = { name: playerName, deviceId, isAdmin: amAdmin };
+        await setGearRole(takeDate, who, 'taker', type);     // playing the take day
+        await setGearRole(returnDate, who, 'bringer', type); // playing the return day
       }
     } catch (err) {
       console.error('[FTFC] claim gear failed:', err);
@@ -98,12 +107,18 @@ export default function GearManager({ playerName, deviceId, amAdmin, suspended, 
     if (!window.confirm('Cancel this gear commitment?')) return;
     setBusy(true);
     try {
+      const c = commitments.find((x) => x.id === id);
       await runTransaction(db, async (tx) => {
         const snap = await tx.get(LEDGER);
         if (!snap.exists()) return;
         const cs = snap.data().commitments || [];
-        tx.update(LEDGER, { commitments: cs.filter((c) => c.id !== id) });
+        tx.update(LEDGER, { commitments: cs.filter((x) => x.id !== id) });
       });
+      if (c) {
+        const who = { name: c.takerName, deviceId: c.takerDeviceId };
+        await setGearRole(c.takeDate, who, 'taker', null);
+        await setGearRole(c.returnDate, who, 'bringer', null);
+      }
     } catch (err) {
       console.error('[FTFC] cancel gear failed:', err);
     } finally {
@@ -159,10 +174,9 @@ export default function GearManager({ playerName, deviceId, amAdmin, suspended, 
         if (snap.exists()) tx.update(LEDGER, { commitments: [...cs, entry] });
         else tx.set(LEDGER, { commitments: [entry] });
       });
-      await autoConfirmBringer(returnDate, {
-        name: takerName.trim(), deviceId: `admin-gear-${crypto.randomUUID()}`,
-        isAdmin: false, gearType: type,
-      });
+      const who = { name: takerName.trim(), deviceId: `admin-gear-${crypto.randomUUID()}`, isAdmin: false };
+      await setGearRole(takeDate, who, 'taker', type);
+      await setGearRole(returnDate, who, 'bringer', type);
     } catch (err) {
       console.error('[FTFC] manual add failed:', err);
     } finally {
@@ -181,6 +195,30 @@ export default function GearManager({ playerName, deviceId, amAdmin, suspended, 
           {risk.map((m) => `${gearIcon(m.type)} ${gearLabel(m.type)} (${m.have}/${m.need})`).join(', ')} still needed.
         </div>
       )}
+
+      {/* Who's bringing gear over the next game days */}
+      <div className="gear-bring-banner">
+        <div className="gear-bring-title">📥 Bringing gear</div>
+        {upcomingMornings(3).map((m) => {
+          const bring = bringersFor(commitments, m);
+          const cov = coverageForMorning(commitments, m);
+          return (
+            <div key={m} className="gear-bring-day">
+              <span className="gear-bring-date">{fmtDay(m)}</span>
+              <span className="gear-bring-people">
+                {bring.map((c) => (
+                  <span key={c.id} className="gear-bring-person">{gearIcon(c.type)} {c.takerName}</span>
+                ))}
+                {cov.missing.map((mm) => (
+                  <span key={mm.type} className="gear-bring-missing">
+                    {gearIcon(mm.type)} needed{mm.need - mm.have > 1 ? ` ×${mm.need - mm.have}` : ''}
+                  </span>
+                ))}
+              </span>
+            </div>
+          );
+        })}
+      </div>
 
       <div className="gear-panel-head">
         <span className="gear-panel-title">🎒 Gear for {fmtDay(takeDate)}</span>
