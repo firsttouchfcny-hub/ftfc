@@ -4,7 +4,7 @@ import { db } from '../firebase/config';
 import {
   GEAR_TYPE_ORDER, GEAR_DEFS, gearIcon, gearLabel, gearNeed,
   isGearOpen, gearTakeDate, todayKey, gameDaysAfter,
-  availableReturnDates, returnSlotsLeft,
+  availableReturnDates, playerReturnDates, returnSlotsLeft,
   availableToTake, pickFreeSet, coverageForMorning,
   bringersFor, takersFor, gearBringingAlert, gearTakingAlert,
   myCommitments, upcomingMornings,
@@ -283,25 +283,23 @@ export default function GearManager({ playerName, deviceId, amAdmin, suspended, 
         <p className="gear-note">Gear sign-up opens at 11:00 AM.</p>
       ) : pickerType ? (
         (() => {
-          const opts = availableReturnDates(commitments, pickerType, takeDate);
-          const fixed = GEAR_DEFS[pickerType].returnWindow === 1;
+          const opts = playerReturnDates(commitments, pickerType, takeDate);
+          const single = opts.length === 1;
           return (
             <div className="gear-picker">
               <p className="gear-note">
-                {fixed ? (
-                  <>Take {gearLabel(pickerType).toLowerCase()} home — you must bring them back{' '}
+                {single ? (
+                  <>Take {gearLabel(pickerType).toLowerCase()} home — you'll bring them back{' '}
                     <strong>{fmtDay(opts[0])}</strong> (the next game).</>
                 ) : (
-                  <>When will you bring the {gearLabel(pickerType).toLowerCase()} back?
-                    {opts.length === 1 &&
-                      <strong> Only {fmtDay(opts[0])} is open — you'll need to bring it back then.</strong>}</>
+                  <>When will you bring the {gearLabel(pickerType).toLowerCase()} back?</>
                 )}
               </p>
               <div className="gear-date-row">
                 {opts.map((rd) => (
                   <button key={rd} className="btn btn-primary btn-sm" disabled={busy}
                     onClick={() => claimGear(pickerType, rd)}>
-                    {fixed ? `Confirm — bring back ${fmtDay(rd)}` : fmtDay(rd)}
+                    {single ? `Confirm — bring back ${fmtDay(rd)}` : fmtDay(rd)}
                   </button>
                 ))}
                 <button className="btn btn-ghost btn-sm" onClick={() => setPickerType(null)}>Cancel</button>
@@ -318,7 +316,7 @@ export default function GearManager({ playerName, deviceId, amAdmin, suspended, 
           <div className="gear-take-row">
             {GEAR_TYPE_ORDER.map((t) => {
               const left = availableToTake(commitments, t, takeDate);
-              const openDays = availableReturnDates(commitments, t, takeDate).length;
+              const openDays = playerReturnDates(commitments, t, takeDate).length;
               const owned = mine.some((c) => c.type === t);
               const ballsBlocked = t === 'balls' && priorityPending;
               const disabled = suspended || owned || left <= 0 || openDays === 0 || ballsBlocked;

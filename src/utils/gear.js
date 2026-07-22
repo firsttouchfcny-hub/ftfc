@@ -82,6 +82,18 @@ export function availableReturnDates(commitments, type, takeDate) {
     .filter((r) => returnSlotsLeft(commitments, type, r) > 0);
 }
 
+// Player return options with the Friday → Monday priority: a take on a Friday
+// must come back Monday (getting the next game ready after the weekend rest),
+// UNLESS Monday is already full for that gear — then the normal window applies.
+export function playerReturnDates(commitments, type, takeDate) {
+  const opts = availableReturnDates(commitments, type, takeDate);
+  if (isFridayKey(takeDate) && opts.length) {
+    const monday = addGameDays(takeDate, 1); // next game day after Friday
+    if (opts[0] === monday) return [monday];  // Monday still needs it → force it
+  }
+  return opts;
+}
+
 // Bring-back dates for gear ALREADY held (admin "has it" onboarding): unlike a
 // fresh take, it can come back as early as the very next game (`fromGame`),
 // then across the window — capped at need/day.
