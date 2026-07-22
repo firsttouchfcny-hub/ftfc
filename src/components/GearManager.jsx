@@ -237,9 +237,13 @@ export default function GearManager({ playerName, deviceId, amAdmin, suspended, 
         <div className="gear-bring-title">📥 Bringing gear</div>
         {upcomingMornings(3).map((m) => {
           const bring = bringersFor(commitments, m);
+          const done = coverageForMorning(commitments, m).covered;
           return (
-            <div key={m} className="gear-bring-day">
-              <div className="gear-bring-date">{fmtDay(m)}</div>
+            <div key={m} className={`gear-bring-day${done ? ' complete' : ''}`}>
+              <div className="gear-bring-date">
+                {fmtDay(m)}
+                {done && <span className="gear-done">✓ Ready</span>}
+              </div>
               <div className="gear-bring-types">
                 {GEAR_TYPE_ORDER.map((t) => {
                   const names = bring.filter((c) => c.type === t).map((c) => c.takerName);
