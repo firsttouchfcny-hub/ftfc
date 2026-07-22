@@ -77,6 +77,13 @@ export default function GearManager({ playerName, deviceId, amAdmin, suspended, 
       await runTransaction(db, async (tx) => {
         const snap = await tx.get(LEDGER);
         const cs = snap.exists() ? (snap.data().commitments || []) : [];
+        // One person may hold only one set of a given type (e.g. not both goals).
+        const alreadyHas = cs.some(
+          (c) => c.status === 'committed' && c.type === type &&
+            (c.takerDeviceId === deviceId ||
+             (c.takerName || '').toLowerCase() === playerName.toLowerCase())
+        );
+        if (alreadyHas) return;
         const setId = pickFreeSet(cs, type, takeDate);
         if (!setId) return; // lost the race — no set free
         assignedSet = setId;
@@ -253,13 +260,16 @@ export default function GearManager({ playerName, deviceId, amAdmin, suspended, 
         <div className="gear-take-row">
           {GEAR_TYPE_ORDER.map((t) => {
             const left = availableToTake(commitments, t, takeDate);
-            const disabled = suspended || left <= 0;
+            const owned = mine.some((c) => c.type === t);
+            const disabled = suspended || owned || left <= 0;
             return (
               <button key={t} className="gear-take-btn" disabled={disabled}
                 onClick={() => setPickerType(t)}>
                 <span className="gear-take-icon">{gearIcon(t)}</span>
                 <span className="gear-take-label">Take {gearLabel(t)}</span>
-                <span className="gear-take-left">{left > 0 ? `${left} available` : 'none left'}</span>
+                <span className="gear-take-left">
+                  {owned ? 'already yours' : left > 0 ? `${left} available` : 'none left'}
+                </span>
               </button>
             );
           })}
