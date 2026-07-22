@@ -319,7 +319,7 @@ export default function GearManager({ playerName, deviceId, amAdmin, suspended, 
                   <span className="gear-take-label">Take {gearLabel(t)}</span>
                   <span className="gear-take-left">
                     {owned ? 'already yours'
-                      : ballsBlocked ? 'after goals & bibs'
+                      : ballsBlocked ? ''
                       : left <= 0 ? 'none left'
                       : openDays === 0 ? 'no open days'
                       : `${left} available`}
