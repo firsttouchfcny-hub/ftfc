@@ -310,9 +310,19 @@ export default function GearManager({ playerName, deviceId, amAdmin, suspended, 
             const openDays = availableReturnDates(commitments, t, takeDate).length;
             const owned = mine.some((c) => c.type === t);
             const disabled = suspended || owned || left <= 0 || openDays === 0;
+            // Fixed-return gear (balls: returnWindow 1) skips the date picker —
+            // it always comes back the next game day.
+            const onTake = () => {
+              if (GEAR_DEFS[t].returnWindow === 1) {
+                const opts = availableReturnDates(commitments, t, takeDate);
+                if (opts.length) claimGear(t, opts[0]);
+              } else {
+                setPickerType(t);
+              }
+            };
             return (
               <button key={t} className="gear-take-btn" disabled={disabled}
-                onClick={() => setPickerType(t)}>
+                onClick={onTake}>
                 <span className="gear-take-icon">{gearIcon(t)}</span>
                 <span className="gear-take-label">Take {gearLabel(t)}</span>
                 <span className="gear-take-left">

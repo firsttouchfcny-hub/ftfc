@@ -11,14 +11,15 @@ import {
 export const GEAR_OPEN_HOUR_ET  = 11; // 11 AM ET — gear volunteering opens
 export const GEAR_ALERT_HOUR_ET = 18; // 6 PM ET the night before — risk flag
 
-// The physical sets the club owns: 4 goals + 5 rotating bib sets.
-// Per-game need is set in GEAR_DEFS (goals 2, bibs 1); the spare sets (goals
-// 4>2, bibs 5>1) are the slack that lets sets skip games.
+// The physical sets the club owns: 4 goals + 1 balls/cones + 5 rotating bib sets.
+// Per-game need is set in GEAR_DEFS (goals 2, balls 1, bibs 1). Balls has a
+// single set that always comes back the next game day (returnWindow 1).
 export const GEAR_SETS = [
   { id: 'goal-1',  type: 'goal' },
   { id: 'goal-2',  type: 'goal' },
   { id: 'goal-3',  type: 'goal' },
   { id: 'goal-4',  type: 'goal' },
+  { id: 'balls-1', type: 'balls' },
   { id: 'bibs-1',  type: 'bibs' },
   { id: 'bibs-2',  type: 'bibs' },
   { id: 'bibs-3',  type: 'bibs' },
@@ -30,10 +31,11 @@ export const GEAR_SETS = [
 //   goals / balls → tomorrow or the day after (2-day window)
 //   bibs          → any day within the next 5 days
 export const GEAR_DEFS = {
-  goal:  { icon: '🥅', label: 'Goals', need: 2, returnWindow: 2 },
-  bibs:  { icon: '🧺', label: 'Bibs',  need: 1, returnWindow: 5 },
+  goal:  { icon: '🥅', label: 'Goals',         need: 2, returnWindow: 2 },
+  balls: { icon: '⚽', label: 'Balls & cones', need: 1, returnWindow: 1 },
+  bibs:  { icon: '🧺', label: 'Bibs',          need: 1, returnWindow: 5 },
 };
-export const GEAR_TYPE_ORDER = ['goal', 'bibs'];
+export const GEAR_TYPE_ORDER = ['goal', 'balls', 'bibs'];
 
 export function gearIcon(type)  { return GEAR_DEFS[type]?.icon  || ''; }
 export function gearLabel(type) { return GEAR_DEFS[type]?.label || type; }
