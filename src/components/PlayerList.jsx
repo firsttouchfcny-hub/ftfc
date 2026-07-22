@@ -4,10 +4,11 @@ import {
 } from '../utils/helpers';
 import { gearIcon } from '../utils/gear';
 
-export default function PlayerList({ session, deviceId, playerName, isOpen, gearPriorityNames }) {
+export default function PlayerList({ session, deviceId, playerName, isOpen, gearPriorityNames, gearRoles }) {
   const players = session?.players || [];
   const gearPri = gearPriorityNames || new Set();
-  const flat = buildFlatList(players, { gearPriorityNames: gearPri });
+  const roles = gearRoles || {};
+  const flat = buildFlatList(players, { gearPriorityNames: gearPri, gearRoles: roles });
   const total = flat.length;
 
   const match1 = flat.slice(0, MATCH1_MAX);
@@ -38,12 +39,21 @@ export default function PlayerList({ session, deviceId, playerName, isOpen, gear
         <span className="player-name-cell">
           {isOwn && <span className="green-dot" title="You" />}
           <span className="player-name-text">{player.name}</span>
-          {player.gearBringer && <span className="badge badge-bring">{gearIcon(player.gearBringer)} bringing</span>}
-          {player.gearTaker && <span className="badge badge-take">{gearIcon(player.gearTaker)} take home</span>}
-          {player.isAdmin && <span className="badge badge-admin">admin</span>}
-          {!player.gearBringer && !player.gearTaker && !player.isAdmin &&
-            gearPri.has(player.name?.toLowerCase().trim()) &&
-            <span className="badge badge-gearpri" title="Took gear home this week">⭐ gear</span>}
+          {(() => {
+            const r = player.isMainEntry ? roles[player.name?.toLowerCase().trim()] : null;
+            const bring = r?.bring || [];
+            const take = r?.take || [];
+            return (
+              <>
+                {bring.map((t) => <span key={`b${t}`} className="badge badge-bring">{gearIcon(t)} bringing</span>)}
+                {take.map((t) => <span key={`t${t}`} className="badge badge-take">{gearIcon(t)} take home</span>)}
+                {player.isAdmin && <span className="badge badge-admin">admin</span>}
+                {!bring.length && !take.length && !player.isAdmin &&
+                  gearPri.has(player.name?.toLowerCase().trim()) &&
+                  <span className="badge badge-gearpri" title="Took gear home this week">⭐ gear</span>}
+              </>
+            );
+          })()}
           {player.priority && !player.isAdmin && <span className="badge badge-priority">priority</span>}
           {!player.isMainEntry && <span className="badge badge-plus">+1</span>}
         </span>

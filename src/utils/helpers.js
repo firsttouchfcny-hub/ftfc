@@ -200,23 +200,28 @@ export function getCurrentYear() {
 export function buildFlatList(players, opts = {}) {
   if (!players || players.length === 0) return [];
 
-  // On Fridays, people who took gear home earlier that week rank just below
-  // admins (opts.gearPriorityNames = Set of lowercased names).
+  // Gear roles come from the ledger (opts.gearRoles: name → {bring:[], take:[]})
+  // so ordering matches the coverage figures. On Fridays, people who took gear
+  // home earlier that week (opts.gearPriorityNames) rank just below admins.
   const gearPriority = opts.gearPriorityNames || new Set();
+  const gearRoles = opts.gearRoles || {};
   const nameKey = (p) => (p.name || '').toLowerCase().trim();
+  const roleOf = (p) => gearRoles[nameKey(p)] || null;
 
   // List order: gear bringers → gear takers → admins/priority → Friday gear
   // priority → everyone else.
   const GEAR_ORDER = ['goal', 'balls', 'bibs'];
   const groupRank = (p) => {
-    if (p.gearBringer) return 0;
-    if (p.gearTaker) return 1;
+    const r = roleOf(p);
+    if (r && r.bring.length) return 0;
+    if (r && r.take.length) return 1;
     if (p.isAdmin || p.priority) return 2;
     if (gearPriority.has(nameKey(p))) return 3;
     return 4;
   };
   const typeRank = (p) => {
-    const g = p.gearBringer || p.gearTaker;
+    const r = roleOf(p);
+    const g = r ? (r.bring[0] || r.take[0]) : null;
     const i = g ? GEAR_ORDER.indexOf(g) : -1;
     return i === -1 ? 99 : i;
   };

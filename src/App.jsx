@@ -10,7 +10,7 @@ import AdminPanel  from './components/AdminPanel';
 import Rules       from './components/Rules';
 import PhoneVerify from './components/PhoneVerify';
 import GearManager from './components/GearManager';
-import { fridayGearPriorityNames } from './utils/gear';
+import { fridayGearPriorityNames, bringersFor, takersFor } from './utils/gear';
 import {
   getSessionDate, getTomorrow, getDeviceId, normalizeName,
   isSuspended, formatDate, formatTimeET,
@@ -122,7 +122,19 @@ export default function App() {
 
   // ── My standing (so players don't scan the whole list) ─────────────────────
   const gearPriorityNames = fridayGearPriorityNames(gearLedger, today);
-  const flatList = buildFlatList(session?.players || [], { gearPriorityNames });
+
+  // Gear roles for the shown day, derived from the ledger (single source of
+  // truth) so roster badges/order can never drift from the coverage figures.
+  const gearRoles = {};
+  const addRole = (name, kind, type) => {
+    const k = (name || '').toLowerCase().trim();
+    if (!gearRoles[k]) gearRoles[k] = { bring: [], take: [] };
+    if (!gearRoles[k][kind].includes(type)) gearRoles[k][kind].push(type);
+  };
+  bringersFor(gearLedger, today).forEach((c) => addRole(c.takerName, 'bring', c.type));
+  takersFor(gearLedger, today).forEach((c) => addRole(c.takerName, 'take', c.type));
+
+  const flatList = buildFlatList(session?.players || [], { gearPriorityNames, gearRoles });
   const myFlatIndex = flatList.findIndex(
     (p) => p.isMainEntry &&
       (p.deviceId === deviceId || p.name.toLowerCase() === playerName.toLowerCase())
@@ -397,6 +409,7 @@ export default function App() {
               playerName={playerName}
               isOpen={rollOpen}
               gearPriorityNames={gearPriorityNames}
+              gearRoles={gearRoles}
             />
 
             {/* Drops today (#7) */}
