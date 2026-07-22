@@ -93,6 +93,11 @@ body {
   display: flex; justify-content: space-between;
   font-size: .85rem; padding: 4px 0; border-top: 1px solid var(--border);
 }
+.drops-group { margin-top: 6px; }
+.drops-group-title { font-size: .74rem; font-weight: 700; margin-bottom: 2px; }
+.drops-game .drops-group-title { color: var(--red); }
+.drops-bench { opacity: .7; }
+.drops-bench .drops-group-title { color: var(--text-muted); }
 .drops-log-name { color: var(--text); }
 .drops-log-time { color: var(--text-muted); }
 

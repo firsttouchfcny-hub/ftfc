@@ -215,10 +215,15 @@ export default function App() {
         const newPlayers = players.filter(
           (p) => p.deviceId !== deviceId && p.name.toLowerCase() !== playerName.toLowerCase()
         );
+        // Position at drop time → was this a playing spot (top 36) or the bench?
+        const flat = buildFlatList(players);
+        const idx = flat.findIndex((p) => p.isMainEntry &&
+          (p.deviceId === deviceId || p.name.toLowerCase() === playerName.toLowerCase()));
+        const fromBench = idx >= 0 && idx + 1 > MATCH2_MAX;
         tx.update(ref, {
           players: newPlayers,
           // #7 — record the drop (clears when the session rolls over at 10 AM)
-          drops: [...(data.drops || []), { name: removed[0].name, deviceId, at: Date.now() }],
+          drops: [...(data.drops || []), { name: removed[0].name, deviceId, at: Date.now(), fromBench }],
         });
       });
     } catch (err) {
@@ -412,20 +417,41 @@ export default function App() {
               gearRoles={gearRoles}
             />
 
-            {/* Drops today (#7) */}
-            {session?.drops?.length > 0 && (
-              <div className="drops-log">
-                <div className="drops-log-title">
-                  📤 Drops today <span className="count-badge">{session.drops.length}</span>
-                </div>
-                {[...session.drops].sort((a, b) => b.at - a.at).map((d, i) => (
-                  <div key={`${d.deviceId}-${d.at}-${i}`} className="drops-log-row">
-                    <span className="drops-log-name">{d.name}</span>
-                    <span className="drops-log-time">{formatTimeET(d.at)}</span>
+            {/* Drops today (#7) — game drops (matter) vs bench drops (harmless) */}
+            {session?.drops?.length > 0 && (() => {
+              const sorted = [...session.drops].sort((a, b) => b.at - a.at);
+              const gameDrops = sorted.filter((d) => !d.fromBench);
+              const benchDrops = sorted.filter((d) => d.fromBench);
+              return (
+                <div className="drops-log">
+                  <div className="drops-log-title">
+                    📤 Drops today <span className="count-badge">{session.drops.length}</span>
                   </div>
-                ))}
-              </div>
-            )}
+                  {gameDrops.length > 0 && (
+                    <div className="drops-group drops-game">
+                      <div className="drops-group-title">⚠️ From the game ({gameDrops.length}) — opened a spot</div>
+                      {gameDrops.map((d, i) => (
+                        <div key={`g-${d.deviceId}-${d.at}-${i}`} className="drops-log-row">
+                          <span className="drops-log-name">{d.name}</span>
+                          <span className="drops-log-time">{formatTimeET(d.at)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {benchDrops.length > 0 && (
+                    <div className="drops-group drops-bench">
+                      <div className="drops-group-title">🪑 From the bench ({benchDrops.length}) — no game impact</div>
+                      {benchDrops.map((d, i) => (
+                        <div key={`b-${d.deviceId}-${d.at}-${i}`} className="drops-log-row">
+                          <span className="drops-log-name">{d.name}</span>
+                          <span className="drops-log-time">{formatTimeET(d.at)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Rules */}
             <Rules />
