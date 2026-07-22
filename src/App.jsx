@@ -10,6 +10,7 @@ import AdminPanel  from './components/AdminPanel';
 import Rules       from './components/Rules';
 import PhoneVerify from './components/PhoneVerify';
 import GearManager from './components/GearManager';
+import { fridayGearPriorityNames } from './utils/gear';
 import {
   getSessionDate, getTomorrow, getDeviceId, normalizeName,
   isSuspended, formatDate, formatTimeET,
@@ -34,6 +35,7 @@ export default function App() {
   // ── Firebase state ────────────────────────────────────────────────────────
   const [session,       setSession]       = useState(null);
   const [playerProfile, setPlayerProfile] = useState(null);
+  const [gearLedger,    setGearLedger]    = useState([]);
   const [loading,       setLoading]       = useState(true);
   const [, setClockTick] = useState(0); // re-render so time-based open/close updates live
 
@@ -73,6 +75,15 @@ export default function App() {
     return () => { unsub(); clearTimeout(timeout); };
   }, [today]);
 
+  // Listen to the gear ledger (drives Friday gear-priority ordering).
+  useEffect(() => {
+    const unsub = onSnapshot(
+      doc(db, 'gear', 'ledger'),
+      (snap) => setGearLedger(snap.exists() ? (snap.data().commitments || []) : []),
+      () => setGearLedger([])
+    );
+    return unsub;
+  }, []);
 
   // Listen to this player's profile (suspension, admin flag)
   useEffect(() => {
@@ -110,7 +121,8 @@ export default function App() {
   const iCanSignUp = amAdmin ? canAdminSignUp(session) : rollOpen;
 
   // ── My standing (so players don't scan the whole list) ─────────────────────
-  const flatList = buildFlatList(session?.players || []);
+  const gearPriorityNames = fridayGearPriorityNames(gearLedger, today);
+  const flatList = buildFlatList(session?.players || [], { gearPriorityNames });
   const myFlatIndex = flatList.findIndex(
     (p) => p.isMainEntry &&
       (p.deviceId === deviceId || p.name.toLowerCase() === playerName.toLowerCase())
@@ -384,6 +396,7 @@ export default function App() {
               deviceId={deviceId}
               playerName={playerName}
               isOpen={rollOpen}
+              gearPriorityNames={gearPriorityNames}
             />
 
             {/* Drops today (#7) */}

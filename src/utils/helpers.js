@@ -197,16 +197,23 @@ export function getCurrentYear() {
   return new Date().getFullYear();
 }
 
-export function buildFlatList(players) {
+export function buildFlatList(players, opts = {}) {
   if (!players || players.length === 0) return [];
 
-  // List order: gear bringers → gear takers → admins/priority → everyone else.
+  // On Fridays, people who took gear home earlier that week rank just below
+  // admins (opts.gearPriorityNames = Set of lowercased names).
+  const gearPriority = opts.gearPriorityNames || new Set();
+  const nameKey = (p) => (p.name || '').toLowerCase().trim();
+
+  // List order: gear bringers → gear takers → admins/priority → Friday gear
+  // priority → everyone else.
   const GEAR_ORDER = ['goal', 'balls', 'bibs'];
   const groupRank = (p) => {
     if (p.gearBringer) return 0;
     if (p.gearTaker) return 1;
     if (p.isAdmin || p.priority) return 2;
-    return 3;
+    if (gearPriority.has(nameKey(p))) return 3;
+    return 4;
   };
   const typeRank = (p) => {
     const g = p.gearBringer || p.gearTaker;

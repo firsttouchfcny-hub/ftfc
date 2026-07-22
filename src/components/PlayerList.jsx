@@ -4,9 +4,10 @@ import {
 } from '../utils/helpers';
 import { gearIcon } from '../utils/gear';
 
-export default function PlayerList({ session, deviceId, playerName, isOpen }) {
+export default function PlayerList({ session, deviceId, playerName, isOpen, gearPriorityNames }) {
   const players = session?.players || [];
-  const flat = buildFlatList(players);
+  const gearPri = gearPriorityNames || new Set();
+  const flat = buildFlatList(players, { gearPriorityNames: gearPri });
   const total = flat.length;
 
   const match1 = flat.slice(0, MATCH1_MAX);
@@ -40,6 +41,9 @@ export default function PlayerList({ session, deviceId, playerName, isOpen }) {
           {player.gearBringer && <span className="badge badge-bring">{gearIcon(player.gearBringer)} bringing</span>}
           {player.gearTaker && <span className="badge badge-take">{gearIcon(player.gearTaker)} take home</span>}
           {player.isAdmin && <span className="badge badge-admin">admin</span>}
+          {!player.gearBringer && !player.gearTaker && !player.isAdmin &&
+            gearPri.has(player.name?.toLowerCase().trim()) &&
+            <span className="badge badge-gearpri" title="Took gear home this week">⭐ gear</span>}
           {player.priority && !player.isAdmin && <span className="badge badge-priority">priority</span>}
           {!player.isMainEntry && <span className="badge badge-plus">+1</span>}
         </span>

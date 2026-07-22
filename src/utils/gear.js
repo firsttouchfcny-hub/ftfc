@@ -113,6 +113,27 @@ export function gearRiskAlert(commitments) {
   return cov.covered ? null : cov.missing;
 }
 
+export function isFridayKey(dateKey) {
+  return new Date(dateKey + 'T12:00:00Z').getUTCDay() === 5;
+}
+
+// Reward: on a Friday, anyone who took a set HOME earlier that week (Mon–Thu)
+// gets priority. Returns a Set of lowercased names (empty unless dateKey is a
+// Friday). "Same Friday only" — it does not carry to the next week.
+export function fridayGearPriorityNames(commitments, dateKey) {
+  const names = new Set();
+  if (!isFridayKey(dateKey)) return names;
+  const monday = addDaysToKey(dateKey, -4);
+  const thursday = addDaysToKey(dateKey, -1);
+  for (const c of commitments || []) {
+    if (c.status !== 'committed') continue;
+    if (c.takeDate >= monday && c.takeDate <= thursday) {
+      names.add((c.takerName || '').toLowerCase().trim());
+    }
+  }
+  return names;
+}
+
 // A person's own live commitments (matched by device id or name).
 export function myCommitments(commitments, deviceId, name) {
   const n = (name || '').toLowerCase();
