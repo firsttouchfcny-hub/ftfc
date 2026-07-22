@@ -210,7 +210,7 @@ export function buildFlatList(players, opts = {}) {
 
   // List order: gear bringers → gear takers → admins/priority → Friday gear
   // priority → everyone else.
-  const GEAR_ORDER = ['goal', 'balls', 'bibs'];
+  const GEAR_ORDER = ['goal', 'bibs'];
   const groupRank = (p) => {
     const r = roleOf(p);
     if (r && r.bring.length) return 0;
