@@ -200,24 +200,27 @@ export function getCurrentYear() {
 export function buildFlatList(players) {
   if (!players || players.length === 0) return [];
 
-  // Gear people (bringing in or taking home) pin to the very top.
+  // List order: gear bringers → gear takers → admins/priority → everyone else.
   const GEAR_ORDER = ['goal', 'balls', 'bibs'];
-  const gearRank = (p) => {
+  const groupRank = (p) => {
+    if (p.gearBringer) return 0;
+    if (p.gearTaker) return 1;
+    if (p.isAdmin || p.priority) return 2;
+    return 3;
+  };
+  const typeRank = (p) => {
     const g = p.gearBringer || p.gearTaker;
-    if (!g) return 99;
-    const i = GEAR_ORDER.indexOf(g);
+    const i = g ? GEAR_ORDER.indexOf(g) : -1;
     return i === -1 ? 99 : i;
   };
 
-  // Admins and per-day priority players both pin below gear, above everyone.
-  const pinned = (p) => (p.isAdmin || p.priority) ? 0 : 1;
-
   const sorted = [...players].sort((a, b) => {
-    const ar = gearRank(a), br = gearRank(b);
-    if (ar !== br) return ar - br;                          // gear bringers first
-    if (ar !== 99) return (a.signedUpAt || 0) - (b.signedUpAt || 0); // same gear → earliest
-    const ap = pinned(a), bp = pinned(b);
-    if (ap !== bp) return ap - bp;                          // then admins + priority
+    const ga = groupRank(a), gb = groupRank(b);
+    if (ga !== gb) return ga - gb;                          // bringers, takers, admins, rest
+    if (ga <= 1) {                                          // within gear groups, order by type
+      const ta = typeRank(a), tb = typeRank(b);
+      if (ta !== tb) return ta - tb;
+    }
     return (a.signedUpAt || 0) - (b.signedUpAt || 0);       // then by signup time
   });
 
