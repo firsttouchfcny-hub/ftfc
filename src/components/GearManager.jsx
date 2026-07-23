@@ -87,7 +87,9 @@ export default function GearManager({ playerName, deviceId, amAdmin, suspended, 
              (c.takerName || '').toLowerCase() === playerName.toLowerCase())
         );
         if (alreadyHas) return;
-        if (returnSlotsLeft(cs, type, returnDate) <= 0) return; // that day filled up
+        // The per-day return cap only applies to windowed gear (bibs); fixed
+        // next-day gear (goals, balls) always returns the next game day.
+        if ((GEAR_DEFS[type].returnWindow || 2) > 1 && returnSlotsLeft(cs, type, returnDate) <= 0) return;
         const setId = pickFreeSet(cs, type, takeDate);
         if (!setId) return; // lost the race — no set free
         assignedSet = setId;
@@ -308,10 +310,12 @@ export default function GearManager({ playerName, deviceId, amAdmin, suspended, 
           );
         })()
       ) : (() => {
-        // Goals & bibs are priority — balls open up only once they're taken.
-        const priorityPending =
-          availableToTake(commitments, 'goal', takeDate) > 0 ||
-          availableToTake(commitments, 'bibs', takeDate) > 0;
+        // Goals & bibs are priority — balls open up only once they can't be
+        // taken further (fully taken OR no open return day, so no deadlock).
+        const canTakeMore = (ty) =>
+          availableToTake(commitments, ty, takeDate) > 0 &&
+          playerReturnDates(commitments, ty, takeDate).length > 0;
+        const priorityPending = canTakeMore('goal') || canTakeMore('bibs');
         return (
           <div className="gear-take-row">
             {GEAR_TYPE_ORDER.map((t) => {
