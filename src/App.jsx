@@ -335,7 +335,14 @@ export default function App() {
                   )}
                 </span>
                 <div className="you-row-actions">
-                  {/* Phone verification hidden until the phone-auth phase (PhoneVerify.jsx kept in tree) */}
+                  {!playerProfile?.phoneVerified && (
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => setShowPhoneVerify(true)}
+                    >
+                      Verify phone
+                    </button>
+                  )}
                   <button
                     className="btn btn-ghost btn-sm"
                     onClick={() => setShowEditName(true)}

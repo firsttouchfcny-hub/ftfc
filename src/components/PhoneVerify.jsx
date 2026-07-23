@@ -4,7 +4,7 @@ import {
   signInWithPhoneNumber,
   signOut,
 } from 'firebase/auth';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
 import { normalizeName } from '../utils/helpers';
 
@@ -92,11 +92,13 @@ export default function PhoneVerify({ playerName, onClose, onVerified }) {
     try {
       await confirmRef.current.confirm(code);
       const e164 = toE164US(phone);
-      await updateDoc(doc(db, 'players', normalizeName(playerName)), {
+      // merge so it works whether or not a profile doc already exists
+      await setDoc(doc(db, 'players', normalizeName(playerName)), {
+        name: playerName,
         phoneVerified: true,
         phone: e164,
         phoneVerifiedAt: Date.now(),
-      });
+      }, { merge: true });
       // We only used Firebase Auth to verify ownership of the number — no need to keep the session.
       try { await signOut(auth); } catch { /* noop */ }
       onVerified?.();
