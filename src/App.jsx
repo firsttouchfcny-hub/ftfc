@@ -172,7 +172,9 @@ export default function App() {
       : isRollCallOpen(session);
     if (!playerCanSignUp || !playerName || suspended) return;
 
-    const playerIsAdmin = isAdmin || playerProfile?.isAdmin || false;
+    // Admin badge comes from the profile only — NOT from the device having
+    // entered the shared PIN (which would leak the badge to anyone who logs in).
+    const playerIsAdmin = playerProfile?.isAdmin || false;
     const ref = doc(db, 'sessions', today);
     try {
       // Atomic: read the live list inside a transaction so we never clobber

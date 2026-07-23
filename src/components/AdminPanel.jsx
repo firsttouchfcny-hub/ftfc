@@ -176,6 +176,24 @@ export default function AdminPanel({ session, today, adminName }) {
     }
   };
 
+  // Admin badge is a deliberate label (separate from Priority). Writes both the
+  // session entry and the profile so it persists / stops on future signups.
+  const handleToggleAdmin = async (playerId, name, current) => {
+    try {
+      const newVal = !current;
+      const newPlayers = (session?.players || []).map((p) =>
+        p.id === playerId ? { ...p, isAdmin: newVal } : p
+      );
+      await updateSession({ players: newPlayers });
+      const ref = doc(db, 'players', normalizeName(name));
+      const snap = await getDoc(ref);
+      if (snap.exists()) await updateDoc(ref, { isAdmin: newVal });
+      else await setDoc(ref, { name, isAdmin: newVal, suspendedUntil: null, createdAt: Date.now() });
+    } catch (err) {
+      fireError('Toggle admin', err);
+    }
+  };
+
   const handleRemovePlayer = async (playerId) => {
     try {
       const newPlayers = (session?.players || []).filter((p) => p.id !== playerId);
@@ -342,6 +360,14 @@ export default function AdminPanel({ session, today, adminName }) {
                       onChange={() => handleTogglePriority(p.id, p.priority)}
                     />
                     Priority
+                  </label>
+                  <label className="ctrl-label">
+                    <input
+                      type="checkbox"
+                      checked={p.isAdmin || false}
+                      onChange={() => handleToggleAdmin(p.id, p.name, p.isAdmin)}
+                    />
+                    Admin
                   </label>
                   <button
                     className="btn btn-sm btn-danger"
