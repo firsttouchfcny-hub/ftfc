@@ -68,7 +68,7 @@ export default function PhoneVerify({ playerName, onClose, onVerified }) {
           : err.code === 'auth/operation-not-allowed'
             ? 'Phone sign-in is not enabled in Firebase. Enable it in the console.'
             : 'Could not send the code. Try again.';
-      setError(msg);
+      setError(`${msg}  [${err.code || 'unknown'}]`);
       resetRecaptcha();
     } finally {
       setBusy(false);
