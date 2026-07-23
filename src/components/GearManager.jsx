@@ -87,9 +87,7 @@ export default function GearManager({ playerName, deviceId, amAdmin, suspended, 
              (c.takerName || '').toLowerCase() === playerName.toLowerCase())
         );
         if (alreadyHas) return;
-        // The per-day return cap only applies to windowed gear (bibs); fixed
-        // next-day gear (goals, balls) always returns the next game day.
-        if ((GEAR_DEFS[type].returnWindow || 2) > 1 && returnSlotsLeft(cs, type, returnDate) <= 0) return;
+        if (returnSlotsLeft(cs, type, returnDate) <= 0) return; // that day already full
         const setId = pickFreeSet(cs, type, takeDate);
         if (!setId) return; // lost the race — no set free
         assignedSet = setId;
@@ -178,10 +176,12 @@ export default function GearManager({ playerName, deviceId, amAdmin, suspended, 
     const useTake = held ? todayKey() : (takeOn || takeDate); // held = out now; take = chosen day
     setBusy(true);
     try {
-      let ok = false;
+      let ok = false, dayFull = false;
       await runTransaction(db, async (tx) => {
         const snap = await tx.get(LEDGER);
         const cs = snap.exists() ? (snap.data().commitments || []) : [];
+        // Don't over-book the bring-back day (max `need` bringers/day).
+        if (returnSlotsLeft(cs, type, backDate) <= 0) { dayFull = true; return; }
         let setId = pickFreeSet(cs, type, useTake);
         if (!setId) {
           if (held) return;            // no free physical set to mark as held
@@ -206,6 +206,9 @@ export default function GearManager({ playerName, deviceId, amAdmin, suspended, 
           await setGearRole(useTake, who, 'taker', type);
           await setGearRole(backDate, who, 'bringer', type);
         }
+      }
+      if (dayFull) {
+        window.alert(`${gearLabel(type)} already has enough coming that day — pick another bring-back date.`);
       }
     } catch (err) {
       console.error('[FTFC] manual add failed:', err);
@@ -411,13 +414,18 @@ export default function GearManager({ playerName, deviceId, amAdmin, suspended, 
 function GearAdmin({ commitments, busy, takeDate, onMarkReturned, onReassign, onRemove, onAdd }) {
   const [addType, setAddType] = useState('goal');
   const [addName, setAddName] = useState('');
-  const days = upcomingMornings(7); // next 7 game days — admins pick any, no caps
-  const [bringDate, setBringDate] = useState(days[0]);
-  const [takeOn, setTakeOn] = useState(days[0]);
-  const [backDate, setBackDate] = useState(gameDaysAfter(days[0], 1)[0]);
+  const [bringDate, setBringDate] = useState('');
+  const [takeOn, setTakeOn] = useState(upcomingMornings(7)[0]);
+  const [backDate, setBackDate] = useState('');
   const live = commitments.filter((c) => c.status === 'committed');
 
-  const changeTakeOn = (d) => { setTakeOn(d); setBackDate(gameDaysAfter(d, 1)[0]); };
+  // Only offer days that still have an open slot for this gear (no over-booking).
+  const bringDays = upcomingMornings(7).filter((d) => returnSlotsLeft(commitments, addType, d) > 0);
+  const backDays = gameDaysAfter(takeOn, 7).filter((d) => returnSlotsLeft(commitments, addType, d) > 0);
+  const bringVal = bringDays.includes(bringDate) ? bringDate : bringDays[0];
+  const backVal = backDays.includes(backDate) ? backDate : backDays[0];
+
+  const changeTakeOn = (d) => { setTakeOn(d); setBackDate(''); };
 
   return (
     <div className="gear-admin">
@@ -429,28 +437,29 @@ function GearAdmin({ commitments, busy, takeDate, onMarkReturned, onReassign, on
       </div>
       <div className="gear-admin-add">
         <span className="gear-admin-lbl">Bring in on:</span>
-        <select value={bringDate} onChange={(e) => setBringDate(e.target.value)}>
-          {days.map((d) => <option key={d} value={d}>{fmtDay(d)}</option>)}
-        </select>
-        <button className="btn btn-success btn-sm" disabled={busy || !addName.trim()}
-          onClick={() => { onAdd(addType, addName, bringDate, 'held'); setAddName(''); }}>Assign bring</button>
+        {bringDays.length ? (
+          <select value={bringVal} onChange={(e) => setBringDate(e.target.value)}>
+            {bringDays.map((d) => <option key={d} value={d}>{fmtDay(d)}</option>)}
+          </select>
+        ) : <span className="gear-note">all days full</span>}
+        <button className="btn btn-success btn-sm" disabled={busy || !addName.trim() || !bringDays.length}
+          onClick={() => { onAdd(addType, addName, bringVal, 'held'); setAddName(''); }}>Assign bring</button>
       </div>
       <div className="gear-admin-add">
         <span className="gear-admin-lbl">Take home on:</span>
         <select value={takeOn} onChange={(e) => changeTakeOn(e.target.value)}>
-          {days.map((d) => <option key={d} value={d}>{fmtDay(d)}</option>)}
+          {upcomingMornings(7).map((d) => <option key={d} value={d}>{fmtDay(d)}</option>)}
         </select>
         <span className="gear-admin-lbl">back:</span>
-        <select value={backDate} onChange={(e) => setBackDate(e.target.value)}>
-          {gameDaysAfter(takeOn, 7).map((d) => <option key={d} value={d}>{fmtDay(d)}</option>)}
+        <select value={backVal} onChange={(e) => setBackDate(e.target.value)}>
+          {backDays.map((d) => <option key={d} value={d}>{fmtDay(d)}</option>)}
         </select>
-        <button className="btn btn-primary btn-sm" disabled={busy || !addName.trim()}
-          onClick={() => { onAdd(addType, addName, backDate, 'take', takeOn); setAddName(''); }}>Assign take</button>
+        <button className="btn btn-primary btn-sm" disabled={busy || !addName.trim() || !backDays.length}
+          onClick={() => { onAdd(addType, addName, backVal, 'take', takeOn); setAddName(''); }}>Assign take</button>
       </div>
       <p className="gear-note">
-        Free-form for admins. <strong>Assign bring</strong> = just brings a set that day (no take).
-        <strong> Assign take</strong> = takes home on one day, brings back on another. The caps/windows only
-        apply to players signing themselves up.
+        <strong>Assign bring</strong> = just brings a set that day (no take). <strong>Assign take</strong> = takes
+        home one day, brings back another. Only days that still need that gear are shown (max 2 goals / 1 balls / 1 bibs per day).
       </p>
 
       {live.length === 0 ? (

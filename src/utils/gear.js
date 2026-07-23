@@ -76,14 +76,11 @@ export function returnSlotsLeft(commitments, type, morning) {
 }
 
 // The bring-back dates still open for a take on `takeDate`: window days that
-// aren't already full. None selected → full window; days fill up → fewer options.
-// Fixed next-day gear (returnWindow 1: goals, balls) always returns the next
-// game day — the per-day return cap doesn't apply (both sets go home daily; a
-// little surplus on the return day is fine since there's no other day to pick).
+// aren't already full (each day holds at most `need` bringers). None booked →
+// full window; days fill up → fewer options.
 export function availableReturnDates(commitments, type, takeDate) {
-  const opts = returnDateOptions(takeDate, type);
-  if ((GEAR_DEFS[type]?.returnWindow || 2) <= 1) return opts;
-  return opts.filter((r) => returnSlotsLeft(commitments, type, r) > 0);
+  return returnDateOptions(takeDate, type)
+    .filter((r) => returnSlotsLeft(commitments, type, r) > 0);
 }
 
 // Player return options with the Friday → Monday priority: a take on a Friday
