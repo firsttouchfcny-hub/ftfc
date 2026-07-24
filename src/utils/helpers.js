@@ -67,20 +67,25 @@ export function addGameDays(dateKey, n) {
   return d;
 }
 
-// The game date the app is focused on, in Eastern time:
-//   Before 10 AM ET  → today's game (last night's locked roster)
-//   10 AM ET or later → tomorrow's game (the list has reset for the next day)
+// The game date the app is focused on, in Eastern time. Games run Mon–Fri, so
+// on weekends (and Friday after the 10 AM reset) this skips ahead to Monday.
+//   Before 10 AM ET  → today's game (or the next game day if today is a weekend)
+//   10 AM ET or later → the next game day
 export function getSessionDate() {
   const et = getEasternNow();
-  return et.hour < RESET_HOUR_ET ? et.dateKey : addDaysToKey(et.dateKey, 1);
+  const base = et.hour < RESET_HOUR_ET ? et.dateKey : addDaysToKey(et.dateKey, 1);
+  return isGameDay(base) ? base : nextGameDay(base);
 }
 
 // Roll-call phase for the active signup day, in Eastern time:
 //   'closed'      → before 10 AM (prior game still showing; nothing to join yet)
 //   'admins-only' → 10 AM–3 PM (admins may sign up early)
 //   'open'        → 3 PM onward (everyone may sign up)
+// On weekends the next game (Monday) already opened Friday 3 PM, so it stays open.
 export function getRollCallPhase() {
-  const { hour } = getEasternNow();
+  const et = getEasternNow();
+  if (!isGameDay(et.dateKey)) return 'open'; // Sat/Sun → Monday's signup already open
+  const { hour } = et;
   if (hour < RESET_HOUR_ET) return 'closed';
   if (hour < OPEN_HOUR_ET) return 'admins-only';
   return 'open';
