@@ -52,6 +52,7 @@ async function setGearRole(dateKey, { name, deviceId, isAdmin }, role, type) {
 
 export default function GearManager({ playerName, deviceId, amAdmin, suspended, adminName }) {
   const [commitments, setCommitments] = useState([]);
+  const [loaded, setLoaded] = useState(false); // ledger has arrived from Firebase
   const [pickerType, setPickerType] = useState(null); // type mid-return-date-pick
   const [busy, setBusy] = useState(false);
   const [showSchedule, setShowSchedule] = useState(false);
@@ -60,7 +61,8 @@ export default function GearManager({ playerName, deviceId, amAdmin, suspended, 
   useEffect(() => {
     const unsub = onSnapshot(LEDGER, (snap) => {
       setCommitments(snap.exists() ? (snap.data().commitments || []) : []);
-    }, () => setCommitments([]));
+      setLoaded(true);
+    }, () => setLoaded(true));
     return unsub;
   }, []);
 
@@ -218,6 +220,11 @@ export default function GearManager({ playerName, deviceId, amAdmin, suspended, 
   };
 
   if (!playerName) return null;
+
+  // Don't flash "GEAR AT RISK / everything needed" before the ledger loads.
+  if (!loaded) {
+    return <div className="gear-panel"><p className="gear-note">Loading gear…</p></div>;
+  }
 
   return (
     <div className="gear-panel">
