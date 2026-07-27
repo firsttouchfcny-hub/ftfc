@@ -77,18 +77,29 @@ export function getSessionDate() {
   return isGameDay(base) ? base : nextGameDay(base);
 }
 
-// Roll-call phase for the active signup day, in Eastern time:
-//   'closed'      → before 10 AM (prior game still showing; nothing to join yet)
-//   'admins-only' → 10 AM–3 PM (admins may sign up early)
-//   'open'        → 3 PM onward (everyone may sign up)
-// On weekends the next game (Monday) already opened Friday 3 PM, so it stays open.
+// Roll-call phase for the active signup day, in Eastern time. A game's roll call
+// opens the DAY BEFORE the game — including Sunday for a Monday game (so it no
+// longer springs open on Friday over the weekend):
+//   'closed'      → more than a day out, or before 10 AM the day before
+//   'admins-only' → 10 AM–3 PM the day before (admins may sign up early)
+//   'open'        → 3 PM the day before, through the game morning
 export function getRollCallPhase() {
   const et = getEasternNow();
-  if (!isGameDay(et.dateKey)) return 'open'; // Sat/Sun → Monday's signup already open
-  const { hour } = et;
-  if (hour < RESET_HOUR_ET) return 'closed';
-  if (hour < OPEN_HOUR_ET) return 'admins-only';
-  return 'open';
+  const target = getSessionDate();              // the game we're currently showing
+  const dayBefore = addDaysToKey(target, -1);   // roll call opens on this day at 3 PM ET
+
+  // Morning of the game itself: stays open until the 10 AM reset moves to the next game.
+  if (et.dateKey === target) {
+    return et.hour < RESET_HOUR_ET ? 'open' : 'closed';
+  }
+  // The day before the game (e.g. Sunday for a Monday game).
+  if (et.dateKey === dayBefore) {
+    if (et.hour < RESET_HOUR_ET) return 'closed';
+    if (et.hour < OPEN_HOUR_ET) return 'admins-only';
+    return 'open';
+  }
+  // Two or more days before the next game (e.g. Fri/Sat for a Monday game).
+  return 'closed';
 }
 
 // Effective open state. An admin override ('open' | 'closed') only applies

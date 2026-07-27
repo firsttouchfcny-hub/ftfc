@@ -11,14 +11,14 @@ import {
 export const GEAR_OPEN_HOUR_ET  = 11; // 11 AM ET — gear volunteering opens
 export const GEAR_ALERT_HOUR_ET = 18; // 6 PM ET the night before — risk flag
 
-// The physical sets the club owns: 4 goals + 1 balls/cones + 5 rotating bib sets.
-// Per-game need is set in GEAR_DEFS (goals 2, balls 1, bibs 1). Balls has a
+// The physical sets the club owns: 3 goals + 1 balls/cones + 5 rotating bib sets.
+// Per-game need is set in GEAR_DEFS (goals 2, balls 1, bibs 1) — so 2 of the 3
+// goal sets are in play each game and 1 is the rotating spare. Balls has a
 // single set that always comes back the next game day (returnWindow 1).
 export const GEAR_SETS = [
   { id: 'goal-1',  type: 'goal' },
   { id: 'goal-2',  type: 'goal' },
   { id: 'goal-3',  type: 'goal' },
-  { id: 'goal-4',  type: 'goal' },
   { id: 'balls-1', type: 'balls' },
   { id: 'bibs-1',  type: 'bibs' },
   { id: 'bibs-2',  type: 'bibs' },
@@ -27,11 +27,14 @@ export const GEAR_SETS = [
   { id: 'bibs-5',  type: 'bibs' },
 ];
 
-// Per-type definitions. returnWindow = how many days out a return date may be.
-//   goals / balls → tomorrow or the day after (2-day window)
-//   bibs          → any day within the next 5 days
+// Per-type definitions. returnWindow = how many game days out a return may be.
+//   goals → next game OR the day after (2-day window): the 2 goals at the field
+//           must be carried to an upcoming match; if the next game already has
+//           its 2 goals covered, the taker brings them the day after instead.
+//   balls → next game (1-day)
+//   bibs  → any day within the next 5 days
 export const GEAR_DEFS = {
-  goal:  { icon: '🥅', label: 'Goals',         need: 2, returnWindow: 1 },
+  goal:  { icon: '🥅', label: 'Goals',         need: 2, returnWindow: 2 },
   balls: { icon: '⚽', label: 'Balls & cones', need: 1, returnWindow: 1 },
   bibs:  { icon: '🧺', label: 'Bibs',          need: 1, returnWindow: 5 },
 };
@@ -88,11 +91,17 @@ export function availableReturnDates(commitments, type, takeDate) {
 // UNLESS Monday is already full for that gear — then the normal window applies.
 export function playerReturnDates(commitments, type, takeDate) {
   const opts = availableReturnDates(commitments, type, takeDate);
-  if (isFridayKey(takeDate) && opts.length) {
-    const monday = addGameDays(takeDate, 1); // next game day after Friday
-    if (opts[0] === monday) return [monday];  // Monday still needs it → force it
+  if (!opts.length) return opts;
+  // A Friday take should come back Monday when that slot is still open.
+  if (isFridayKey(takeDate)) {
+    const monday = addGameDays(takeDate, 1);
+    if (opts[0] === monday) return [monday];
   }
-  return opts;
+  // Goals & balls are auto-assigned to the earliest open day — the next game, or
+  // the following game if the next one already has its full set of goals. No
+  // date choice for the player.
+  if (type === 'goal' || type === 'balls') return [opts[0]];
+  return opts; // bibs: player picks a day within the window
 }
 
 // Bring-back dates for gear ALREADY held (admin "has it" onboarding): unlike a
@@ -127,6 +136,31 @@ export function availableToTake(commitments, type, takeDate) {
   const atGame = gearNeed(type);
   const alreadyTaking = takersFor(commitments, takeDate).filter((c) => c.type === type).length;
   return Math.max(0, atGame - alreadyTaking);
+}
+
+// Per-set custody for the admin tracker: for each physical set of `type`, who
+// holds it right now and when it's due back — the next scheduled hand-off, or
+// "at the field" if it's free. Sorted by set id.
+export function setStatuses(type, commitments) {
+  const today = todayKey();
+  return setsForType(type).map((set) => {
+    const held = (commitments || []).find(
+      (c) => isLive(c) && c.setId === set.id && c.takeDate <= today && c.returnDate > today
+    );
+    if (held) {
+      return { setId: set.id, state: 'out', holder: held.takerName, back: held.returnDate };
+    }
+    const upcoming = (commitments || [])
+      .filter((c) => isLive(c) && c.setId === set.id && c.returnDate > today)
+      .sort((a, b) => (a.takeDate < b.takeDate ? -1 : 1))[0];
+    if (upcoming) {
+      return {
+        setId: set.id, state: 'scheduled',
+        holder: upcoming.takerName, take: upcoming.takeDate, back: upcoming.returnDate,
+      };
+    }
+    return { setId: set.id, state: 'field', holder: null };
+  });
 }
 
 // Pick a concrete free physical set of the type for a take on `takeDate`.

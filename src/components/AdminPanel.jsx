@@ -17,10 +17,27 @@ export default function AdminPanel({ session, today, adminName }) {
   const [showStrikeLog, setShowStrikeLog] = useState(false);
   const [toast, setToast]                 = useState('');
   const [toastError, setToastError]       = useState(false);
+  const [manageInput, setManageInput]     = useState('');
+  const [admins, setAdmins]               = useState([]);
 
   useEffect(() => {
     if (showStrikeLog) loadStrikeLog();
   }, [showStrikeLog]);
+
+  useEffect(() => { loadAdmins(); }, []);
+
+  const loadAdmins = async () => {
+    try {
+      const snap = await getDocs(query(collection(db, 'players'), where('isAdmin', '==', true)));
+      setAdmins(
+        snap.docs
+          .map((d) => ({ id: d.id, ...d.data() }))
+          .sort((a, b) => (a.name || a.id).localeCompare(b.name || b.id))
+      );
+    } catch (err) {
+      console.error('load admins', err);
+    }
+  };
 
   const flash = (msg, isError = false) => {
     setToast(isError ? `❌ ${msg}` : msg);
@@ -194,6 +211,53 @@ export default function AdminPanel({ session, today, adminName }) {
     }
   };
 
+  // ── Manage admins & verification BY NAME (works even if the person isn't on
+  // today's list). Writes the profile, which is the source of truth for both the
+  // admin exemption and the sign-up verify gate. ──────────────────────────────
+  const handleGrantAdminByName = async () => {
+    const name = manageInput.trim();
+    if (!name) return;
+    try {
+      const ref = doc(db, 'players', normalizeName(name));
+      const snap = await getDoc(ref);
+      if (snap.exists()) await updateDoc(ref, { isAdmin: true });
+      else await setDoc(ref, { name, isAdmin: true, suspendedUntil: null, createdAt: Date.now() });
+      setManageInput('');
+      flash(`${name} is now an admin.`);
+      loadAdmins();
+    } catch (err) {
+      fireError('Make admin', err);
+    }
+  };
+
+  const handleRevokeAdmin = async (id, name) => {
+    try {
+      await updateDoc(doc(db, 'players', id), { isAdmin: false });
+      flash(`Removed admin from ${name || id}.`);
+      loadAdmins();
+    } catch (err) {
+      fireError('Remove admin', err);
+    }
+  };
+
+  // Safety valve: manually mark a player verified when their phone can't complete
+  // SMS verification, so the sign-up gate never permanently locks anyone out.
+  const handleMarkVerifiedByName = async () => {
+    const name = manageInput.trim();
+    if (!name) return;
+    try {
+      const ref = doc(db, 'players', normalizeName(name));
+      const snap = await getDoc(ref);
+      const stamp = { phoneVerified: true, phoneVerifiedByAdmin: true, phoneVerifiedAt: Date.now() };
+      if (snap.exists()) await updateDoc(ref, stamp);
+      else await setDoc(ref, { name, isAdmin: false, suspendedUntil: null, createdAt: Date.now(), ...stamp });
+      setManageInput('');
+      flash(`${name} marked verified (admin override).`);
+    } catch (err) {
+      fireError('Mark verified', err);
+    }
+  };
+
   const handleRemovePlayer = async (playerId) => {
     try {
       const newPlayers = (session?.players || []).filter((p) => p.id !== playerId);
@@ -326,6 +390,51 @@ export default function AdminPanel({ session, today, adminName }) {
         <button className="btn btn-primary" onClick={handleBulkAdd}>
           Add to List
         </button>
+      </div>
+
+      {/* Manage Admins & Verification */}
+      <div className="admin-block">
+        <h4>Admins &amp; Verification</h4>
+        <p className="admin-hint">
+          Assign admin roles, or manually mark a player verified (safety valve if
+          their phone can’t get the SMS code). Works by name — even if they’re not
+          on today’s list.
+        </p>
+        <input
+          className="form-input"
+          placeholder="Player’s name…"
+          value={manageInput}
+          onChange={(e) => setManageInput(e.target.value)}
+        />
+        <div className="btn-row">
+          <button className="btn btn-primary" onClick={handleGrantAdminByName}>
+            Make admin
+          </button>
+          <button className="btn btn-success" onClick={handleMarkVerifiedByName}>
+            Mark verified
+          </button>
+        </div>
+        {admins.length > 0 && (
+          <div className="admin-player-list" style={{ marginTop: 10 }}>
+            {admins.map((a) => (
+              <div key={a.id} className="admin-player-row">
+                <span className="admin-player-name">
+                  {a.name || a.id}
+                  <span className="badge badge-admin">admin</span>
+                  {a.phoneVerified && (
+                    <span className="badge badge-verified">✓ verified</span>
+                  )}
+                </span>
+                <button
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => handleRevokeAdmin(a.id, a.name)}
+                >
+                  Remove admin
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Manage Players */}

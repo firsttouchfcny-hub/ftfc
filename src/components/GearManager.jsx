@@ -7,7 +7,7 @@ import {
   availableReturnDates, playerReturnDates, returnSlotsLeft,
   availableToTake, pickFreeSet, coverageForMorning,
   bringersFor, takersFor, gearBringingAlert, gearTakingAlert,
-  myCommitments, upcomingMornings,
+  myCommitments, upcomingMornings, setStatuses,
 } from '../utils/gear';
 
 const LEDGER = doc(db, 'gear', 'ledger');
@@ -56,6 +56,7 @@ export default function GearManager({ playerName, deviceId, amAdmin, suspended, 
   const [pickerType, setPickerType] = useState(null); // type mid-return-date-pick
   const [busy, setBusy] = useState(false);
   const [showSchedule, setShowSchedule] = useState(false);
+  const [showSets, setShowSets] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
 
   useEffect(() => {
@@ -360,6 +361,38 @@ export default function GearManager({ playerName, deviceId, amAdmin, suspended, 
             <div key={c.id} className="gear-mine-row">
               <span>{gearIcon(c.type)} You're bringing <strong>{gearLabel(c.type)}</strong> back {fmtDay(c.returnDate)}</span>
               <button className="btn btn-ghost btn-sm" onClick={() => cancelCommitment(c.id)}>Cancel</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Where's each set right now — who holds it and when it's due back */}
+      <button className="btn btn-ghost btn-full btn-sm" onClick={() => setShowSets(!showSets)}>
+        {showSets ? '▲ Hide who has the gear' : '🧭 Who has the gear'}
+      </button>
+      {showSets && (
+        <div className="gear-sets">
+          {GEAR_TYPE_ORDER.map((t) => (
+            <div key={t} className="gear-sets-type">
+              <div className="gear-sets-head">{gearIcon(t)} {gearLabel(t)}</div>
+              {setStatuses(t, commitments).map((s) => (
+                <div key={s.setId} className="gear-sets-row">
+                  <span className="gear-sets-id">{s.setId}</span>
+                  {s.state === 'out' && (
+                    <span className="gear-sets-holder">
+                      <strong>{s.holder}</strong> · back {fmtDay(s.back)}
+                    </span>
+                  )}
+                  {s.state === 'scheduled' && (
+                    <span className="gear-sets-holder">
+                      {s.holder} takes {fmtDay(s.take)} · back {fmtDay(s.back)}
+                    </span>
+                  )}
+                  {s.state === 'field' && (
+                    <span className="gear-sets-field">at the field</span>
+                  )}
+                </div>
+              ))}
             </div>
           ))}
         </div>

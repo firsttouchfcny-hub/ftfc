@@ -10,6 +10,8 @@ import AdminPanel  from './components/AdminPanel';
 import Rules       from './components/Rules';
 import PhoneVerify from './components/PhoneVerify';
 import GearManager from './components/GearManager';
+import PushSetup   from './components/PushSetup';
+import { registerServiceWorker } from './utils/push';
 import { fridayGearPriorityNames, bringersFor, takersFor } from './utils/gear';
 import {
   getSessionDate, getTomorrow, getDeviceId, normalizeName,
@@ -29,6 +31,9 @@ export default function App() {
   const [showNameEntry, setShowNameEntry] = useState(() => !localStorage.getItem('ftfc_player_name'));
   const [showEditName,    setShowEditName]    = useState(false);
   const [showPhoneVerify, setShowPhoneVerify] = useState(false);
+  // When the verify screen is opened by a blocked join, remember the +1s so we
+  // can finish that exact sign-up once the phone is verified.
+  const [pendingPlusOnes, setPendingPlusOnes] = useState(null);
   const [showAdminLogin,  setShowAdminLogin]  = useState(false);
   const [showAdminPanel,  setShowAdminPanel]  = useState(false);
 
@@ -38,6 +43,9 @@ export default function App() {
   const [gearLedger,    setGearLedger]    = useState([]);
   const [loading,       setLoading]       = useState(true);
   const [, setClockTick] = useState(0); // re-render so time-based open/close updates live
+
+  // Register the service worker once so the app is installable and can receive push.
+  useEffect(() => { registerServiceWorker(); }, []);
 
   // Re-evaluate Eastern-time state (10 AM reset, 3 PM open) without a manual refresh.
   // The interval covers foreground; visibility/focus covers phones returning from
@@ -166,11 +174,20 @@ export default function App() {
 
   // ── Actions ───────────────────────────────────────────────────────────────
 
-  const handleSignIn = useCallback(async (plusOnes = 0) => {
+  const handleSignIn = useCallback(async (plusOnes = 0, assumeVerified = false) => {
     const playerCanSignUp = (isAdmin || playerProfile?.isAdmin)
       ? canAdminSignUp(session)
       : isRollCallOpen(session);
     if (!playerCanSignUp || !playerName || suspended) return;
+
+    // Everyone must verify their phone before joining. Admins are exempt (they
+    // hold the PIN). If not yet verified, open the verify screen and remember
+    // the +1s so onVerified can finish this exact join.
+    if (!amAdmin && !assumeVerified && !playerProfile?.phoneVerified) {
+      setPendingPlusOnes(plusOnes);
+      setShowPhoneVerify(true);
+      return;
+    }
 
     // Admin badge comes from the profile only — NOT from the device having
     // entered the shared PIN (which would leak the badge to anyone who logs in).
@@ -335,7 +352,15 @@ export default function App() {
                   )}
                 </span>
                 <div className="you-row-actions">
-                  {/* Phone verification hidden until the phone-auth phase (PhoneVerify.jsx kept in tree) */}
+                  {/* Shown until the player has verified their phone. */}
+                  {!playerProfile?.phoneVerified && (
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => setShowPhoneVerify(true)}
+                    >
+                      Verify phone
+                    </button>
+                  )}
                   <button
                     className="btn btn-ghost btn-sm"
                     onClick={() => setShowEditName(true)}
@@ -345,6 +370,8 @@ export default function App() {
                 </div>
               </div>
             )}
+
+            {playerName && <PushSetup />}
 
             {/* Suspension banner */}
             {suspended && (
@@ -508,7 +535,15 @@ export default function App() {
       {showPhoneVerify && (
         <PhoneVerify
           playerName={playerName}
-          onClose={() => setShowPhoneVerify(false)}
+          onClose={() => { setShowPhoneVerify(false); setPendingPlusOnes(null); }}
+          onVerified={() => {
+            setShowPhoneVerify(false);
+            if (pendingPlusOnes !== null) {
+              const n = pendingPlusOnes;
+              setPendingPlusOnes(null);
+              handleSignIn(n, true); // finish the join now that they're verified
+            }
+          }}
         />
       )}
       {showAdminLogin && (

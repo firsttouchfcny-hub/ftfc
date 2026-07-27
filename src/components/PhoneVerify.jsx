@@ -4,7 +4,7 @@ import {
   signInWithPhoneNumber,
   signOut,
 } from 'firebase/auth';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
 import { normalizeName } from '../utils/helpers';
 
@@ -67,7 +67,7 @@ export default function PhoneVerify({ playerName, onClose, onVerified }) {
           ? 'Too many attempts. Try again later.'
           : err.code === 'auth/operation-not-allowed'
             ? 'Phone sign-in is not enabled in Firebase. Enable it in the console.'
-            : 'Could not send the code. Try again.';
+            : `Could not send the code. Try again. [${err.code}]`;
       setError(msg);
       resetRecaptcha();
     } finally {
@@ -92,11 +92,24 @@ export default function PhoneVerify({ playerName, onClose, onVerified }) {
     try {
       await confirmRef.current.confirm(code);
       const e164 = toE164US(phone);
-      await updateDoc(doc(db, 'players', normalizeName(playerName)), {
+      const mine = normalizeName(playerName);
+
+      // One number per player: reject if this verified number is already tied to
+      // a different name — this is what actually stops roster abuse.
+      const dupes = await getDocs(query(collection(db, 'players'), where('phone', '==', e164)));
+      const conflict = dupes.docs.find((d) => d.id !== mine && d.data()?.phoneVerified);
+      if (conflict) {
+        try { await signOut(auth); } catch { /* noop */ }
+        setError(`This number is already verified for "${conflict.data().name || conflict.id}". Each player needs their own number — ask an admin if this is a mistake.`);
+        setBusy(false);
+        return;
+      }
+
+      await setDoc(doc(db, 'players', mine), {
         phoneVerified: true,
         phone: e164,
         phoneVerifiedAt: Date.now(),
-      });
+      }, { merge: true });
       // We only used Firebase Auth to verify ownership of the number — no need to keep the session.
       try { await signOut(auth); } catch { /* noop */ }
       onVerified?.();
@@ -123,8 +136,8 @@ export default function PhoneVerify({ playerName, onClose, onVerified }) {
         </h2>
         <p className="modal-subtitle">
           {step === 'phone'
-            ? "We'll text a 6-digit code to confirm it's you."
-            : `Code sent to ${phone}.`}
+            ? "New this season: verify your number once so we know every player is real. It takes a few seconds — and you'll only ever do it this one time."
+            : `We texted a 6-digit code to ${phone}. Enter it below.`}
         </p>
 
         {step === 'phone' ? (
