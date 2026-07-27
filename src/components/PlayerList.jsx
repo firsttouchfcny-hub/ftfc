@@ -4,8 +4,8 @@ import {
 } from '../utils/helpers';
 import { gearIcon } from '../utils/gear';
 
-export default function PlayerList({ session, deviceId, playerName, isOpen, gearPriorityNames, gearRoles }) {
-  const players = session?.players || [];
+export default function PlayerList({ players: playersProp, deviceId, playerName, isOpen, gearPriorityNames, gearRoles }) {
+  const players = playersProp || [];
   const gearPri = gearPriorityNames || new Set();
   const roles = gearRoles || {};
   const flat = buildFlatList(players, { gearPriorityNames: gearPri, gearRoles: roles });
