@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
-import { doc, onSnapshot, runTransaction } from 'firebase/firestore';
+import {
+  doc, onSnapshot, runTransaction, collection, getDocs, setDoc, updateDoc,
+} from 'firebase/firestore';
 import { db } from '../firebase/config';
 import {
   GEAR_TYPE_ORDER, GEAR_DEFS, gearIcon, gearLabel, gearNeed,
@@ -24,31 +26,33 @@ function fmtDay(key) {
 // Pass type=null to clear the marker (used when a commitment is cancelled).
 async function setGearRole(dateKey, { name, deviceId, uid, isAdmin }, role, type) {
   const field = role === 'bringer' ? 'gearBringer' : 'gearTaker';
-  const ref = doc(db, 'sessions', dateKey);
-  await runTransaction(db, async (tx) => {
-    const snap = await tx.get(ref);
-    const players = snap.exists() ? (snap.data().players || []) : [];
-    const mine = players.find(
-      (p) => (uid && p.uid === uid) || p.deviceId === deviceId ||
-        p.name.toLowerCase() === name.toLowerCase()
-    );
-    if (type == null) { // clear
-      if (!mine || !mine[field]) return;
-      tx.update(ref, { players: players.map((p) => (p === mine ? { ...p, [field]: null } : p)) });
-      return;
-    }
-    let next;
-    if (mine) {
-      next = players.map((p) => (p === mine ? { ...p, [field]: type } : p));
-    } else {
-      next = [...players, {
-        id: crypto.randomUUID(), name, deviceId, uid: uid || null, isAdmin: !!isAdmin,
-        plusOnes: 0, [field]: type, signedUpAt: Date.now(),
-      }];
-    }
-    if (snap.exists()) tx.update(ref, { players: next });
-    else tx.set(ref, { date: dateKey, isOpen: false, players: next, createdAt: Date.now() });
+  const col = collection(db, 'sessions', dateKey, 'players');
+  // Find any existing roster entry for this person (by stable uid, else their
+  // device-keyed doc, else a name match) so we tag the same doc rather than
+  // creating a duplicate. Each person writes only their own doc, so committing
+  // to gear never contends with anyone else's write.
+  const snap = await getDocs(col);
+  const mineDoc = snap.docs.find((d) => {
+    const p = d.data();
+    return (uid && p.uid === uid) || p.deviceId === deviceId ||
+      (p.name || '').toLowerCase() === name.toLowerCase();
   });
+
+  if (type == null) { // clear the role marker (leaves them on the roster)
+    if (mineDoc) await updateDoc(mineDoc.ref, { [field]: null });
+    return;
+  }
+  if (mineDoc) {
+    await updateDoc(mineDoc.ref, { [field]: type });
+  } else {
+    // Not on this day's roster yet → auto-add them, keyed by deviceId to match
+    // sign-in (one doc per device; uid is stored as a field). Committing to gear
+    // signs you up for that game.
+    await setDoc(doc(col, deviceId), {
+      name, deviceId, uid: uid || null, isAdmin: !!isAdmin,
+      plusOnes: 0, [field]: type, signedUpAt: Date.now(),
+    });
+  }
 }
 
 export default function GearManager({ playerName, deviceId, uid, amAdmin, suspended, adminName }) {

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { db } from '../firebase/config';
 import {
-  doc, setDoc, getDoc, updateDoc,
+  doc, setDoc, getDoc, updateDoc, deleteDoc, writeBatch,
   collection, addDoc, query, where, getDocs,
 } from 'firebase/firestore';
 import {
@@ -10,7 +10,7 @@ import {
   getRollCallPhase, isRollCallOpen,
 } from '../utils/helpers';
 
-export default function AdminPanel({ session, today, adminName }) {
+export default function AdminPanel({ session, players, today, adminName }) {
   const [bulkAddInput, setBulkAddInput]   = useState('');
   const [strikeInput, setStrikeInput]     = useState('');
   const [strikeLog, setStrikeLog]         = useState([]);
@@ -72,7 +72,6 @@ export default function AdminPanel({ session, today, adminName }) {
       await setDoc(ref, {
         date: today,
         isOpen: false,
-        players: [],
         createdAt: Date.now(),
       });
     }
@@ -83,6 +82,9 @@ export default function AdminPanel({ session, today, adminName }) {
     const ref = await getOrCreateSession();
     await updateDoc(ref, data);
   }
+
+  // A player is now its own document in the session's players subcollection.
+  const playerDoc = (id) => doc(db, 'sessions', today, 'players', id);
 
   async function ensurePlayerProfile(name) {
     const id = normalizeName(name);
@@ -124,7 +126,13 @@ export default function AdminPanel({ session, today, adminName }) {
   const handleResetList = async () => {
     if (!confirm('Reset the player list for today? This cannot be undone.')) return;
     try {
-      await updateSession({ players: [], isOpen: false });
+      // Delete every player doc in one atomic batch (batching is the right tool
+      // here: one admin clearing many docs at once, not many clients contending).
+      const snap = await getDocs(collection(db, 'sessions', today, 'players'));
+      const batch = writeBatch(db);
+      snap.docs.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+      await updateSession({ isOpen: false, drops: [] });
       flash('List reset');
     } catch (err) {
       fireError('Reset list', err);
@@ -137,30 +145,32 @@ export default function AdminPanel({ session, today, adminName }) {
     const names = parseNames(bulkAddInput);
     if (!names.length) return;
 
-    const ref = await getOrCreateSession();
-    const snap = await getDoc(ref);
-    const current = snap.data()?.players || [];
-    const existing = new Set(current.map((p) => p.name.toLowerCase()));
-
-    const toAdd = [];
-    for (const name of names) {
-      if (existing.has(name.toLowerCase())) continue;
-      const profile = await ensurePlayerProfile(name);
-      toAdd.push({
-        id: crypto.randomUUID(),
-        name,
-        deviceId: `admin-added-${crypto.randomUUID()}`,
-        isAdmin: profile.isAdmin || false,
-        plusOnes: 0,
-        signedUpAt: Date.now(),
-      });
-      existing.add(name.toLowerCase());
-    }
+    await getOrCreateSession();
+    const existing = new Set((players || []).map((p) => p.name.toLowerCase()));
 
     try {
-      await updateDoc(ref, { players: [...current, ...toAdd] });
+      const batch = writeBatch(db);
+      let added = 0;
+      for (const name of names) {
+        if (existing.has(name.toLowerCase())) continue;
+        const profile = await ensurePlayerProfile(name);
+        // Admin-added players have no real device, so key the doc by name.
+        const id = `admin-${normalizeName(name)}`;
+        batch.set(playerDoc(id), {
+          name,
+          deviceId: id,
+          isAdmin: profile.isAdmin || false,
+          plusOnes: 0,
+          priority: false,
+          // +added keeps a stable signup order within one batch (same-ms writes).
+          signedUpAt: Date.now() + added,
+        });
+        existing.add(name.toLowerCase());
+        added++;
+      }
+      await batch.commit();
       setBulkAddInput('');
-      flash(`Added ${toAdd.length} player(s)`);
+      flash(`Added ${added} player(s)`);
     } catch (err) {
       fireError('Bulk add', err);
     }
@@ -170,10 +180,7 @@ export default function AdminPanel({ session, today, adminName }) {
 
   const handleUpdatePlusOnes = async (playerId, value) => {
     try {
-      const newPlayers = (session?.players || []).map((p) =>
-        p.id === playerId ? { ...p, plusOnes: parseInt(value, 10) } : p
-      );
-      await updateSession({ players: newPlayers });
+      await updateDoc(playerDoc(playerId), { plusOnes: parseInt(value, 10) });
     } catch (err) {
       fireError('Update +1s', err);
     }
@@ -184,10 +191,7 @@ export default function AdminPanel({ session, today, adminName }) {
   // password login) and never touches the player's profile.
   const handleTogglePriority = async (playerId, current) => {
     try {
-      const newPlayers = (session?.players || []).map((p) =>
-        p.id === playerId ? { ...p, priority: !current } : p
-      );
-      await updateSession({ players: newPlayers });
+      await updateDoc(playerDoc(playerId), { priority: !current });
     } catch (err) {
       fireError('Toggle priority', err);
     }
@@ -198,10 +202,7 @@ export default function AdminPanel({ session, today, adminName }) {
   const handleToggleAdmin = async (playerId, name, current) => {
     try {
       const newVal = !current;
-      const newPlayers = (session?.players || []).map((p) =>
-        p.id === playerId ? { ...p, isAdmin: newVal } : p
-      );
-      await updateSession({ players: newPlayers });
+      await updateDoc(playerDoc(playerId), { isAdmin: newVal });
       const ref = doc(db, 'players', normalizeName(name));
       const snap = await getDoc(ref);
       if (snap.exists()) await updateDoc(ref, { isAdmin: newVal });
@@ -260,8 +261,7 @@ export default function AdminPanel({ session, today, adminName }) {
 
   const handleRemovePlayer = async (playerId) => {
     try {
-      const newPlayers = (session?.players || []).filter((p) => p.id !== playerId);
-      await updateSession({ players: newPlayers });
+      await deleteDoc(playerDoc(playerId));
     } catch (err) {
       fireError('Remove player', err);
     }
@@ -333,7 +333,7 @@ export default function AdminPanel({ session, today, adminName }) {
 
   // ── Render ────────────────────────────────────────────────────────────────
 
-  const mainPlayers = buildFlatList(session?.players || []).filter((p) => p.isMainEntry);
+  const mainPlayers = buildFlatList(players || []).filter((p) => p.isMainEntry);
 
   const phase    = getRollCallPhase();           // closed | admins-only | open
   const rollOpen = isRollCallOpen(session);

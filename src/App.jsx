@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { db } from './firebase/config';
 import {
-  doc, onSnapshot, setDoc, getDoc, updateDoc, runTransaction,
+  doc, onSnapshot, setDoc, getDoc, updateDoc, deleteDoc,
+  collection, arrayUnion,
 } from 'firebase/firestore';
 import NameEntry   from './components/NameEntry';
 import AdminLogin  from './components/AdminLogin';
@@ -40,9 +41,13 @@ export default function App() {
   const [pendingPlusOnes, setPendingPlusOnes] = useState(null);
   const [showAdminLogin,  setShowAdminLogin]  = useState(false);
   const [showAdminPanel,  setShowAdminPanel]  = useState(false);
+  // Which sign-in is in flight (null = none, 0 = "In", 1 = "In +1") — drives the
+  // button's submitting state and blocks double taps while the write is pending.
+  const [signingIn,       setSigningIn]       = useState(null);
 
   // ── Firebase state ────────────────────────────────────────────────────────
   const [session,       setSession]       = useState(null);
+  const [players,       setPlayers]       = useState([]);
   const [playerProfile, setPlayerProfile] = useState(null);
   const [gearLedger,    setGearLedger]    = useState([]);
   const [loading,       setLoading]       = useState(true);
@@ -72,7 +77,8 @@ export default function App() {
     };
   }, []);
 
-  // Listen to the player-facing session (today before noon, tomorrow after)
+  // Listen to the session meta doc (isOpen / override / drops). The roster no
+  // longer lives here — it's the players subcollection below.
   useEffect(() => {
     const ref = doc(db, 'sessions', today);
     const timeout = setTimeout(() => setLoading(false), 5000);
@@ -80,16 +86,29 @@ export default function App() {
       ref,
       (snap) => {
         clearTimeout(timeout);
-        setSession(snap.exists() ? snap.data() : { date: today, isOpen: false, players: [] });
+        setSession(snap.exists() ? snap.data() : { date: today, isOpen: false });
         setLoading(false);
       },
       () => {
         clearTimeout(timeout);
-        setSession({ date: today, isOpen: false, players: [] });
+        setSession({ date: today, isOpen: false });
         setLoading(false);
       }
     );
     return () => { unsub(); clearTimeout(timeout); };
+  }, [today]);
+
+  // Listen to this session's players subcollection. Each player is their own
+  // document (keyed by device id), so simultaneous sign-ins each write a
+  // different doc and never contend on a shared roster array.
+  useEffect(() => {
+    const col = collection(db, 'sessions', today, 'players');
+    const unsub = onSnapshot(
+      col,
+      (snap) => setPlayers(snap.docs.map((d) => ({ ...d.data(), id: d.id }))),
+      () => setPlayers([])
+    );
+    return unsub;
   }, [today]);
 
   // Listen to the gear ledger (drives Friday gear-priority ordering).
@@ -130,8 +149,8 @@ export default function App() {
   // A roster entry is "me" if the stable uid matches, else fall back to device/name.
   const isMe = (p) => (uid && p.uid === uid) || p.deviceId === deviceId ||
     (p.name || '').toLowerCase() === playerName.toLowerCase();
-  const myEntry       = session?.players?.find(isMe);
-  const onListByName  = session?.players?.some(
+  const myEntry       = players.find(isMe);
+  const onListByName  = players.some(
     (p) => p.name.toLowerCase() === playerName.toLowerCase()
   );
   const isOnList      = !!myEntry || onListByName;
@@ -156,11 +175,8 @@ export default function App() {
   bringersFor(gearLedger, today).forEach((c) => addRole(c.takerName, 'bring', c.type));
   takersFor(gearLedger, today).forEach((c) => addRole(c.takerName, 'take', c.type));
 
-  const flatList = buildFlatList(session?.players || [], { gearPriorityNames, gearRoles });
-  const myFlatIndex = flatList.findIndex(
-    (p) => p.isMainEntry &&
-      (p.deviceId === deviceId || p.name.toLowerCase() === playerName.toLowerCase())
-  );
+  const flatList = buildFlatList(players, { gearPriorityNames, gearRoles });
+  const myFlatIndex = flatList.findIndex((p) => p.isMainEntry && isMe(p));
   const myPosition = myFlatIndex >= 0 ? myFlatIndex + 1 : null;
 
   let myStatus = null;
@@ -189,6 +205,7 @@ export default function App() {
   // ── Actions ───────────────────────────────────────────────────────────────
 
   const handleSignIn = useCallback(async (plusOnes = 0, assumeVerified = false) => {
+    if (signingIn !== null) return; // a sign-in is already in flight — ignore
     const playerCanSignUp = (isAdmin || playerProfile?.isAdmin)
       ? canAdminSignUp(session)
       : isRollCallOpen(session);
@@ -203,64 +220,79 @@ export default function App() {
       return;
     }
 
+    // Best-effort guard against a duplicate NAME held by someone else (a
+    // different uid/device). Not transactional: each person writes their own
+    // doc, so the worst case is a rare duplicate an admin can remove — never a
+    // lost or clobbered sign-in.
+    const nameHeldByOther = players.some(
+      (p) => (p.name || '').toLowerCase() === playerName.toLowerCase() &&
+        !(p.deviceId === deviceId || (uid && p.uid === uid))
+    );
+    if (nameHeldByOther) return;
+
     // Admin badge comes from the profile only — NOT from the device having
     // entered the shared PIN (which would leak the badge to anyone who logs in).
     const playerIsAdmin = playerProfile?.isAdmin || false;
-    const ref = doc(db, 'sessions', today);
+
+    // One roster document per device, keyed by the always-present deviceId (uid
+    // is stored as a field, not used as the key: it can be absent on an early
+    // sign-in and present later, which would split one device across two docs).
+    // A plain setDoc with no read-modify-write means concurrent sign-ins each
+    // touch a different doc and never collide; re-tapping overwrites the same
+    // doc (idempotent), so it can never create a duplicate.
+    const ref = doc(db, 'sessions', today, 'players', deviceId);
+    setSigningIn(plusOnes); // show the submitting state and block further taps
     try {
-      // Atomic: read the live list inside a transaction so we never clobber
-      // concurrent sign-ups with a stale in-browser copy.
-      await runTransaction(db, async (tx) => {
-        const snap = await tx.get(ref);
-        const players = snap.exists() ? (snap.data().players || []) : [];
-        if (players.some(
-          (p) => (uid && p.uid === uid) || p.deviceId === deviceId ||
-            (p.name || '').toLowerCase() === playerName.toLowerCase()
-        )) return; // already on the list
-        const entry = {
-          id: crypto.randomUUID(), name: playerName, deviceId, uid,
-          isAdmin: playerIsAdmin, plusOnes, signedUpAt: Date.now(),
-        };
-        if (snap.exists()) tx.update(ref, { players: [...players, entry] });
-        else tx.set(ref, { date: today, isOpen: false, players: [entry], createdAt: Date.now() });
-      });
+      // merge:true so signing in only sets the identity/+1 fields and preserves
+      // anything another writer put on this same doc — an admin's `priority` or
+      // GearManager's `gearBringer`/`gearTaker` markers. Without merge, a plain
+      // setDoc replaces the whole doc and would silently wipe those.
+      await setDoc(ref, {
+        name: playerName, deviceId, uid,
+        isAdmin: playerIsAdmin, plusOnes, signedUpAt: Date.now(),
+      }, { merge: true });
     } catch (err) {
       console.error('[FTFC] sign-in failed:', err);
+    } finally {
+      // Clear on both success and failure: on success the snapshot flips the UI
+      // to "Out"; on failure the buttons re-enable so the player can retry.
+      setSigningIn(null);
     }
-  }, [session, playerName, deviceId, uid, suspended, isAdmin, amAdmin, playerProfile, today]);
+  }, [signingIn, session, players, playerName, deviceId, uid, suspended, isAdmin, amAdmin, playerProfile, today]);
 
   const handleSignOut = useCallback(async () => {
     if (!playerName) return;
     // #5 — confirm before dropping
     if (!window.confirm('Out — are you sure? This removes you from the list.')) return;
 
-    const ref = doc(db, 'sessions', today);
+    // Act only on THIS device's own entry — match by device id, never by name or
+    // uid. Name would risk deleting a same-named stranger; uid would risk
+    // deleting the same person's doc created on a *different* device. deviceId is
+    // exactly the key sign-in wrote, so we delete precisely our own doc.
+    const mine = players.find((p) => p.deviceId === deviceId);
+    if (!mine) return;
+
+    // Position at drop time → was this a playing spot (top 36) or the bench?
+    // Match our own row by its doc id (not name) for the same reason.
+    const flat = buildFlatList(players);
+    const idx = flat.findIndex((p) => p.isMainEntry && p.id === mine.id);
+    const fromBench = idx >= 0 && idx + 1 > MATCH2_MAX;
+
     try {
-      // Atomic: remove only self against the live list, and log the drop.
-      await runTransaction(db, async (tx) => {
-        const snap = await tx.get(ref);
-        if (!snap.exists()) return;
-        const data = snap.data();
-        const players = data.players || [];
-        const isMine = (p) => (uid && p.uid === uid) || p.deviceId === deviceId ||
-          (p.name || '').toLowerCase() === playerName.toLowerCase();
-        const removed = players.filter(isMine);
-        if (removed.length === 0) return;
-        const newPlayers = players.filter((p) => !isMine(p));
-        // Position at drop time → was this a playing spot (top 36) or the bench?
-        const flat = buildFlatList(players);
-        const idx = flat.findIndex((p) => p.isMainEntry && isMine(p));
-        const fromBench = idx >= 0 && idx + 1 > MATCH2_MAX;
-        tx.update(ref, {
-          players: newPlayers,
-          // #7 — record the drop (clears when the session rolls over at 10 AM)
-          drops: [...(data.drops || []), { name: removed[0].name, deviceId, at: Date.now(), fromBench }],
-        });
-      });
+      // Delete only my own player doc, then append the drop to the session meta
+      // doc. arrayUnion + merge is a single atomic field op (no read-back), and
+      // drops are far too rare to contend the way sign-ins did.
+      await deleteDoc(doc(db, 'sessions', today, 'players', mine.id));
+      await setDoc(
+        doc(db, 'sessions', today),
+        // #7 — record the drop (clears when the session rolls over at 10 AM)
+        { date: today, drops: arrayUnion({ name: mine.name, deviceId, at: Date.now(), fromBench }) },
+        { merge: true }
+      );
     } catch (err) {
       console.error('[FTFC] sign-out failed:', err);
     }
-  }, [playerName, deviceId, uid, today]);
+  }, [playerName, players, deviceId, today]);
 
   const handleNameSave = async (name, verifiedPhone = null) => {
     const previousName = playerName;
@@ -273,12 +305,11 @@ export default function App() {
     setOnboardPhone(null);
 
     // If renaming and signed up for today's session, update the on-list entry.
-    if (isRename && session?.players?.some((p) => p.deviceId === deviceId)) {
-      const sessionRef = doc(db, 'sessions', today);
-      const updatedPlayers = session.players.map((p) =>
-        p.deviceId === deviceId ? { ...p, name } : p
-      );
-      await updateDoc(sessionRef, { players: updatedPlayers });
+    if (isRename) {
+      const mine = players.find((p) => p.deviceId === deviceId);
+      if (mine) {
+        await updateDoc(doc(db, 'sessions', today, 'players', mine.id), { name });
+      }
     }
 
     // Ensure a profile exists for this name, carrying the STABLE identity (uid +
@@ -440,21 +471,29 @@ export default function App() {
             {/* Signup buttons */}
             {playerName && (
               <div className="action-bar">
-                {!isOnList ? (
+                {/* Keep showing the In/In+1 controls while a sign-in is in flight
+                    (signingIn !== null), even though Firestore optimistically adds
+                    us to the roster the instant setDoc is called. Otherwise the
+                    buttons would flip to "Out" before the write is confirmed,
+                    reducing the submitting state to a sub-frame flash — and a
+                    failed write would flash "Out" then snap back. */}
+                {(!isOnList || signingIn !== null) ? (
                   <>
                     <button
                       className="btn btn-in"
                       onClick={() => handleSignIn(0)}
-                      disabled={!iCanSignUp || suspended}
+                      disabled={!iCanSignUp || suspended || signingIn !== null}
+                      aria-busy={signingIn === 0}
                     >
-                      In
+                      {signingIn === 0 ? 'Signing in…' : 'In'}
                     </button>
                     <button
                       className="btn btn-in-plus"
                       onClick={() => handleSignIn(1)}
-                      disabled={!iCanSignUp || suspended}
+                      disabled={!iCanSignUp || suspended || signingIn !== null}
+                      aria-busy={signingIn === 1}
                     >
-                      In +1
+                      {signingIn === 1 ? 'Signing in…' : 'In +1'}
                     </button>
                   </>
                 ) : (
@@ -484,7 +523,7 @@ export default function App() {
 
             {/* Player list */}
             <PlayerList
-              session={session}
+              players={players}
               deviceId={deviceId}
               playerName={playerName}
               isOpen={rollOpen}
@@ -560,6 +599,7 @@ export default function App() {
               {isAdmin && showAdminPanel && (
                 <AdminPanel
                   session={session}
+                  players={players}
                   today={adminDate}
                   adminName={playerName}
                 />
