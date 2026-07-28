@@ -294,6 +294,19 @@ export default function App() {
     }
   }, [playerName, players, deviceId, today]);
 
+  // Adjust my +1 guest count AFTER I'm already signed up — updates my own roster
+  // doc in place, so my signup time (and list position) never changes.
+  const handleSetMyPlusOnes = useCallback(async (n) => {
+    if (!myEntry) return;
+    const val = Math.max(0, Math.min(n, 20)); // clamp to a sane range
+    if (val === (myEntry.plusOnes || 0)) return;
+    try {
+      await updateDoc(doc(db, 'sessions', today, 'players', myEntry.id), { plusOnes: val });
+    } catch (err) {
+      console.error('[FTFC] update +1 failed:', err);
+    }
+  }, [myEntry, today]);
+
   const handleNameSave = async (name, verifiedPhone = null) => {
     const previousName = playerName;
     const isRename = previousName && previousName !== name;
@@ -497,9 +510,28 @@ export default function App() {
                     </button>
                   </>
                 ) : (
-                  <button className="btn btn-out" onClick={handleSignOut}>
-                    Out
-                  </button>
+                  <div className="signed-in-row">
+                    <button className="btn btn-out" onClick={handleSignOut}>
+                      Out
+                    </button>
+                    {/* Add/remove a +1 guest without dropping — keeps your spot. */}
+                    <div className="plus-stepper">
+                      <button
+                        className="btn btn-sm plus-btn"
+                        onClick={() => handleSetMyPlusOnes((myEntry?.plusOnes || 0) - 1)}
+                        disabled={(myEntry?.plusOnes || 0) <= 0}
+                        aria-label="Remove a guest"
+                      >–</button>
+                      <span className="plus-stepper-count">
+                        +{myEntry?.plusOnes || 0} guest{(myEntry?.plusOnes || 0) === 1 ? '' : 's'}
+                      </span>
+                      <button
+                        className="btn btn-sm plus-btn btn-in-plus"
+                        onClick={() => handleSetMyPlusOnes((myEntry?.plusOnes || 0) + 1)}
+                        aria-label="Add a guest"
+                      >+1</button>
+                    </div>
+                  </div>
                 )}
                 {!iCanSignUp && !isOnList && (
                   <p className="action-hint">

@@ -642,3 +642,12 @@ body {
 }
 .gear-sets-holder { color: var(--text); }
 .gear-sets-field { color: var(--text); opacity: .5; font-style: italic; }
+
+/* Add/remove a +1 guest while signed up */
+.signed-in-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.plus-stepper { display: inline-flex; align-items: center; gap: 8px; }
+.plus-btn { min-width: 42px; padding: 6px 10px; }
+.plus-stepper-count {
+  font-size: .9rem; font-weight: 600; color: var(--text);
+  min-width: 72px; text-align: center; font-variant: tabular-nums;
+}
