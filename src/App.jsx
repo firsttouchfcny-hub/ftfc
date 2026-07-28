@@ -41,6 +41,9 @@ export default function App() {
   const [pendingPlusOnes, setPendingPlusOnes] = useState(null);
   const [showAdminLogin,  setShowAdminLogin]  = useState(false);
   const [showAdminPanel,  setShowAdminPanel]  = useState(false);
+  // Which sign-in is in flight (null = none, 0 = "In", 1 = "In +1") — drives the
+  // button's submitting state and blocks double taps while the write is pending.
+  const [signingIn,       setSigningIn]       = useState(null);
 
   // ── Firebase state ────────────────────────────────────────────────────────
   const [session,       setSession]       = useState(null);
@@ -202,6 +205,7 @@ export default function App() {
   // ── Actions ───────────────────────────────────────────────────────────────
 
   const handleSignIn = useCallback(async (plusOnes = 0, assumeVerified = false) => {
+    if (signingIn !== null) return; // a sign-in is already in flight — ignore
     const playerCanSignUp = (isAdmin || playerProfile?.isAdmin)
       ? canAdminSignUp(session)
       : isRollCallOpen(session);
@@ -236,6 +240,7 @@ export default function App() {
     // re-tapping just overwrites the same doc (idempotent), so no duplicates.
     const rosterKey = uid || deviceId;
     const ref = doc(db, 'sessions', today, 'players', rosterKey);
+    setSigningIn(plusOnes); // show the submitting state and block further taps
     try {
       // merge:true so signing in only sets the identity/+1 fields and preserves
       // anything another writer put on this same doc — an admin's `priority` or
@@ -247,8 +252,12 @@ export default function App() {
       }, { merge: true });
     } catch (err) {
       console.error('[FTFC] sign-in failed:', err);
+    } finally {
+      // Clear on both success and failure: on success the snapshot flips the UI
+      // to "Out"; on failure the buttons re-enable so the player can retry.
+      setSigningIn(null);
     }
-  }, [session, players, playerName, deviceId, uid, suspended, isAdmin, amAdmin, playerProfile, today]);
+  }, [signingIn, session, players, playerName, deviceId, uid, suspended, isAdmin, amAdmin, playerProfile, today]);
 
   const handleSignOut = useCallback(async () => {
     if (!playerName) return;
@@ -297,7 +306,6 @@ export default function App() {
     setOnboardPhone(null);
 
     // If renaming and signed up for today's session, update the on-list entry.
-    // The doc is keyed by device id, so the id is stable across a rename.
     if (isRename) {
       const mine = players.find((p) => p.deviceId === deviceId);
       if (mine) {
@@ -469,16 +477,18 @@ export default function App() {
                     <button
                       className="btn btn-in"
                       onClick={() => handleSignIn(0)}
-                      disabled={!iCanSignUp || suspended}
+                      disabled={!iCanSignUp || suspended || signingIn !== null}
+                      aria-busy={signingIn === 0}
                     >
-                      In
+                      {signingIn === 0 ? 'Signing in…' : 'In'}
                     </button>
                     <button
                       className="btn btn-in-plus"
                       onClick={() => handleSignIn(1)}
-                      disabled={!iCanSignUp || suspended}
+                      disabled={!iCanSignUp || suspended || signingIn !== null}
+                      aria-busy={signingIn === 1}
                     >
-                      In +1
+                      {signingIn === 1 ? 'Signing in…' : 'In +1'}
                     </button>
                   </>
                 ) : (
