@@ -45,10 +45,10 @@ async function setGearRole(dateKey, { name, deviceId, uid, isAdmin }, role, type
   if (mineDoc) {
     await updateDoc(mineDoc.ref, { [field]: type });
   } else {
-    // Not on this day's roster yet → auto-add them, keyed by their stable uid
-    // (falling back to device id), and tag the gear role. (Committing to gear
-    // signs you up for that game.)
-    await setDoc(doc(col, uid || deviceId), {
+    // Not on this day's roster yet → auto-add them, keyed by deviceId to match
+    // sign-in (one doc per device; uid is stored as a field). Committing to gear
+    // signs you up for that game.
+    await setDoc(doc(col, deviceId), {
       name, deviceId, uid: uid || null, isAdmin: !!isAdmin,
       plusOnes: 0, [field]: type, signedUpAt: Date.now(),
     });

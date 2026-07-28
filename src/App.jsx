@@ -234,12 +234,13 @@ export default function App() {
     // entered the shared PIN (which would leak the badge to anyone who logs in).
     const playerIsAdmin = playerProfile?.isAdmin || false;
 
-    // Each player is their own document, keyed by their stable uid (falling back
-    // to device id until a uid exists). A plain setDoc with no read-modify-write
-    // means concurrent sign-ins each touch a different doc and never collide;
-    // re-tapping just overwrites the same doc (idempotent), so no duplicates.
-    const rosterKey = uid || deviceId;
-    const ref = doc(db, 'sessions', today, 'players', rosterKey);
+    // One roster document per device, keyed by the always-present deviceId (uid
+    // is stored as a field, not used as the key: it can be absent on an early
+    // sign-in and present later, which would split one device across two docs).
+    // A plain setDoc with no read-modify-write means concurrent sign-ins each
+    // touch a different doc and never collide; re-tapping overwrites the same
+    // doc (idempotent), so it can never create a duplicate.
+    const ref = doc(db, 'sessions', today, 'players', deviceId);
     setSigningIn(plusOnes); // show the submitting state and block further taps
     try {
       // merge:true so signing in only sets the identity/+1 fields and preserves
@@ -264,13 +265,11 @@ export default function App() {
     // #5 — confirm before dropping
     if (!window.confirm('Out — are you sure? This removes you from the list.')) return;
 
-    // Act only on THIS device's own entry — match by device id (and the stable
-    // uid), NEVER by name. A duplicate or stale entry sharing the name must not
-    // let a sign-out delete someone else's doc. This resolves to the same
-    // per-player key sign-in wrote, so we delete exactly our own doc.
-    const mine = players.find(
-      (p) => p.deviceId === deviceId || (uid && p.uid === uid)
-    );
+    // Act only on THIS device's own entry — match by device id, never by name or
+    // uid. Name would risk deleting a same-named stranger; uid would risk
+    // deleting the same person's doc created on a *different* device. deviceId is
+    // exactly the key sign-in wrote, so we delete precisely our own doc.
+    const mine = players.find((p) => p.deviceId === deviceId);
     if (!mine) return;
 
     // Position at drop time → was this a playing spot (top 36) or the bench?
@@ -293,7 +292,7 @@ export default function App() {
     } catch (err) {
       console.error('[FTFC] sign-out failed:', err);
     }
-  }, [playerName, players, deviceId, uid, today]);
+  }, [playerName, players, deviceId, today]);
 
   const handleNameSave = async (name, verifiedPhone = null) => {
     const previousName = playerName;
