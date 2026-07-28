@@ -472,7 +472,13 @@ export default function App() {
             {/* Signup buttons */}
             {playerName && (
               <div className="action-bar">
-                {!isOnList ? (
+                {/* Keep showing the In/In+1 controls while a sign-in is in flight
+                    (signingIn !== null), even though Firestore optimistically adds
+                    us to the roster the instant setDoc is called. Otherwise the
+                    buttons would flip to "Out" before the write is confirmed,
+                    reducing the submitting state to a sub-frame flash — and a
+                    failed write would flash "Out" then snap back. */}
+                {(!isOnList || signingIn !== null) ? (
                   <>
                     <button
                       className="btn btn-in"
