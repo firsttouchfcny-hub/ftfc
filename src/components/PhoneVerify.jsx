@@ -18,7 +18,7 @@ function toE164US(raw) {
   return null;
 }
 
-export default function PhoneVerify({ playerName, onClose, onVerified }) {
+export default function PhoneVerify({ playerName, onClose, onVerified, onboarding = false }) {
   const [step, setStep] = useState('phone');
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
@@ -92,6 +92,22 @@ export default function PhoneVerify({ playerName, onClose, onVerified }) {
     try {
       await confirmRef.current.confirm(code);
       const e164 = toE164US(phone);
+
+      // Onboarding: no name yet. Verify the number, then either recognize the
+      // person (load their canonical identity) or hand a brand-new player to name entry.
+      if (onboarding) {
+        const snap = await getDocs(query(collection(db, 'players'), where('phone', '==', e164)));
+        const existing = snap.docs.find((d) => d.data()?.phoneVerified);
+        try { await signOut(auth); } catch { /* noop */ }
+        if (existing) {
+          onVerified?.({ adoptedName: existing.data().name || existing.id, uid: existing.data().uid || null });
+        } else {
+          onVerified?.({ newPhone: e164 });
+        }
+        onClose?.();
+        return;
+      }
+
       const mine = normalizeName(playerName);
 
       // One number per player: reject if this verified number is already tied to
@@ -195,15 +211,17 @@ export default function PhoneVerify({ playerName, onClose, onVerified }) {
           </form>
         )}
 
-        <button
-          type="button"
-          className="btn btn-ghost btn-full"
-          onClick={onClose}
-          style={{ marginTop: 8 }}
-          disabled={busy}
-        >
-          Cancel
-        </button>
+        {!onboarding && (
+          <button
+            type="button"
+            className="btn btn-ghost btn-full"
+            onClick={onClose}
+            style={{ marginTop: 8 }}
+            disabled={busy}
+          >
+            Cancel
+          </button>
+        )}
 
         <div id={RECAPTCHA_ID}></div>
 

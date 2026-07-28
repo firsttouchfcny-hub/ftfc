@@ -14,7 +14,7 @@ import PushSetup   from './components/PushSetup';
 import { registerServiceWorker } from './utils/push';
 import { fridayGearPriorityNames, bringersFor, takersFor } from './utils/gear';
 import {
-  getSessionDate, getTomorrow, getDeviceId, normalizeName, newUid,
+  getSessionDate, getDeviceId, normalizeName, newUid,
   isSuspended, formatDate, formatTimeET,
   getRollCallPhase, isRollCallOpen, canAdminSignUp,
   buildFlatList, MATCH1_MAX, MATCH2_MAX, MATCH2_MIN_CONFIRM, getMatch2State,
@@ -29,6 +29,10 @@ export default function App() {
   const [playerName,    setPlayerName]    = useState(() => localStorage.getItem('ftfc_player_name') || '');
   const [isAdmin,       setIsAdmin]       = useState(() => localStorage.getItem('ftfc_is_admin') === 'true');
   const [showNameEntry, setShowNameEntry] = useState(() => !localStorage.getItem('ftfc_player_name'));
+  // During first-time onboarding, a brand-new (unrecognized) verified number waiting for a name.
+  const [onboardPhone, setOnboardPhone] = useState(null);
+  // Locally-cached stable uid (read once) — a fallback before the profile loads.
+  const [cachedUid] = useState(() => localStorage.getItem('ftfc_uid'));
   const [showEditName,    setShowEditName]    = useState(false);
   const [showPhoneVerify, setShowPhoneVerify] = useState(false);
   // When the verify screen is opened by a blocked join, remember the +1s so we
@@ -122,7 +126,7 @@ export default function App() {
   // ── Derived state ─────────────────────────────────────────────────────────
   const suspended     = isSuspended(playerProfile?.suspendedUntil);
   // Stable identity anchor (from the profile; cached locally for immediate use).
-  const uid           = playerProfile?.uid || localStorage.getItem('ftfc_uid') || null;
+  const uid           = playerProfile?.uid || cachedUid || null;
   // A roster entry is "me" if the stable uid matches, else fall back to device/name.
   const isMe = (p) => (uid && p.uid === uid) || p.deviceId === deviceId ||
     (p.name || '').toLowerCase() === playerName.toLowerCase();
@@ -223,7 +227,7 @@ export default function App() {
     } catch (err) {
       console.error('[FTFC] sign-in failed:', err);
     }
-  }, [session, playerName, deviceId, uid, suspended, isAdmin, playerProfile, today]);
+  }, [session, playerName, deviceId, uid, suspended, isAdmin, amAdmin, playerProfile, today]);
 
   const handleSignOut = useCallback(async () => {
     if (!playerName) return;
@@ -258,7 +262,7 @@ export default function App() {
     }
   }, [playerName, deviceId, uid, today]);
 
-  const handleNameSave = async (name) => {
+  const handleNameSave = async (name, verifiedPhone = null) => {
     const previousName = playerName;
     const isRename = previousName && previousName !== name;
 
@@ -266,6 +270,7 @@ export default function App() {
     setPlayerName(name);
     setShowNameEntry(false);
     setShowEditName(false);
+    setOnboardPhone(null);
 
     // If renaming and signed up for today's session, update the on-list entry.
     if (isRename && session?.players?.some((p) => p.deviceId === deviceId)) {
@@ -303,9 +308,9 @@ export default function App() {
       await setDoc(newProfileRef, {
         name,
         uid: uidToUse,
-        phone: carry.phone ?? null,
-        phoneVerified: carry.phoneVerified ?? false,
-        phoneVerifiedAt: carry.phoneVerifiedAt ?? null,
+        phone: verifiedPhone ?? carry.phone ?? null,
+        phoneVerified: verifiedPhone ? true : (carry.phoneVerified ?? false),
+        phoneVerifiedAt: verifiedPhone ? Date.now() : (carry.phoneVerifiedAt ?? null),
         isAdmin: carry.isAdmin ?? false,
         suspendedUntil: carry.suspendedUntil ?? null,
         suspensionType: carry.suspensionType ?? null,
@@ -317,10 +322,19 @@ export default function App() {
       }
       localStorage.setItem('ftfc_uid', uidToUse);
     } else {
-      // Profile already exists — make sure it has a stable uid.
+      // Profile already exists — ensure a uid, and if we just verified a phone
+      // during onboarding, stamp it (reuniting a returning player with their old
+      // profile). Don't overwrite a profile already verified by someone else.
       const data = newSnap.data();
       const uidToUse = data.uid || newUid();
-      if (!data.uid) await updateDoc(newProfileRef, { uid: uidToUse });
+      const patch = {};
+      if (!data.uid) patch.uid = uidToUse;
+      if (verifiedPhone && !data.phoneVerified) {
+        patch.phone = verifiedPhone;
+        patch.phoneVerified = true;
+        patch.phoneVerifiedAt = Date.now();
+      }
+      if (Object.keys(patch).length) await updateDoc(newProfileRef, patch);
       localStorage.setItem('ftfc_uid', uidToUse);
     }
   };
@@ -556,7 +570,27 @@ export default function App() {
       </main>
 
       {/* Modals */}
-      {showNameEntry && <NameEntry onSave={handleNameSave} />}
+      {/* First-time onboarding — verify phone FIRST so names can't be messed up.
+          A recognized number loads that person's identity; a brand-new number
+          then asks for a name (which becomes a verified profile). */}
+      {showNameEntry && !onboardPhone && (
+        <PhoneVerify
+          onboarding
+          onVerified={(result) => {
+            if (result?.adoptedName) {
+              if (result.uid) localStorage.setItem('ftfc_uid', result.uid);
+              localStorage.setItem('ftfc_player_name', result.adoptedName);
+              setPlayerName(result.adoptedName);
+              setShowNameEntry(false);
+            } else if (result?.newPhone) {
+              setOnboardPhone(result.newPhone);
+            }
+          }}
+        />
+      )}
+      {showNameEntry && onboardPhone && (
+        <NameEntry onSave={(name) => handleNameSave(name, onboardPhone)} />
+      )}
       {showEditName && (
         <NameEntry
           onSave={handleNameSave}
