@@ -237,10 +237,14 @@ export default function App() {
     const rosterKey = uid || deviceId;
     const ref = doc(db, 'sessions', today, 'players', rosterKey);
     try {
+      // merge:true so signing in only sets the identity/+1 fields and preserves
+      // anything another writer put on this same doc — an admin's `priority` or
+      // GearManager's `gearBringer`/`gearTaker` markers. Without merge, a plain
+      // setDoc replaces the whole doc and would silently wipe those.
       await setDoc(ref, {
         name: playerName, deviceId, uid,
         isAdmin: playerIsAdmin, plusOnes, signedUpAt: Date.now(),
-      });
+      }, { merge: true });
     } catch (err) {
       console.error('[FTFC] sign-in failed:', err);
     }
@@ -251,13 +255,17 @@ export default function App() {
     // #5 — confirm before dropping
     if (!window.confirm('Out — are you sure? This removes you from the list.')) return;
 
+    // Act only on THIS device's own entry — match by device id (and the stable
+    // uid), NEVER by name. A duplicate or stale entry sharing the name must not
+    // let a sign-out delete someone else's doc. This resolves to the same
+    // per-player key sign-in wrote, so we delete exactly our own doc.
     const mine = players.find(
-      (p) => (uid && p.uid === uid) || p.deviceId === deviceId ||
-        (p.name || '').toLowerCase() === playerName.toLowerCase()
+      (p) => p.deviceId === deviceId || (uid && p.uid === uid)
     );
     if (!mine) return;
 
     // Position at drop time → was this a playing spot (top 36) or the bench?
+    // Match our own row by its doc id (not name) for the same reason.
     const flat = buildFlatList(players);
     const idx = flat.findIndex((p) => p.isMainEntry && p.id === mine.id);
     const fromBench = idx >= 0 && idx + 1 > MATCH2_MAX;
