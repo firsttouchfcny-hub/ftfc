@@ -70,8 +70,19 @@ describe('bibs auto-assign to the nearest coverage gap', () => {
     c({ type: 'bibs', setId: 'bibs-1', takeDate: '2026-07-24', returnDate: '2026-07-29', takerName: 'wed' }),
     c({ type: 'bibs', setId: 'bibs-2', takeDate: '2026-07-24', returnDate: '2026-07-31', takerName: 'fri' }),
   ];
-  it('a Tuesday bibs take is forced to Thursday (soonest open day), skipping covered Wed/Fri', () => {
+  it('a Tuesday bibs take is forced to Thursday (a CLOSE gap), skipping covered Wed/Fri', () => {
     expect(playerReturnDates(commits, 'bibs', '2026-07-28')).toEqual(['2026-07-30']);
+  });
+
+  it('leaves the player a choice when the next two games are already covered', () => {
+    const covered = [
+      c({ type: 'bibs', takeDate: '2026-07-24', returnDate: '2026-07-29', takerName: 'wed' }), // next game
+      c({ type: 'bibs', takeDate: '2026-07-24', returnDate: '2026-07-30', takerName: 'thu' }), // the one after
+    ];
+    // Take after Tue → Wed & Thu covered, so the earliest gap (Fri) is not "close" → free pick.
+    const r = playerReturnDates(covered, 'bibs', '2026-07-28');
+    expect(r.length).toBeGreaterThan(1);
+    expect(r[0]).toBe('2026-07-31'); // Friday, first open day, but not forced
   });
 });
 

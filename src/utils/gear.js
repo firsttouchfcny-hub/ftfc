@@ -97,10 +97,14 @@ export function playerReturnDates(commitments, type, takeDate) {
     const monday = addGameDays(takeDate, 1);
     if (opts[0] === monday) return [monday];
   }
-  // All gear auto-assigns to the EARLIEST open game day, so the nearest coverage
-  // gap always fills first (e.g. bibs → the soonest day still missing a set). The
-  // window (5 days for bibs) just bounds how far ahead we may reach. No player choice.
-  return [opts[0]];
+  // Goals & balls: short window (1–2 days) — always fix to the earliest open day
+  // so every game stays covered.
+  if (type === 'goal' || type === 'balls') return [opts[0]];
+  // Bibs (long window): only FORCE the earliest open day when a CLOSE game — the
+  // next one or two — is uncovered (fill the urgent gap). If the near games are
+  // already covered, leave the player free to pick a day within the window.
+  const closeGap = opts[0] === addGameDays(takeDate, 1) || opts[0] === addGameDays(takeDate, 2);
+  return closeGap ? [opts[0]] : opts;
 }
 
 // Bring-back dates for gear ALREADY held (admin "has it" onboarding): unlike a
