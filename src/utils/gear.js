@@ -160,6 +160,13 @@ export function setStatuses(type, commitments) {
       };
     }
     return { setId: set.id, state: 'field', holder: null };
+  }).sort((a, b) => {
+    // Soonest return first; sets with no return date ("at the field") go last.
+    if (!a.back && !b.back) return a.setId < b.setId ? -1 : 1;
+    if (!a.back) return 1;
+    if (!b.back) return -1;
+    if (a.back !== b.back) return a.back < b.back ? -1 : 1;
+    return a.setId < b.setId ? -1 : 1;
   });
 }
 
