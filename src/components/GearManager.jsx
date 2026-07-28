@@ -22,14 +22,15 @@ function fmtDay(key) {
 //   'bringer' → they carry the set IN that morning (their return date)
 //   'taker'   → they take the set HOME after that morning's game (their take date)
 // Pass type=null to clear the marker (used when a commitment is cancelled).
-async function setGearRole(dateKey, { name, deviceId, isAdmin }, role, type) {
+async function setGearRole(dateKey, { name, deviceId, uid, isAdmin }, role, type) {
   const field = role === 'bringer' ? 'gearBringer' : 'gearTaker';
   const ref = doc(db, 'sessions', dateKey);
   await runTransaction(db, async (tx) => {
     const snap = await tx.get(ref);
     const players = snap.exists() ? (snap.data().players || []) : [];
     const mine = players.find(
-      (p) => p.deviceId === deviceId || p.name.toLowerCase() === name.toLowerCase()
+      (p) => (uid && p.uid === uid) || p.deviceId === deviceId ||
+        p.name.toLowerCase() === name.toLowerCase()
     );
     if (type == null) { // clear
       if (!mine || !mine[field]) return;
@@ -41,7 +42,7 @@ async function setGearRole(dateKey, { name, deviceId, isAdmin }, role, type) {
       next = players.map((p) => (p === mine ? { ...p, [field]: type } : p));
     } else {
       next = [...players, {
-        id: crypto.randomUUID(), name, deviceId, isAdmin: !!isAdmin,
+        id: crypto.randomUUID(), name, deviceId, uid: uid || null, isAdmin: !!isAdmin,
         plusOnes: 0, [field]: type, signedUpAt: Date.now(),
       }];
     }
@@ -50,7 +51,7 @@ async function setGearRole(dateKey, { name, deviceId, isAdmin }, role, type) {
   });
 }
 
-export default function GearManager({ playerName, deviceId, amAdmin, suspended, adminName }) {
+export default function GearManager({ playerName, deviceId, uid, amAdmin, suspended, adminName }) {
   const [commitments, setCommitments] = useState([]);
   const [loaded, setLoaded] = useState(false); // ledger has arrived from Firebase
   const [pickerType, setPickerType] = useState(null); // type mid-return-date-pick
@@ -72,7 +73,7 @@ export default function GearManager({ playerName, deviceId, amAdmin, suspended, 
   const coverage = coverageForMorning(commitments, takeDate);
   const bringingRisk = gearBringingAlert(commitments);
   const takingRisk = gearTakingAlert(commitments);
-  const mine = myCommitments(commitments, deviceId, playerName);
+  const mine = myCommitments(commitments, deviceId, playerName, uid);
 
   // ── Player: claim a set + return date (atomic) ────────────────────────────
   const claimGear = async (type, returnDate) => {
@@ -86,7 +87,8 @@ export default function GearManager({ playerName, deviceId, amAdmin, suspended, 
         // One person may hold only one set of a given type (e.g. not both goals).
         const alreadyHas = cs.some(
           (c) => c.status === 'committed' && c.type === type &&
-            (c.takerDeviceId === deviceId ||
+            ((uid && c.takerUid === uid) ||
+             c.takerDeviceId === deviceId ||
              (c.takerName || '').toLowerCase() === playerName.toLowerCase())
         );
         if (alreadyHas) return;
@@ -96,7 +98,8 @@ export default function GearManager({ playerName, deviceId, amAdmin, suspended, 
         assignedSet = setId;
         const entry = {
           id: crypto.randomUUID(), type, setId,
-          takerName: playerName, takerDeviceId: deviceId, takerIsAdmin: !!amAdmin,
+          takerName: playerName, takerDeviceId: deviceId, takerUid: uid || null,
+          takerIsAdmin: !!amAdmin,
           takeDate, returnDate, status: 'committed', returnedOnTime: null,
           createdAt: Date.now(), source: 'player',
         };
@@ -104,7 +107,7 @@ export default function GearManager({ playerName, deviceId, amAdmin, suspended, 
         else tx.set(LEDGER, { commitments: [entry] });
       });
       if (assignedSet) {
-        const who = { name: playerName, deviceId, isAdmin: amAdmin };
+        const who = { name: playerName, deviceId, uid, isAdmin: amAdmin };
         await setGearRole(takeDate, who, 'taker', type);     // playing the take day
         await setGearRole(returnDate, who, 'bringer', type); // playing the return day
       }
@@ -129,7 +132,7 @@ export default function GearManager({ playerName, deviceId, amAdmin, suspended, 
         tx.update(LEDGER, { commitments: cs.filter((x) => x.id !== id) });
       });
       if (c) {
-        const who = { name: c.takerName, deviceId: c.takerDeviceId };
+        const who = { name: c.takerName, deviceId: c.takerDeviceId, uid: c.takerUid };
         await setGearRole(c.takeDate, who, 'taker', null);
         await setGearRole(c.returnDate, who, 'bringer', null);
       }

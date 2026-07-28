@@ -246,12 +246,14 @@ export function fridayGearPriorityNames(commitments, dateKey) {
   return names;
 }
 
-// A person's own live commitments (matched by device id or name).
-export function myCommitments(commitments, deviceId, name) {
+// A person's own live commitments (matched by stable uid, else device id / name).
+export function myCommitments(commitments, deviceId, name, uid) {
   const n = (name || '').toLowerCase();
   return (commitments || []).filter(
     (c) => isLive(c) &&
-      (c.takerDeviceId === deviceId || (c.takerName || '').toLowerCase() === n)
+      ((uid && c.takerUid === uid) ||
+        c.takerDeviceId === deviceId ||
+        (c.takerName || '').toLowerCase() === n)
   );
 }
 

@@ -14,7 +14,7 @@ import PushSetup   from './components/PushSetup';
 import { registerServiceWorker } from './utils/push';
 import { fridayGearPriorityNames, bringersFor, takersFor } from './utils/gear';
 import {
-  getSessionDate, getTomorrow, getDeviceId, normalizeName,
+  getSessionDate, getTomorrow, getDeviceId, normalizeName, newUid,
   isSuspended, formatDate, formatTimeET,
   getRollCallPhase, isRollCallOpen, canAdminSignUp,
   buildFlatList, MATCH1_MAX, MATCH2_MAX, MATCH2_MIN_CONFIRM, getMatch2State,
@@ -46,6 +46,11 @@ export default function App() {
 
   // Register the service worker once so the app is installable and can receive push.
   useEffect(() => { registerServiceWorker(); }, []);
+
+  // Cache the stable uid locally so records can be stamped before the profile loads.
+  useEffect(() => {
+    if (playerProfile?.uid) localStorage.setItem('ftfc_uid', playerProfile.uid);
+  }, [playerProfile?.uid]);
 
   // Re-evaluate Eastern-time state (10 AM reset, 3 PM open) without a manual refresh.
   // The interval covers foreground; visibility/focus covers phones returning from
@@ -116,7 +121,12 @@ export default function App() {
 
   // ── Derived state ─────────────────────────────────────────────────────────
   const suspended     = isSuspended(playerProfile?.suspendedUntil);
-  const myEntry       = session?.players?.find((p) => p.deviceId === deviceId);
+  // Stable identity anchor (from the profile; cached locally for immediate use).
+  const uid           = playerProfile?.uid || localStorage.getItem('ftfc_uid') || null;
+  // A roster entry is "me" if the stable uid matches, else fall back to device/name.
+  const isMe = (p) => (uid && p.uid === uid) || p.deviceId === deviceId ||
+    (p.name || '').toLowerCase() === playerName.toLowerCase();
+  const myEntry       = session?.players?.find(isMe);
   const onListByName  = session?.players?.some(
     (p) => p.name.toLowerCase() === playerName.toLowerCase()
   );
@@ -200,10 +210,11 @@ export default function App() {
         const snap = await tx.get(ref);
         const players = snap.exists() ? (snap.data().players || []) : [];
         if (players.some(
-          (p) => p.deviceId === deviceId || p.name.toLowerCase() === playerName.toLowerCase()
+          (p) => (uid && p.uid === uid) || p.deviceId === deviceId ||
+            (p.name || '').toLowerCase() === playerName.toLowerCase()
         )) return; // already on the list
         const entry = {
-          id: crypto.randomUUID(), name: playerName, deviceId,
+          id: crypto.randomUUID(), name: playerName, deviceId, uid,
           isAdmin: playerIsAdmin, plusOnes, signedUpAt: Date.now(),
         };
         if (snap.exists()) tx.update(ref, { players: [...players, entry] });
@@ -212,7 +223,7 @@ export default function App() {
     } catch (err) {
       console.error('[FTFC] sign-in failed:', err);
     }
-  }, [session, playerName, deviceId, suspended, isAdmin, playerProfile, today]);
+  }, [session, playerName, deviceId, uid, suspended, isAdmin, playerProfile, today]);
 
   const handleSignOut = useCallback(async () => {
     if (!playerName) return;
@@ -227,17 +238,14 @@ export default function App() {
         if (!snap.exists()) return;
         const data = snap.data();
         const players = data.players || [];
-        const removed = players.filter(
-          (p) => p.deviceId === deviceId || p.name.toLowerCase() === playerName.toLowerCase()
-        );
+        const isMine = (p) => (uid && p.uid === uid) || p.deviceId === deviceId ||
+          (p.name || '').toLowerCase() === playerName.toLowerCase();
+        const removed = players.filter(isMine);
         if (removed.length === 0) return;
-        const newPlayers = players.filter(
-          (p) => p.deviceId !== deviceId && p.name.toLowerCase() !== playerName.toLowerCase()
-        );
+        const newPlayers = players.filter((p) => !isMine(p));
         // Position at drop time → was this a playing spot (top 36) or the bench?
         const flat = buildFlatList(players);
-        const idx = flat.findIndex((p) => p.isMainEntry &&
-          (p.deviceId === deviceId || p.name.toLowerCase() === playerName.toLowerCase()));
+        const idx = flat.findIndex((p) => p.isMainEntry && isMine(p));
         const fromBench = idx >= 0 && idx + 1 > MATCH2_MAX;
         tx.update(ref, {
           players: newPlayers,
@@ -248,7 +256,7 @@ export default function App() {
     } catch (err) {
       console.error('[FTFC] sign-out failed:', err);
     }
-  }, [playerName, deviceId, today]);
+  }, [playerName, deviceId, uid, today]);
 
   const handleNameSave = async (name) => {
     const previousName = playerName;
@@ -268,29 +276,52 @@ export default function App() {
       await updateDoc(sessionRef, { players: updatedPlayers });
     }
 
-    // Ensure a profile exists for the new name, carrying over old status if any.
+    // Ensure a profile exists for this name, carrying the STABLE identity (uid +
+    // phone) forward on a rename so history/gear never detaches from the person.
     const newProfileRef = doc(db, 'players', normalizeName(name));
     const newSnap = await getDoc(newProfileRef);
     if (!newSnap.exists()) {
-      let carryOver = {};
+      let carry = {};
+      let oldRef = null;
       if (isRename) {
-        const oldSnap = await getDoc(doc(db, 'players', normalizeName(previousName)));
+        oldRef = doc(db, 'players', normalizeName(previousName));
+        const oldSnap = await getDoc(oldRef);
         if (oldSnap.exists()) {
           const old = oldSnap.data();
-          carryOver = {
+          carry = {
+            uid: old.uid ?? null,
+            phone: old.phone ?? null,
+            phoneVerified: old.phoneVerified ?? false,
+            phoneVerifiedAt: old.phoneVerifiedAt ?? null,
             isAdmin: old.isAdmin ?? false,
             suspendedUntil: old.suspendedUntil ?? null,
             suspensionType: old.suspensionType ?? null,
           };
         }
       }
+      const uidToUse = carry.uid || newUid();
       await setDoc(newProfileRef, {
         name,
-        isAdmin: carryOver.isAdmin ?? false,
-        suspendedUntil: carryOver.suspendedUntil ?? null,
-        suspensionType: carryOver.suspensionType ?? null,
+        uid: uidToUse,
+        phone: carry.phone ?? null,
+        phoneVerified: carry.phoneVerified ?? false,
+        phoneVerifiedAt: carry.phoneVerifiedAt ?? null,
+        isAdmin: carry.isAdmin ?? false,
+        suspendedUntil: carry.suspendedUntil ?? null,
+        suspensionType: carry.suspensionType ?? null,
         createdAt: Date.now(),
       });
+      // A number must live on exactly one name — move it off the old profile.
+      if (oldRef && carry.phone) {
+        await updateDoc(oldRef, { phone: null, phoneVerified: false });
+      }
+      localStorage.setItem('ftfc_uid', uidToUse);
+    } else {
+      // Profile already exists — make sure it has a stable uid.
+      const data = newSnap.data();
+      const uidToUse = data.uid || newUid();
+      if (!data.uid) await updateDoc(newProfileRef, { uid: uidToUse });
+      localStorage.setItem('ftfc_uid', uidToUse);
     }
   };
 
@@ -386,6 +417,7 @@ export default function App() {
             <GearManager
               playerName={playerName}
               deviceId={deviceId}
+              uid={uid}
               amAdmin={amAdmin}
               suspended={suspended}
               adminName={playerName}
@@ -541,6 +573,7 @@ export default function App() {
             // Phone already belongs to a registered player → adopt that canonical
             // name so gear/roster/history all match (they re-tap join as themselves).
             if (result?.adoptedName) {
+              if (result.uid) localStorage.setItem('ftfc_uid', result.uid);
               if (result.adoptedName !== playerName) {
                 localStorage.setItem('ftfc_player_name', result.adoptedName);
                 setPlayerName(result.adoptedName);

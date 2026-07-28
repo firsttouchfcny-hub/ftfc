@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   gearNeed, returnDateOptions, returnSlotsLeft, availableToTake,
   playerReturnDates, coverageForMorning, setStatuses,
-  fridayGearPriorityNames, isFridayKey,
+  fridayGearPriorityNames, isFridayKey, myCommitments,
 } from './gear.js';
 
 // Helper to build a live commitment.
@@ -102,3 +102,21 @@ describe('Friday gear priority (reward for taking gear home Mon–Thu)', () => {
     expect(names.has('took last friday')).toBe(false);
   });
 });
+
+describe('identity matching by stable uid', () => {
+  const commits = [
+    c({ type: 'goal', takerName: 'Old Name', takerDeviceId: 'devA', takerUid: 'u_1', takeDate: '2026-07-27', returnDate: '2026-07-28' }),
+    c({ type: 'bibs', takerName: 'Someone',  takerDeviceId: 'devB', takerUid: 'u_2', takeDate: '2026-07-27', returnDate: '2026-07-28' }),
+  ];
+
+  it('finds a person by uid even when name AND device differ (new phone/device, renamed)', () => {
+    const mine = myCommitments(commits, 'devX', 'A Different Name', 'u_1');
+    expect(mine.map((m) => m.type)).toEqual(['goal']);
+  });
+
+  it('falls back to device/name for records without a uid', () => {
+    const mine = myCommitments(commits, 'devB', 'unknown', null);
+    expect(mine.map((m) => m.type)).toEqual(['bibs']);
+  });
+});
+

@@ -152,6 +152,13 @@ export function normalizeName(name) {
   return name.toLowerCase().trim().replace(/\s+/g, '-');
 }
 
+// A person's stable identity anchor. Generated ONCE and stored on their profile,
+// it never changes — not when they edit their name and not when they update
+// their phone number. Roster + gear records reference this so nothing drifts.
+export function newUid() {
+  return 'u_' + crypto.randomUUID();
+}
+
 export function parseNames(input) {
   return input
     .split(/[,\n\r]+/)

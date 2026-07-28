@@ -104,7 +104,10 @@ export default function PhoneVerify({ playerName, onClose, onVerified }) {
         // a mismatched duplicate under a different typed name. Only the real owner
         // can pass SMS verification, so adopting is safe.
         try { await signOut(auth); } catch { /* noop */ }
-        onVerified?.({ adoptedName: conflict.data().name || conflict.id });
+        onVerified?.({
+          adoptedName: conflict.data().name || conflict.id,
+          uid: conflict.data().uid || null,
+        });
         onClose?.();
         return;
       }
