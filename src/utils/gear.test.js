@@ -64,6 +64,17 @@ describe('goal take-home: 2 per day, auto-rolls to the following game when next 
   });
 });
 
+describe('bibs auto-assign to the nearest coverage gap', () => {
+  // Bibs covered Wed & Fri; Thursday is the only near gap in the window.
+  const commits = [
+    c({ type: 'bibs', setId: 'bibs-1', takeDate: '2026-07-24', returnDate: '2026-07-29', takerName: 'wed' }),
+    c({ type: 'bibs', setId: 'bibs-2', takeDate: '2026-07-24', returnDate: '2026-07-31', takerName: 'fri' }),
+  ];
+  it('a Tuesday bibs take is forced to Thursday (soonest open day), skipping covered Wed/Fri', () => {
+    expect(playerReturnDates(commits, 'bibs', '2026-07-28')).toEqual(['2026-07-30']);
+  });
+});
+
 describe('"Who has the gear" tracker (setStatuses)', () => {
   afterEach(() => vi.useRealTimers());
 

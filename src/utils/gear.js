@@ -97,11 +97,10 @@ export function playerReturnDates(commitments, type, takeDate) {
     const monday = addGameDays(takeDate, 1);
     if (opts[0] === monday) return [monday];
   }
-  // Goals & balls are auto-assigned to the earliest open day — the next game, or
-  // the following game if the next one already has its full set of goals. No
-  // date choice for the player.
-  if (type === 'goal' || type === 'balls') return [opts[0]];
-  return opts; // bibs: player picks a day within the window
+  // All gear auto-assigns to the EARLIEST open game day, so the nearest coverage
+  // gap always fills first (e.g. bibs → the soonest day still missing a set). The
+  // window (5 days for bibs) just bounds how far ahead we may reach. No player choice.
+  return [opts[0]];
 }
 
 // Bring-back dates for gear ALREADY held (admin "has it" onboarding): unlike a
