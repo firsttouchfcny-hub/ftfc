@@ -1,0 +1,104 @@
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import {
+  gearNeed, returnDateOptions, returnSlotsLeft, availableToTake,
+  playerReturnDates, coverageForMorning, setStatuses,
+  fridayGearPriorityNames, isFridayKey,
+} from './gear.js';
+
+// Helper to build a live commitment.
+const c = (over) => ({ status: 'committed', held: false, ...over });
+
+describe('per-game needs & return windows', () => {
+  it('needs: 2 goals, 1 balls, 1 bibs', () => {
+    expect(gearNeed('goal')).toBe(2);
+    expect(gearNeed('balls')).toBe(1);
+    expect(gearNeed('bibs')).toBe(1);
+  });
+
+  it('goals return over a 2-day window (next game or the one after)', () => {
+    expect(returnDateOptions('2026-07-27', 'goal')).toEqual(['2026-07-28', '2026-07-29']);
+  });
+
+  it('bibs return over a 5-day window', () => {
+    expect(returnDateOptions('2026-07-27', 'bibs')).toEqual([
+      '2026-07-28', '2026-07-29', '2026-07-30', '2026-07-31', '2026-08-03',
+    ]);
+  });
+});
+
+describe('coverage & return slots', () => {
+  const commits = [
+    c({ type: 'goal',  setId: 'goal-1',  takeDate: '2026-07-24', returnDate: '2026-07-27', takerName: 'A' }),
+    c({ type: 'goal',  setId: 'goal-2',  takeDate: '2026-07-24', returnDate: '2026-07-27', takerName: 'B' }),
+    c({ type: 'balls', setId: 'balls-1', takeDate: '2026-07-24', returnDate: '2026-07-27', takerName: 'C' }),
+    c({ type: 'bibs',  setId: 'bibs-1',  takeDate: '2026-07-24', returnDate: '2026-07-27', takerName: 'D' }),
+  ];
+
+  it('a morning with 2 goals + 1 balls + 1 bibs is covered', () => {
+    expect(coverageForMorning(commits, '2026-07-27').covered).toBe(true);
+  });
+
+  it('a morning short a goal is not covered', () => {
+    expect(coverageForMorning(commits.slice(0, 1), '2026-07-27').covered).toBe(false);
+  });
+
+  it('returnSlotsLeft caps at the need (no over-booking)', () => {
+    expect(returnSlotsLeft(commits, 'goal', '2026-07-27')).toBe(0); // 2 goals already back
+    expect(returnSlotsLeft(commits, 'bibs', '2026-07-27')).toBe(0); // 1 bibs already back
+  });
+});
+
+describe('goal take-home: 2 per day, auto-rolls to the following game when next is full', () => {
+  // Tuesday already has its 2 goals committed back (goal-1 held over, goal-2 from Monday).
+  const commits = [
+    c({ type: 'goal', setId: 'goal-1', takeDate: '2026-07-24', returnDate: '2026-07-28', takerName: 'X' }),
+    c({ type: 'goal', setId: 'goal-2', takeDate: '2026-07-27', returnDate: '2026-07-28', takerName: 'Y' }),
+  ];
+
+  it('a further Monday goal auto-returns Wednesday because Tuesday is full', () => {
+    expect(playerReturnDates(commits, 'goal', '2026-07-27')).toEqual(['2026-07-29']);
+  });
+
+  it('availableToTake = need minus who is already taking that day', () => {
+    expect(availableToTake(commits, 'goal', '2026-07-27')).toBe(1); // Y takes 1 of 2
+  });
+});
+
+describe('"Who has the gear" tracker (setStatuses)', () => {
+  afterEach(() => vi.useRealTimers());
+
+  it('sorts each type by return date, with "at the field" last', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-27T12:00:00Z')); // today = Mon 2026-07-27
+    const commits = [
+      c({ type: 'bibs', setId: 'bibs-1', takeDate: '2026-07-24', returnDate: '2026-07-31', takerName: 'late' }),
+      c({ type: 'bibs', setId: 'bibs-2', takeDate: '2026-07-24', returnDate: '2026-07-28', takerName: 'soon' }),
+      // bibs-3/4/5 have no commitment -> "at the field"
+    ];
+    const backs = setStatuses('bibs', commits).map((r) => r.back || 'field');
+    expect(backs[0]).toBe('2026-07-28');            // soonest first
+    expect(backs[1]).toBe('2026-07-31');
+    expect(backs[backs.length - 1]).toBe('field');  // field last
+  });
+});
+
+describe('Friday gear priority (reward for taking gear home Mon–Thu)', () => {
+  it('is empty on non-Fridays', () => {
+    expect(isFridayKey('2026-07-31')).toBe(true);
+    expect(isFridayKey('2026-07-27')).toBe(false);
+    expect(fridayGearPriorityNames([], '2026-07-27').size).toBe(0);
+  });
+
+  it('rewards Mon–Thu take-home only — not last Friday, not this Friday', () => {
+    const friday = '2026-07-31';
+    const commits = [
+      c({ type: 'goal', takeDate: '2026-07-28', returnDate: '2026-07-29', takerName: 'Took Tuesday' }),
+      c({ type: 'goal', takeDate: '2026-07-30', returnDate: '2026-07-31', takerName: 'Took Thursday' }),
+      c({ type: 'goal', takeDate: '2026-07-24', returnDate: '2026-07-27', takerName: 'Took Last Friday' }),
+    ];
+    const names = fridayGearPriorityNames(commits, friday);
+    expect(names.has('took tuesday')).toBe(true);
+    expect(names.has('took thursday')).toBe(true);
+    expect(names.has('took last friday')).toBe(false);
+  });
+});
