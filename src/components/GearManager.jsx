@@ -7,7 +7,7 @@ import {
   GEAR_TYPE_ORDER, GEAR_DEFS, gearIcon, gearLabel, gearNeed,
   isGearOpen, gearTakeDate, todayKey, gameDaysAfter,
   availableReturnDates, playerReturnDates, returnSlotsLeft,
-  availableToTake, pickFreeSet, coverageForMorning,
+  availableToTake, takeBlockedByPriority, pickFreeSet, coverageForMorning,
   bringersFor, takersFor, gearBringingAlert, gearTakingAlert,
   myCommitments, upcomingMornings, setStatuses,
 } from '../utils/gear';
@@ -328,19 +328,15 @@ export default function GearManager({ playerName, deviceId, uid, amAdmin, suspen
           );
         })()
       ) : (() => {
-        // Goals & bibs are priority — balls open up only once they can't be
-        // taken further (fully taken OR no open return day, so no deadlock).
-        const canTakeMore = (ty) =>
-          availableToTake(commitments, ty, takeDate) > 0 &&
-          playerReturnDates(commitments, ty, takeDate).length > 0;
-        const priorityPending = canTakeMore('goal') || canTakeMore('bibs');
         return (
           <div className="gear-take-row">
             {GEAR_TYPE_ORDER.map((t) => {
               const left = availableToTake(commitments, t, takeDate);
               const openDays = playerReturnDates(commitments, t, takeDate).length;
               const owned = mine.some((c) => c.type === t);
-              const ballsBlocked = t === 'balls' && priorityPending;
+              // Balls is lowest priority — locked until goals AND bibs are taken
+              // (based on whether they still need a taker, not return-day quirks).
+              const ballsBlocked = takeBlockedByPriority(commitments, t, takeDate);
               const disabled = suspended || owned || left <= 0 || openDays === 0 || ballsBlocked;
               return (
                 <button key={t} className="gear-take-btn" disabled={disabled}
@@ -349,7 +345,7 @@ export default function GearManager({ playerName, deviceId, uid, amAdmin, suspen
                   <span className="gear-take-label">Take {gearLabel(t)}</span>
                   <span className="gear-take-left">
                     {owned ? 'already yours'
-                      : ballsBlocked ? ''
+                      : ballsBlocked ? 'goals & bibs first'
                       : left <= 0 ? 'none left'
                       : openDays === 0 ? 'no open days'
                       : `${left} available`}

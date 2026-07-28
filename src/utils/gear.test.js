@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   gearNeed, returnDateOptions, returnSlotsLeft, availableToTake,
   playerReturnDates, coverageForMorning, setStatuses,
-  fridayGearPriorityNames, isFridayKey, myCommitments,
+  fridayGearPriorityNames, isFridayKey, myCommitments, takeBlockedByPriority,
 } from './gear.js';
 
 // Helper to build a live commitment.
@@ -122,6 +122,31 @@ describe('Friday gear priority (reward for taking gear home Mon–Thu)', () => {
     expect(names.has('took tuesday')).toBe(true);
     expect(names.has('took thursday')).toBe(true);
     expect(names.has('took last friday')).toBe(false);
+  });
+});
+
+describe('balls priority lock — goals & bibs must be taken first', () => {
+  const td = '2026-07-28';
+  const goal = (n) => c({ type: 'goal', takeDate: td, returnDate: '2026-07-29', takerName: n });
+  const bibs = (n) => c({ type: 'bibs', takeDate: td, returnDate: '2026-07-29', takerName: n });
+
+  it('locks balls while goals still need a taker', () => {
+    expect(takeBlockedByPriority([], 'balls', td)).toBe(true);
+  });
+
+  it('locks balls while bibs still needs a taker (even after goals are done)', () => {
+    // both goals taken, bibs NOT — balls must stay locked (this is the bug we fixed:
+    // balls used to unlock here if bibs happened to have no open return day)
+    expect(takeBlockedByPriority([goal('a'), goal('b')], 'balls', td)).toBe(true);
+  });
+
+  it('unlocks balls only once BOTH goals and bibs are taken', () => {
+    expect(takeBlockedByPriority([goal('a'), goal('b'), bibs('c')], 'balls', td)).toBe(false);
+  });
+
+  it('never blocks goals or bibs themselves', () => {
+    expect(takeBlockedByPriority([], 'goal', td)).toBe(false);
+    expect(takeBlockedByPriority([], 'bibs', td)).toBe(false);
   });
 });
 

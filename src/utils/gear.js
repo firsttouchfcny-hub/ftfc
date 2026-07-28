@@ -141,6 +141,17 @@ export function availableToTake(commitments, type, takeDate) {
   return Math.max(0, atGame - alreadyTaking);
 }
 
+// Priority lock: balls (lowest priority) can't be taken home until goals AND
+// bibs are fully taken for the game — every game needs those two, so they go
+// first. Keyed strictly on whether they still NEED a taker (availableToTake),
+// NOT on whether they can be returned — otherwise a temporarily over-supplied
+// bibs would unlock balls before bibs was actually taken.
+export function takeBlockedByPriority(commitments, type, takeDate) {
+  if (type !== 'balls') return false;
+  return availableToTake(commitments, 'goal', takeDate) > 0 ||
+         availableToTake(commitments, 'bibs', takeDate) > 0;
+}
+
 // Per-set custody for the admin tracker: for each physical set of `type`, who
 // holds it right now and when it's due back — the next scheduled hand-off, or
 // "at the field" if it's free. Sorted by set id.
