@@ -99,9 +99,13 @@ export default function PhoneVerify({ playerName, onClose, onVerified }) {
       const dupes = await getDocs(query(collection(db, 'players'), where('phone', '==', e164)));
       const conflict = dupes.docs.find((d) => d.id !== mine && d.data()?.phoneVerified);
       if (conflict) {
+        // This number already belongs to a registered player. Reunite this device
+        // with that canonical identity (name + history + gear) instead of creating
+        // a mismatched duplicate under a different typed name. Only the real owner
+        // can pass SMS verification, so adopting is safe.
         try { await signOut(auth); } catch { /* noop */ }
-        setError(`This number is already verified for "${conflict.data().name || conflict.id}". Each player needs their own number — ask an admin if this is a mistake.`);
-        setBusy(false);
+        onVerified?.({ adoptedName: conflict.data().name || conflict.id });
+        onClose?.();
         return;
       }
 

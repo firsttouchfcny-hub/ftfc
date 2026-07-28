@@ -536,8 +536,18 @@ export default function App() {
         <PhoneVerify
           playerName={playerName}
           onClose={() => { setShowPhoneVerify(false); setPendingPlusOnes(null); }}
-          onVerified={() => {
+          onVerified={(result) => {
             setShowPhoneVerify(false);
+            // Phone already belongs to a registered player → adopt that canonical
+            // name so gear/roster/history all match (they re-tap join as themselves).
+            if (result?.adoptedName) {
+              if (result.adoptedName !== playerName) {
+                localStorage.setItem('ftfc_player_name', result.adoptedName);
+                setPlayerName(result.adoptedName);
+              }
+              setPendingPlusOnes(null);
+              return;
+            }
             if (pendingPlusOnes !== null) {
               const n = pendingPlusOnes;
               setPendingPlusOnes(null);
