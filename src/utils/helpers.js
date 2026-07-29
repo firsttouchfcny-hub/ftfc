@@ -159,6 +159,28 @@ export function newUid() {
   return 'u_' + crypto.randomUUID();
 }
 
+// The one place that decides whether a roster/gear entry `p` is the same person
+// as { uid, deviceId, name }. uid is the strong signal (a person's stable
+// account id); deviceId and name are fallbacks for rows created before the
+// person had a resolved account. Used for "is this me?", sign-out, gear tagging,
+// and duplicate detection — so every path agrees on identity.
+export function isSamePerson(p, { uid, deviceId, name } = {}) {
+  if (!p) return false;
+  if (uid && p.uid === uid) return true;
+  if (deviceId && p.deviceId === deviceId) return true;
+  if (name && (p.name || '').toLowerCase() === name.toLowerCase()) return true;
+  return false;
+}
+
+// The roster document id for a person in a session. Prefer the id of a row they
+// ALREADY own (so a re-tap — even from another device, or onto an admin's
+// pre-add — updates that one row); otherwise key by their stable uid, falling
+// back to deviceId only when no account is resolved yet. This makes
+// "one person = one row per session" true by construction, not by cleanup.
+export function rosterDocId({ existingId, uid, deviceId }) {
+  return existingId || uid || deviceId || null;
+}
+
 export function parseNames(input) {
   return input
     .split(/[,\n\r]+/)

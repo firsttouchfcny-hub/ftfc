@@ -17,6 +17,7 @@ import { accountRef } from './utils/identity';
 import { fridayGearPriorityNames, bringersFor, takersFor } from './utils/gear';
 import {
   getSessionDate, getDeviceId, normalizeName, newUid,
+  isSamePerson, rosterDocId,
   isSuspended, formatDate, formatTimeET,
   getRollCallPhase, isRollCallOpen, canAdminSignUp,
   buildFlatList, MATCH1_MAX, MATCH2_MAX, MATCH2_MIN_CONFIRM, getMatch2State,
@@ -182,8 +183,7 @@ export default function App() {
   // until the account loads.
   const displayName   = playerProfile?.name || playerName;
   // A roster entry is "me" if the stable uid matches, else fall back to device/name.
-  const isMe = (p) => (uid && p.uid === uid) || p.deviceId === deviceId ||
-    (p.name || '').toLowerCase() === playerName.toLowerCase();
+  const isMe = (p) => isSamePerson(p, { uid, deviceId, name: playerName });
   const myEntry       = players.find(isMe);
   const onListByName  = players.some(
     (p) => p.name.toLowerCase() === playerName.toLowerCase()
@@ -271,13 +271,16 @@ export default function App() {
     // entered the shared PIN (which would leak the badge to anyone who logs in).
     const playerIsAdmin = playerProfile?.isAdmin || false;
 
-    // One roster document per device, keyed by the always-present deviceId (uid
-    // is stored as a field, not used as the key: it can be absent on an early
-    // sign-in and present later, which would split one device across two docs).
-    // A plain setDoc with no read-modify-write means concurrent sign-ins each
-    // touch a different doc and never collide; re-tapping overwrites the same
-    // doc (idempotent), so it can never create a duplicate.
-    const ref = doc(db, 'sessions', today, 'players', deviceId);
+    // One roster document per PERSON. Reuse the row I already own (found by uid,
+    // else device/name) so a re-tap — even from a second device, or onto a row an
+    // admin pre-added for me — updates that single row instead of forking a new
+    // one; otherwise key by my stable uid (deviceId only until an account is
+    // resolved). Different people have different keys, so concurrent sign-ins
+    // still touch different docs and never collide. This is what makes a
+    // duplicate structurally impossible rather than something we clean up after.
+    const existing = players.find((p) => isSamePerson(p, { uid, deviceId, name: playerName }));
+    const ref = doc(db, 'sessions', today, 'players',
+      rosterDocId({ existingId: existing?.id, uid, deviceId }));
     setSigningIn(plusOnes); // show the submitting state and block further taps
     try {
       // merge:true so signing in only sets the identity/+1 fields and preserves

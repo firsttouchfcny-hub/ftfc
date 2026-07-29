@@ -130,29 +130,35 @@ export default function AdminPanel({ session, players, today, adminName }) {
     if (!names.length) return;
 
     await getOrCreateSession();
-    const existing = new Set((players || []).map((p) => p.name.toLowerCase()));
+    const existingNames = new Set((players || []).map((p) => p.name.toLowerCase()));
+    const existingUids  = new Set((players || []).map((p) => p.uid).filter(Boolean));
 
     try {
       const batch = writeBatch(db);
       let added = 0;
       for (const name of names) {
-        if (existing.has(name.toLowerCase())) continue;
-        // Resolve (or create) the person's account so their roster entry is tied
-        // to a real identity by uid, and carries any existing admin flag.
+        if (existingNames.has(name.toLowerCase())) continue;
+        // Resolve (or create) the person's account so the row ties to a real
+        // identity by uid, carries any existing admin flag, and shows the
+        // canonical name.
         const acct = await ensureAccount(name);
-        // Admin-added players have no real device, so key the doc by name.
-        const id = `admin-${normalizeName(name)}`;
+        // Already on today's list under a different name? Same person → skip.
+        if (existingUids.has(acct.uid)) continue;
+        // Key the row by the person's uid (not the typed name), so if they later
+        // self-sign-up it lands on THIS row instead of forking a duplicate.
+        const id = acct.uid;
         batch.set(playerDoc(id), {
-          name,
-          deviceId: id,
+          name: acct.name,
+          deviceId: `admin-${normalizeName(acct.name)}`,
           uid: acct.uid,
           isAdmin: acct.isAdmin || false,
           plusOnes: 0,
           priority: false,
           // +added keeps a stable signup order within one batch (same-ms writes).
           signedUpAt: Date.now() + added,
-        });
-        existing.add(name.toLowerCase());
+        }, { merge: true });
+        existingNames.add(acct.name.toLowerCase());
+        existingUids.add(acct.uid);
         added++;
       }
       await batch.commit();

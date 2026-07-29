@@ -4,6 +4,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { ensureAccount } from '../utils/identity';
+import { isSamePerson, rosterDocId } from '../utils/helpers';
 import {
   GEAR_TYPE_ORDER, GEAR_DEFS, gearIcon, gearLabel, gearNeed,
   isGearOpen, gearTakeDate, todayKey, gameDaysAfter,
@@ -33,11 +34,7 @@ async function setGearRole(dateKey, { name, deviceId, uid, isAdmin }, role, type
   // creating a duplicate. Each person writes only their own doc, so committing
   // to gear never contends with anyone else's write.
   const snap = await getDocs(col);
-  const mineDoc = snap.docs.find((d) => {
-    const p = d.data();
-    return (uid && p.uid === uid) || p.deviceId === deviceId ||
-      (p.name || '').toLowerCase() === name.toLowerCase();
-  });
+  const mineDoc = snap.docs.find((d) => isSamePerson(d.data(), { uid, deviceId, name }));
 
   if (type == null) { // clear the role marker (leaves them on the roster)
     if (mineDoc) await updateDoc(mineDoc.ref, { [field]: null });
@@ -46,10 +43,10 @@ async function setGearRole(dateKey, { name, deviceId, uid, isAdmin }, role, type
   if (mineDoc) {
     await updateDoc(mineDoc.ref, { [field]: type });
   } else {
-    // Not on this day's roster yet → auto-add them, keyed by deviceId to match
-    // sign-in (one doc per device; uid is stored as a field). Committing to gear
-    // signs you up for that game.
-    await setDoc(doc(col, deviceId), {
+    // Not on this day's roster yet → auto-add them, keyed by their stable uid
+    // (deviceId only until an account is resolved), matching sign-in so gear and
+    // a later self-signup land on the SAME row. Committing to gear signs you up.
+    await setDoc(doc(col, rosterDocId({ uid, deviceId })), {
       name, deviceId, uid: uid || null, isAdmin: !!isAdmin,
       plusOnes: 0, [field]: type, signedUpAt: Date.now(),
     });

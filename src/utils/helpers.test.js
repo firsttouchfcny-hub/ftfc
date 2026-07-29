@@ -2,6 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   isGameDay, addDaysToKey, nextGameDay, addGameDays,
   getSessionDate, getRollCallPhase,
+  isSamePerson, rosterDocId,
 } from './helpers.js';
 
 // Reference weekdays: 2026-07-25 Sat, -26 Sun, -27 Mon, -28 Tue, -31 Fri, 08-03 Mon.
@@ -61,5 +62,51 @@ describe('roll-call timing (Eastern; July = EDT, UTC-4)', () => {
     expect(getSessionDate()).toBe('2026-07-27');
     at('2026-07-27T15:00:00Z'); // Mon 11am ET -> next game (Tuesday)
     expect(getSessionDate()).toBe('2026-07-28');
+  });
+});
+
+describe('isSamePerson — the one identity matcher', () => {
+  const me = { uid: 'u_1', deviceId: 'dev_A', name: 'William' };
+
+  it('matches on uid regardless of device or name (cross-device, renamed)', () => {
+    expect(isSamePerson({ uid: 'u_1', deviceId: 'dev_B', name: 'Will' }, me)).toBe(true);
+  });
+
+  it('matches on deviceId when uid is absent (legacy/unverified row)', () => {
+    expect(isSamePerson({ deviceId: 'dev_A' }, me)).toBe(true);
+  });
+
+  it('matches on name (case-insensitive) as a last resort', () => {
+    expect(isSamePerson({ name: 'william' }, { name: 'William' })).toBe(true);
+  });
+
+  it('does NOT match a different person (different uid, device, and name)', () => {
+    expect(isSamePerson({ uid: 'u_2', deviceId: 'dev_B', name: 'Dave' }, me)).toBe(false);
+  });
+
+  it('a different uid does not short-circuit a device/name match', () => {
+    // uid differs (no match on uid) but same device → still me.
+    expect(isSamePerson({ uid: 'u_2', deviceId: 'dev_A', name: 'Dave' }, me)).toBe(true);
+  });
+
+  it('handles null/empty entry safely', () => {
+    expect(isSamePerson(null, me)).toBe(false);
+    expect(isSamePerson({}, me)).toBe(false);
+  });
+});
+
+describe('rosterDocId — one row per person, by construction', () => {
+  it('reuses the id of a row the person already owns', () => {
+    expect(rosterDocId({ existingId: 'u_1', uid: 'u_1', deviceId: 'dev_A' })).toBe('u_1');
+    // even if the existing row was device-keyed (created before uid resolved)
+    expect(rosterDocId({ existingId: 'dev_A', uid: 'u_1', deviceId: 'dev_A' })).toBe('dev_A');
+  });
+
+  it('keys a fresh sign-up by the stable uid when known', () => {
+    expect(rosterDocId({ uid: 'u_1', deviceId: 'dev_A' })).toBe('u_1');
+  });
+
+  it('falls back to deviceId only when no account is resolved', () => {
+    expect(rosterDocId({ deviceId: 'dev_A' })).toBe('dev_A');
   });
 });
