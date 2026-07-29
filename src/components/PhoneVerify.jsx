@@ -4,9 +4,9 @@ import {
   signInWithPhoneNumber,
   signOut,
 } from 'firebase/auth';
-import { doc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
-import { auth, db } from '../firebase/config';
-import { normalizeName } from '../utils/helpers';
+import { setDoc } from 'firebase/firestore';
+import { auth } from '../firebase/config';
+import { accountRef, findAccountByPhone } from '../utils/identity';
 
 const RECAPTCHA_ID = 'ftfc-recaptcha-container';
 
@@ -18,7 +18,7 @@ function toE164US(raw) {
   return null;
 }
 
-export default function PhoneVerify({ playerName, onClose, onVerified, onboarding = false }) {
+export default function PhoneVerify({ uid, onClose, onVerified, onboarding = false }) {
   const [step, setStep] = useState('phone');
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
@@ -93,49 +93,35 @@ export default function PhoneVerify({ playerName, onClose, onVerified, onboardin
       await confirmRef.current.confirm(code);
       const e164 = toE164US(phone);
 
-      // Onboarding: no name yet. Verify the number, then either recognize the
-      // person (load their canonical identity) or hand a brand-new player to name entry.
-      if (onboarding) {
-        const snap = await getDocs(query(collection(db, 'players'), where('phone', '==', e164)));
-        const existing = snap.docs.find((d) => d.data()?.phoneVerified);
-        try { await signOut(auth); } catch { /* noop */ }
-        if (existing) {
-          onVerified?.({ adoptedName: existing.data().name || existing.id, uid: existing.data().uid || null });
-        } else {
-          onVerified?.({ newPhone: e164 });
-        }
-        onClose?.();
-        return;
-      }
-
-      const mine = normalizeName(playerName);
-
-      // One number per player: reject if this verified number is already tied to
-      // a different name — this is what actually stops roster abuse.
-      const dupes = await getDocs(query(collection(db, 'players'), where('phone', '==', e164)));
-      const conflict = dupes.docs.find((d) => d.id !== mine && d.data()?.phoneVerified);
-      if (conflict) {
-        // This number already belongs to a registered player. Reunite this device
-        // with that canonical identity (name + history + gear) instead of creating
-        // a mismatched duplicate under a different typed name. Only the real owner
-        // can pass SMS verification, so adopting is safe.
-        try { await signOut(auth); } catch { /* noop */ }
-        onVerified?.({
-          adoptedName: conflict.data().name || conflict.id,
-          uid: conflict.data().uid || null,
-        });
-        onClose?.();
-        return;
-      }
-
-      await setDoc(doc(db, 'players', mine), {
-        phoneVerified: true,
-        phone: e164,
-        phoneVerifiedAt: Date.now(),
-      }, { merge: true });
-      // We only used Firebase Auth to verify ownership of the number — no need to keep the session.
+      // Who (if anyone) already owns this verified number?
+      const owner = await findAccountByPhone(e164);
+      // We only used Firebase Auth to prove ownership of the number — drop the session.
       try { await signOut(auth); } catch { /* noop */ }
-      onVerified?.();
+
+      // No account resolved for this device yet (onboarding, or a legacy device):
+      // adopt the number's account if one exists, else hand a brand-new number to
+      // name entry.
+      if (onboarding || !uid) {
+        if (owner) onVerified?.({ adoptedName: owner.name, uid: owner.uid });
+        else onVerified?.({ newPhone: e164 });
+        onClose?.();
+        return;
+      }
+
+      // A signed-in account is verifying a number. If it already belongs to a
+      // DIFFERENT account, that's who they really are → adopt it (one number, one
+      // person — this is what collapses typo'd duplicates).
+      if (owner && owner.uid !== uid) {
+        onVerified?.({ adoptedName: owner.name, uid: owner.uid });
+        onClose?.();
+        return;
+      }
+
+      // Stamp the verified number on my own account.
+      await setDoc(accountRef(uid), {
+        phone: e164, phoneVerified: true, phoneVerifiedAt: Date.now(),
+      }, { merge: true });
+      onVerified?.({ phone: e164 });
       onClose?.();
     } catch (err) {
       console.error('[FTFC] confirm failed:', err);

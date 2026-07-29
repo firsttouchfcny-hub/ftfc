@@ -13,6 +13,7 @@ import PhoneVerify from './components/PhoneVerify';
 import GearManager from './components/GearManager';
 import PushSetup   from './components/PushSetup';
 import { registerServiceWorker } from './utils/push';
+import { accountRef } from './utils/identity';
 import { fridayGearPriorityNames, bringersFor, takersFor } from './utils/gear';
 import {
   getSessionDate, getDeviceId, normalizeName, newUid,
@@ -33,7 +34,9 @@ export default function App() {
   // During first-time onboarding, a brand-new (unrecognized) verified number waiting for a name.
   const [onboardPhone, setOnboardPhone] = useState(null);
   // Locally-cached stable uid (read once) — a fallback before the profile loads.
-  const [cachedUid] = useState(() => localStorage.getItem('ftfc_uid'));
+  // The stable identity anchor. Everything about a person hangs off this — their
+  // account lives at accounts/<uid>; name and phone are just fields on it.
+  const [uid, setUid] = useState(() => localStorage.getItem('ftfc_uid') || null);
   const [showEditName,    setShowEditName]    = useState(false);
   const [showPhoneVerify, setShowPhoneVerify] = useState(false);
   // When the verify screen is opened by a blocked join, remember the +1s so we
@@ -56,10 +59,10 @@ export default function App() {
   // Register the service worker once so the app is installable and can receive push.
   useEffect(() => { registerServiceWorker(); }, []);
 
-  // Cache the stable uid locally so records can be stamped before the profile loads.
+  // Keep the cached uid in sync with the identity anchor.
   useEffect(() => {
-    if (playerProfile?.uid) localStorage.setItem('ftfc_uid', playerProfile.uid);
-  }, [playerProfile?.uid]);
+    if (uid) localStorage.setItem('ftfc_uid', uid);
+  }, [uid]);
 
   // Re-evaluate Eastern-time state (10 AM reset, 3 PM open) without a manual refresh.
   // The interval covers foreground; visibility/focus covers phones returning from
@@ -121,31 +124,47 @@ export default function App() {
     return unsub;
   }, []);
 
-  // Listen to this player's profile (suspension, admin flag)
+  // Listen to this person's ACCOUNT (keyed by their stable uid). Suspension,
+  // admin flag, name, phone all live there. If we don't know the uid yet
+  // (a legacy/new device), fall back to the old name-keyed profile just long
+  // enough to LEARN the uid, then this effect re-runs on the account.
   useEffect(() => {
+    const grantAdmin = (data) => {
+      if (data?.isAdmin && !isAdmin) {
+        setIsAdmin(true);
+        localStorage.setItem('ftfc_is_admin', 'true');
+      }
+    };
+    if (uid) {
+      const unsub = onSnapshot(
+        accountRef(uid),
+        (snap) => {
+          const data = snap.exists() ? { uid, ...snap.data() } : null;
+          setPlayerProfile(data);
+          grantAdmin(data);
+        },
+        () => setPlayerProfile(null)
+      );
+      return unsub;
+    }
+    // Transition fallback: no uid known → read the legacy name profile to resolve it.
     if (!playerName) return;
-    const ref = doc(db, 'players', normalizeName(playerName));
     const unsub = onSnapshot(
-      ref,
+      doc(db, 'players', normalizeName(playerName)),
       (snap) => {
         if (!snap.exists()) { setPlayerProfile(null); return; }
         const data = snap.data();
         setPlayerProfile(data);
-        // Sync admin status from Firestore profile
-        if (data.isAdmin && !isAdmin) {
-          setIsAdmin(true);
-          localStorage.setItem('ftfc_is_admin', 'true');
-        }
+        if (data.uid) setUid(data.uid); // switches this effect to the account listener
+        grantAdmin(data);
       },
       () => setPlayerProfile(null)
     );
     return unsub;
-  }, [playerName]);
+  }, [uid, playerName]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Derived state ─────────────────────────────────────────────────────────
   const suspended     = isSuspended(playerProfile?.suspendedUntil);
-  // Stable identity anchor (from the profile; cached locally for immediate use).
-  const uid           = playerProfile?.uid || cachedUid || null;
   // A roster entry is "me" if the stable uid matches, else fall back to device/name.
   const isMe = (p) => (uid && p.uid === uid) || p.deviceId === deviceId ||
     (p.name || '').toLowerCase() === playerName.toLowerCase();
@@ -327,61 +346,34 @@ export default function App() {
       }
     }
 
-    // Ensure a profile exists for this name, carrying the STABLE identity (uid +
-    // phone) forward on a rename so history/gear never detaches from the person.
-    const newProfileRef = doc(db, 'players', normalizeName(name));
-    const newSnap = await getDoc(newProfileRef);
-    if (!newSnap.exists()) {
-      let carry = {};
-      let oldRef = null;
-      if (isRename) {
-        oldRef = doc(db, 'players', normalizeName(previousName));
-        const oldSnap = await getDoc(oldRef);
-        if (oldSnap.exists()) {
-          const old = oldSnap.data();
-          carry = {
-            uid: old.uid ?? null,
-            phone: old.phone ?? null,
-            phoneVerified: old.phoneVerified ?? false,
-            phoneVerifiedAt: old.phoneVerifiedAt ?? null,
-            isAdmin: old.isAdmin ?? false,
-            suspendedUntil: old.suspendedUntil ?? null,
-            suspensionType: old.suspensionType ?? null,
-          };
-        }
-      }
-      const uidToUse = carry.uid || newUid();
-      await setDoc(newProfileRef, {
-        name,
-        uid: uidToUse,
-        phone: verifiedPhone ?? carry.phone ?? null,
-        phoneVerified: verifiedPhone ? true : (carry.phoneVerified ?? false),
-        phoneVerifiedAt: verifiedPhone ? Date.now() : (carry.phoneVerifiedAt ?? null),
-        isAdmin: carry.isAdmin ?? false,
-        suspendedUntil: carry.suspendedUntil ?? null,
-        suspensionType: carry.suspensionType ?? null,
-        createdAt: Date.now(),
-      });
-      // A number must live on exactly one name — move it off the old profile.
-      if (oldRef && carry.phone) {
-        await updateDoc(oldRef, { phone: null, phoneVerified: false });
-      }
-      localStorage.setItem('ftfc_uid', uidToUse);
-    } else {
-      // Profile already exists — ensure a uid, and if we just verified a phone
-      // during onboarding, stamp it (reuniting a returning player with their old
-      // profile). Don't overwrite a profile already verified by someone else.
-      const data = newSnap.data();
-      const uidToUse = data.uid || newUid();
-      const patch = {};
-      if (!data.uid) patch.uid = uidToUse;
-      if (verifiedPhone && !data.phoneVerified) {
+    // Write my identity to my ACCOUNT (keyed by uid). A rename is just a name
+    // change on the same account — no orphaned doc, no duplicate. A brand-new
+    // person (no uid yet) gets a fresh account, stamping the verified phone if
+    // onboarding just captured one.
+    let myUid = uid;
+    if (myUid) {
+      const patch = { name };
+      if (verifiedPhone) {
         patch.phone = verifiedPhone;
         patch.phoneVerified = true;
         patch.phoneVerifiedAt = Date.now();
       }
-      if (Object.keys(patch).length) await updateDoc(newProfileRef, patch);
-      localStorage.setItem('ftfc_uid', uidToUse);
+      await setDoc(accountRef(myUid), patch, { merge: true });
+    } else {
+      myUid = newUid();
+      await setDoc(accountRef(myUid), {
+        uid: myUid,
+        name,
+        phone: verifiedPhone ?? null,
+        phoneVerified: !!verifiedPhone,
+        phoneVerifiedAt: verifiedPhone ? Date.now() : null,
+        isAdmin: false,
+        suspendedUntil: null,
+        suspensionType: null,
+        createdAt: Date.now(),
+      });
+      localStorage.setItem('ftfc_uid', myUid);
+      setUid(myUid);
     }
   };
 
@@ -652,7 +644,7 @@ export default function App() {
           onboarding
           onVerified={(result) => {
             if (result?.adoptedName) {
-              if (result.uid) localStorage.setItem('ftfc_uid', result.uid);
+              if (result.uid) { localStorage.setItem('ftfc_uid', result.uid); setUid(result.uid); }
               localStorage.setItem('ftfc_player_name', result.adoptedName);
               setPlayerName(result.adoptedName);
               setShowNameEntry(false);
@@ -674,14 +666,14 @@ export default function App() {
       )}
       {showPhoneVerify && (
         <PhoneVerify
-          playerName={playerName}
+          uid={uid}
           onClose={() => { setShowPhoneVerify(false); setPendingPlusOnes(null); }}
           onVerified={(result) => {
             setShowPhoneVerify(false);
             // Phone already belongs to a registered player → adopt that canonical
             // name so gear/roster/history all match (they re-tap join as themselves).
             if (result?.adoptedName) {
-              if (result.uid) localStorage.setItem('ftfc_uid', result.uid);
+              if (result.uid) { localStorage.setItem('ftfc_uid', result.uid); setUid(result.uid); }
               if (result.adoptedName !== playerName) {
                 localStorage.setItem('ftfc_player_name', result.adoptedName);
                 setPlayerName(result.adoptedName);
