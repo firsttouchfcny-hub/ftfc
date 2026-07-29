@@ -18,7 +18,7 @@ function toE164US(raw) {
   return null;
 }
 
-export default function PhoneVerify({ uid, onClose, onVerified, onboarding = false }) {
+export default function PhoneVerify({ uid, onClose, onVerified, onboarding = false, updating = false }) {
   const [step, setStep] = useState('phone');
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
@@ -141,12 +141,15 @@ export default function PhoneVerify({ uid, onClose, onVerified, onboarding = fal
       <div className="modal">
         <div className="modal-icon-wrap">📱</div>
         <h2 className="modal-title">
-          {step === 'phone' ? 'Verify your phone' : 'Enter the code'}
+          {step === 'code' ? 'Enter the code'
+            : updating ? 'Update your phone' : 'Verify your phone'}
         </h2>
         <p className="modal-subtitle">
-          {step === 'phone'
-            ? "New this season: verify your number once so we know every player is real. It takes a few seconds — and you'll only ever do it this one time."
-            : `We texted a 6-digit code to ${phone}. Enter it below.`}
+          {step === 'code'
+            ? `We texted a 6-digit code to ${phone}. Enter it below.`
+            : updating
+              ? "Got a new number? Enter it and we'll text a code to confirm it. Your name, history and gear stay the same."
+              : "New this season: verify your number once so we know every player is real. It takes a few seconds — and you'll only ever do it this one time."}
         </p>
 
         {step === 'phone' ? (

@@ -531,15 +531,16 @@ export default function App() {
                   )}
                 </span>
                 <div className="you-row-actions">
-                  {/* Shown until the player has verified their phone. */}
-                  {!playerProfile?.phoneVerified && (
-                    <button
-                      className="btn btn-ghost btn-sm"
-                      onClick={() => setShowPhoneVerify(true)}
-                    >
-                      Verify phone
-                    </button>
-                  )}
+                  {/* Verify (first time) or update (got a new number) — both open
+                      the same flow; verifying a new number just re-points this
+                      account's phone, keeping the same identity. */}
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => setShowPhoneVerify(true)}
+                    title={playerProfile?.phoneVerified ? 'Got a new number? Update it here.' : undefined}
+                  >
+                    {playerProfile?.phoneVerified ? 'Update phone' : 'Verify phone'}
+                  </button>
                   <button
                     className="btn btn-ghost btn-sm"
                     onClick={() => setShowEditName(true)}
@@ -752,6 +753,7 @@ export default function App() {
       {showPhoneVerify && (
         <PhoneVerify
           uid={uid}
+          updating={!!playerProfile?.phoneVerified}
           onClose={() => { setShowPhoneVerify(false); setPendingPlusOnes(null); }}
           onVerified={(result) => {
             setShowPhoneVerify(false);
