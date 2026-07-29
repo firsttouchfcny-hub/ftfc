@@ -7,9 +7,9 @@ import {
 import {
   normalizeName, parseNames, calculateSuspensionEnd,
   formatDateShort, getCurrentYear, buildFlatList,
-  getRollCallPhase, isRollCallOpen,
+  getRollCallPhase, isRollCallOpen, toE164US,
 } from '../utils/helpers';
-import { accountRef, findAccountByName, ensureAccount } from '../utils/identity';
+import { accountRef, findAccountByName, ensureAccount, ensureAccountByPhone } from '../utils/identity';
 
 export default function AdminPanel({ session, players, today, adminName }) {
   const [bulkAddInput, setBulkAddInput]   = useState('');
@@ -259,30 +259,45 @@ export default function AdminPanel({ session, players, today, adminName }) {
 
   // ── Strikes ───────────────────────────────────────────────────────────────
 
+  // Every active strike this year for a person — counted across BOTH the new uid
+  // key and the legacy normalized-name key, so switching the key never loses
+  // history and a person's escalation count can't be split by a name variant.
+  // Returns the raw strike docs (id + data), deduped.
+  const activeStrikesFor = async (acct, year, excludeId = null) => {
+    const seen = new Map();
+    for (const key of [acct.uid, normalizeName(acct.name || '')]) {
+      if (!key) continue;
+      const snap = await getDocs(query(collection(db, 'strikes'), where('playerId', '==', key)));
+      snap.docs.forEach((d) => seen.set(d.id, d.data()));
+    }
+    return [...seen.entries()]
+      .filter(([id, s]) => id !== excludeId && s.year === year && !s.undone)
+      .map(([id, s]) => ({ id, ...s }));
+  };
+
   const handleIssueStrikes = async () => {
-    const names = parseNames(strikeInput);
-    if (!names.length) return;
+    const entries = parseNames(strikeInput);
+    if (!entries.length) return;
     try {
       const year = getCurrentYear();
-      for (const name of names) {
-        const playerId = normalizeName(name);
-        const q = query(collection(db, 'strikes'), where('playerId', '==', playerId));
-        const snap = await getDocs(q);
-        const activeCount = snap.docs.filter(
-          (d) => d.data().year === year && !d.data().undone
-        ).length;
-        const newCount = activeCount + 1;
+      for (const entry of entries) {
+        // Resolve to the ONE canonical account by phone (preferred) or name, so a
+        // strike always attaches to the right person — "Miguel C", "Miguel
+        // Cevallos", or his number all land on the same account and never split.
+        const e164 = toE164US(entry);
+        const acct = e164 ? await ensureAccountByPhone(e164) : await ensureAccount(entry);
+        const newCount = (await activeStrikesFor(acct, year)).length + 1;
         const suspendedUntil = calculateSuspensionEnd(newCount);
         // The suspension lives on the person's ACCOUNT (what the app reads).
-        const acct = await ensureAccount(name);
         await setDoc(accountRef(acct.uid), { suspendedUntil, suspensionType: 'strike' }, { merge: true });
+        // Key the strike by the stable uid; keep the canonical name for the log.
         await addDoc(collection(db, 'strikes'), {
-          playerName: name, playerId, issuedAt: Date.now(), year,
+          playerName: acct.name, playerId: acct.uid, playerUid: acct.uid, issuedAt: Date.now(), year,
           strikeNumber: newCount, undone: false, issuedBy: adminName || 'admin', suspendedUntil,
         });
       }
       setStrikeInput('');
-      flash(`Strike(s) issued to ${names.length} player(s)`);
+      flash(`Strike(s) issued to ${entries.length} player(s)`);
       if (showStrikeLog) loadStrikeLog();
     } catch (err) {
       fireError('Issue strikes', err);
@@ -291,16 +306,16 @@ export default function AdminPanel({ session, players, today, adminName }) {
 
   const handleUndoStrike = async (strike) => {
     try {
-      const strikeRef = doc(db, 'strikes', strike.id);
-      await updateDoc(strikeRef, { undone: true });
+      await updateDoc(doc(db, 'strikes', strike.id), { undone: true });
       const year = getCurrentYear();
-      const q = query(collection(db, 'strikes'), where('playerId', '==', strike.playerId));
-      const snap = await getDocs(q);
-      const remaining = snap.docs.filter(
-        (d) => d.id !== strike.id && d.data().year === year && !d.data().undone
-      ).length;
-      const acct = await findAccountByName(strike.playerName);
+      // Resolve the struck person's account: prefer the uid the strike carries
+      // (new strikes) and fall back to the name (legacy strikes).
+      const acct = strike.playerUid
+        ? { uid: strike.playerUid, name: strike.playerName }
+        : await findAccountByName(strike.playerName);
       if (acct) {
+        // Recount across both keys, excluding the one we just undid.
+        const remaining = (await activeStrikesFor(acct, year, strike.id)).length;
         await setDoc(accountRef(acct.uid), remaining === 0
           ? { suspendedUntil: null, suspensionType: null }
           : { suspendedUntil: calculateSuspensionEnd(remaining), suspensionType: 'strike' },
@@ -478,7 +493,7 @@ export default function AdminPanel({ session, players, today, adminName }) {
         <h4>Issue Strikes</h4>
         <textarea
           className="admin-textarea"
-          placeholder="Names separated by commas or line breaks…"
+          placeholder="Phone numbers (best) or names, comma/line separated…"
           value={strikeInput}
           onChange={(e) => setStrikeInput(e.target.value)}
           rows={3}
