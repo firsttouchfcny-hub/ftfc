@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { db } from './firebase/config';
 import {
-  doc, onSnapshot, setDoc, getDoc, updateDoc, deleteDoc,
+  doc, onSnapshot, setDoc, updateDoc, deleteDoc,
   collection, arrayUnion,
 } from 'firebase/firestore';
 import NameEntry   from './components/NameEntry';

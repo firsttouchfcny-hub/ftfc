@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { db } from '../firebase/config';
 import {
-  doc, setDoc, getDoc, updateDoc, deleteDoc, writeBatch,
+  doc, setDoc, updateDoc, deleteDoc, writeBatch,
   collection, addDoc, query, where, getDocs,
 } from 'firebase/firestore';
 import {
@@ -9,6 +9,7 @@ import {
   formatDateShort, getCurrentYear, buildFlatList,
   getRollCallPhase, isRollCallOpen,
 } from '../utils/helpers';
+import { accountRef, findAccountByName, ensureAccount } from '../utils/identity';
 
 export default function AdminPanel({ session, players, today, adminName }) {
   const [bulkAddInput, setBulkAddInput]   = useState('');
@@ -28,7 +29,7 @@ export default function AdminPanel({ session, players, today, adminName }) {
 
   const loadAdmins = async () => {
     try {
-      const snap = await getDocs(query(collection(db, 'players'), where('isAdmin', '==', true)));
+      const snap = await getDocs(query(collection(db, 'accounts'), where('isAdmin', '==', true)));
       setAdmins(
         snap.docs
           .map((d) => ({ id: d.id, ...d.data() }))
@@ -86,23 +87,6 @@ export default function AdminPanel({ session, players, today, adminName }) {
   // A player is now its own document in the session's players subcollection.
   const playerDoc = (id) => doc(db, 'sessions', today, 'players', id);
 
-  async function ensurePlayerProfile(name) {
-    const id = normalizeName(name);
-    const ref = doc(db, 'players', id);
-    const snap = await getDoc(ref);
-    if (!snap.exists()) {
-      await setDoc(ref, {
-        name,
-        isAdmin: false,
-        suspendedUntil: null,
-        suspensionType: null,
-        createdAt: Date.now(),
-      });
-      return { name, isAdmin: false };
-    }
-    return snap.data();
-  }
-
   // ── Roll call ─────────────────────────────────────────────────────────────
 
   // Roll call follows the Eastern-time schedule (opens 3 PM) unless an admin
@@ -153,13 +137,16 @@ export default function AdminPanel({ session, players, today, adminName }) {
       let added = 0;
       for (const name of names) {
         if (existing.has(name.toLowerCase())) continue;
-        const profile = await ensurePlayerProfile(name);
+        // Resolve (or create) the person's account so their roster entry is tied
+        // to a real identity by uid, and carries any existing admin flag.
+        const acct = await ensureAccount(name);
         // Admin-added players have no real device, so key the doc by name.
         const id = `admin-${normalizeName(name)}`;
         batch.set(playerDoc(id), {
           name,
           deviceId: id,
-          isAdmin: profile.isAdmin || false,
+          uid: acct.uid,
+          isAdmin: acct.isAdmin || false,
           plusOnes: 0,
           priority: false,
           // +added keeps a stable signup order within one batch (same-ms writes).
@@ -197,32 +184,30 @@ export default function AdminPanel({ session, players, today, adminName }) {
     }
   };
 
-  // Admin badge is a deliberate label (separate from Priority). Writes both the
-  // session entry and the profile so it persists / stops on future signups.
-  const handleToggleAdmin = async (playerId, name, current) => {
+  // Admin is a flag on the person's ACCOUNT (keyed by uid) — so it follows them
+  // across name/phone changes and can't be lost to a duplicate. We also tag the
+  // roster entry so the badge shows immediately on today's list.
+  const handleToggleAdmin = async (playerId, uid, name, current) => {
     try {
       const newVal = !current;
       await updateDoc(playerDoc(playerId), { isAdmin: newVal });
-      const ref = doc(db, 'players', normalizeName(name));
-      const snap = await getDoc(ref);
-      if (snap.exists()) await updateDoc(ref, { isAdmin: newVal });
-      else await setDoc(ref, { name, isAdmin: newVal, suspendedUntil: null, createdAt: Date.now() });
+      const acct = uid ? { uid } : await ensureAccount(name);
+      await setDoc(accountRef(acct.uid), { isAdmin: newVal }, { merge: true });
+      loadAdmins();
     } catch (err) {
       fireError('Toggle admin', err);
     }
   };
 
-  // ── Manage admins & verification BY NAME (works even if the person isn't on
-  // today's list). Writes the profile, which is the source of truth for both the
-  // admin exemption and the sign-up verify gate. ──────────────────────────────
+  // ── Manage admins & verification BY NAME. Resolves the name to the person's
+  // account (creating one if they've never signed up) and flags THAT — the
+  // single source of truth for admin power and the verify override. ────────────
   const handleGrantAdminByName = async () => {
     const name = manageInput.trim();
     if (!name) return;
     try {
-      const ref = doc(db, 'players', normalizeName(name));
-      const snap = await getDoc(ref);
-      if (snap.exists()) await updateDoc(ref, { isAdmin: true });
-      else await setDoc(ref, { name, isAdmin: true, suspendedUntil: null, createdAt: Date.now() });
+      const acct = await ensureAccount(name);
+      await setDoc(accountRef(acct.uid), { isAdmin: true }, { merge: true });
       setManageInput('');
       flash(`${name} is now an admin.`);
       loadAdmins();
@@ -231,10 +216,10 @@ export default function AdminPanel({ session, players, today, adminName }) {
     }
   };
 
-  const handleRevokeAdmin = async (id, name) => {
+  const handleRevokeAdmin = async (uid, name) => {
     try {
-      await updateDoc(doc(db, 'players', id), { isAdmin: false });
-      flash(`Removed admin from ${name || id}.`);
+      await setDoc(accountRef(uid), { isAdmin: false }, { merge: true });
+      flash(`Removed admin from ${name || uid}.`);
       loadAdmins();
     } catch (err) {
       fireError('Remove admin', err);
@@ -247,11 +232,10 @@ export default function AdminPanel({ session, players, today, adminName }) {
     const name = manageInput.trim();
     if (!name) return;
     try {
-      const ref = doc(db, 'players', normalizeName(name));
-      const snap = await getDoc(ref);
-      const stamp = { phoneVerified: true, phoneVerifiedByAdmin: true, phoneVerifiedAt: Date.now() };
-      if (snap.exists()) await updateDoc(ref, stamp);
-      else await setDoc(ref, { name, isAdmin: false, suspendedUntil: null, createdAt: Date.now(), ...stamp });
+      const acct = await ensureAccount(name);
+      await setDoc(accountRef(acct.uid), {
+        phoneVerified: true, phoneVerifiedByAdmin: true, phoneVerifiedAt: Date.now(),
+      }, { merge: true });
       setManageInput('');
       flash(`${name} marked verified (admin override).`);
     } catch (err) {
@@ -283,15 +267,9 @@ export default function AdminPanel({ session, players, today, adminName }) {
         ).length;
         const newCount = activeCount + 1;
         const suspendedUntil = calculateSuspensionEnd(newCount);
-        const profileRef = doc(db, 'players', playerId);
-        const profileSnap = await getDoc(profileRef);
-        if (profileSnap.exists()) {
-          await updateDoc(profileRef, { suspendedUntil, suspensionType: 'strike' });
-        } else {
-          await setDoc(profileRef, {
-            name, isAdmin: false, suspendedUntil, suspensionType: 'strike', createdAt: Date.now(),
-          });
-        }
+        // The suspension lives on the person's ACCOUNT (what the app reads).
+        const acct = await ensureAccount(name);
+        await setDoc(accountRef(acct.uid), { suspendedUntil, suspensionType: 'strike' }, { merge: true });
         await addDoc(collection(db, 'strikes'), {
           playerName: name, playerId, issuedAt: Date.now(), year,
           strikeNumber: newCount, undone: false, issuedBy: adminName || 'admin', suspendedUntil,
@@ -315,14 +293,12 @@ export default function AdminPanel({ session, players, today, adminName }) {
       const remaining = snap.docs.filter(
         (d) => d.id !== strike.id && d.data().year === year && !d.data().undone
       ).length;
-      const profileRef = doc(db, 'players', strike.playerId);
-      if (remaining === 0) {
-        await updateDoc(profileRef, { suspendedUntil: null, suspensionType: null });
-      } else {
-        await updateDoc(profileRef, {
-          suspendedUntil: calculateSuspensionEnd(remaining),
-          suspensionType: 'strike',
-        });
+      const acct = await findAccountByName(strike.playerName);
+      if (acct) {
+        await setDoc(accountRef(acct.uid), remaining === 0
+          ? { suspendedUntil: null, suspensionType: null }
+          : { suspendedUntil: calculateSuspensionEnd(remaining), suspensionType: 'strike' },
+          { merge: true });
       }
       loadStrikeLog();
       flash('Strike undone');
@@ -474,7 +450,7 @@ export default function AdminPanel({ session, players, today, adminName }) {
                     <input
                       type="checkbox"
                       checked={p.isAdmin || false}
-                      onChange={() => handleToggleAdmin(p.id, p.name, p.isAdmin)}
+                      onChange={() => handleToggleAdmin(p.id, p.uid, p.name, p.isAdmin)}
                     />
                     Admin
                   </label>
