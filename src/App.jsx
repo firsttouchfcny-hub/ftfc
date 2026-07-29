@@ -338,9 +338,11 @@ export default function App() {
     setShowEditName(false);
     setOnboardPhone(null);
 
-    // If renaming and signed up for today's session, update the on-list entry.
+    // If renaming and signed up today, update my roster entry's display name in
+    // place. Match by uid (the person) first, so it works even when the entry was
+    // created on a different device — deviceId as a fallback for unverified rows.
     if (isRename) {
-      const mine = players.find((p) => p.deviceId === deviceId);
+      const mine = players.find((p) => (uid && p.uid === uid) || p.deviceId === deviceId);
       if (mine) {
         await updateDoc(doc(db, 'sessions', today, 'players', mine.id), { name });
       }
