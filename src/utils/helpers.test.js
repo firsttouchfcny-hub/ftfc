@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   isGameDay, addDaysToKey, nextGameDay, addGameDays,
   getSessionDate, getRollCallPhase,
-  isSamePerson, rosterDocId, toE164US,
+  isSamePerson, rosterDocId, toE164US, buildFlatList,
 } from './helpers.js';
 
 // Reference weekdays: 2026-07-25 Sat, -26 Sun, -27 Mon, -28 Tue, -31 Fri, 08-03 Mon.
@@ -125,5 +125,63 @@ describe('rosterDocId — one row per person, by construction', () => {
 
   it('falls back to deviceId only when no account is resolved', () => {
     expect(rosterDocId({ deviceId: 'dev_A' })).toBe('dev_A');
+  });
+});
+
+describe('buildFlatList — roster ordering + gear roles + +1 expansion', () => {
+  const P = (name, over = {}) => ({ id: name, name, signedUpAt: 0, plusOnes: 0, ...over });
+  const names = (list) => list.map((p) => p.name);
+
+  it('returns [] for empty/null input', () => {
+    expect(buildFlatList([])).toEqual([]);
+    expect(buildFlatList(null)).toEqual([]);
+  });
+
+  it('orders groups: gear bringers → takers → admin/priority → Friday-priority → rest', () => {
+    const players = [
+      P('rest',   { signedUpAt: 5 }),
+      P('bring',  { signedUpAt: 10 }),
+      P('take',   { signedUpAt: 3 }),
+      P('admin',  { signedUpAt: 20, isAdmin: true }),
+      P('friday', { signedUpAt: 1 }),
+    ];
+    const opts = {
+      gearRoles: { bring: { bring: ['goal'], take: [] }, take: { bring: [], take: ['bibs'] } },
+      gearPriorityNames: new Set(['friday']),
+    };
+    expect(names(buildFlatList(players, opts))).toEqual(['bring', 'take', 'admin', 'friday', 'rest']);
+  });
+
+  it('within a gear group, orders by type goal → balls → bibs (not signup time)', () => {
+    const players = [
+      P('bibsGuy',  { signedUpAt: 1 }),
+      P('goalGuy',  { signedUpAt: 2 }),
+      P('ballsGuy', { signedUpAt: 3 }),
+    ];
+    const gearRoles = {
+      bibsguy:  { bring: ['bibs'],  take: [] },
+      goalguy:  { bring: ['goal'],  take: [] },
+      ballsguy: { bring: ['balls'], take: [] },
+    };
+    expect(names(buildFlatList(players, { gearRoles }))).toEqual(['goalGuy', 'ballsGuy', 'bibsGuy']);
+  });
+
+  it('breaks ties within a group by signup time (earliest first)', () => {
+    const players = [P('later', { signedUpAt: 20 }), P('earlier', { signedUpAt: 10 })];
+    expect(names(buildFlatList(players))).toEqual(['earlier', 'later']);
+  });
+
+  it('matches gear roles by NAME, case-insensitively (documents the name-key coupling)', () => {
+    const players = [P('rest', { signedUpAt: 1 }), P('Escobar', { signedUpAt: 2 })];
+    // role keyed by lowercased name — a mismatch here is exactly what drops a badge
+    const gearRoles = { escobar: { bring: ['goal'], take: [] } };
+    expect(names(buildFlatList(players, { gearRoles }))).toEqual(['Escobar', 'rest']);
+  });
+
+  it('expands +1s into non-main entries right after their host', () => {
+    const flat = buildFlatList([P('Host', { plusOnes: 2, signedUpAt: 1 })]);
+    expect(flat.map((p) => p.name)).toEqual(['Host', 'Host +1', 'Host +2']);
+    expect(flat.map((p) => p.isMainEntry)).toEqual([true, false, false]);
+    expect(flat[1].parentId).toBe('Host');
   });
 });

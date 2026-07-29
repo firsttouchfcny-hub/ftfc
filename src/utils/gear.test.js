@@ -3,6 +3,7 @@ import {
   gearNeed, returnDateOptions, returnSlotsLeft, availableToTake,
   playerReturnDates, coverageForMorning, setStatuses,
   fridayGearPriorityNames, isFridayKey, myCommitments, takeBlockedByPriority,
+  takersFor, bringersFor, pickFreeSet,
 } from './gear.js';
 
 // Helper to build a live commitment.
@@ -167,3 +168,40 @@ describe('identity matching by stable uid', () => {
   });
 });
 
+
+describe('return-date rules & set assignment', () => {
+  // Weekdays: 2026-07-27 Mon … 07-31 Fri, 08-03 Mon, 08-04 Tue.
+  it('a Friday take is forced back to Monday when that slot is open', () => {
+    // bibs normally allow a 5-day choice, but a Friday take must come back Monday.
+    expect(playerReturnDates([], 'bibs', '2026-07-31')).toEqual(['2026-08-03']);
+  });
+
+  it('takersFor excludes admin-seeded "held" gear (it was never taken home)', () => {
+    const commits = [
+      c({ type: 'goal', takerName: 'Real', takeDate: '2026-07-27', returnDate: '2026-07-28' }),
+      c({ type: 'bibs', takerName: 'Seeded', held: true, takeDate: '2026-07-27', returnDate: '2026-07-28' }),
+    ];
+    expect(takersFor(commits, '2026-07-27').map((x) => x.takerName)).toEqual(['Real']);
+  });
+
+  it('bringersFor lists everyone due to bring gear IN that morning (held included)', () => {
+    const commits = [
+      c({ type: 'goal', takerName: 'A', takeDate: '2026-07-27', returnDate: '2026-07-28' }),
+      c({ type: 'bibs', takerName: 'B', held: true, takeDate: '2026-07-27', returnDate: '2026-07-28' }),
+      c({ type: 'goal', takerName: 'C', takeDate: '2026-07-27', returnDate: '2026-07-29' }),
+    ];
+    expect(bringersFor(commits, '2026-07-28').map((x) => x.takerName).sort()).toEqual(['A', 'B']);
+  });
+
+  it('pickFreeSet skips a set that is out over the take date', () => {
+    const commits = [c({ type: 'goal', setId: 'goal-1', takeDate: '2026-07-27', returnDate: '2026-07-28' })];
+    // goal-1 is busy on the 27th → next free goal set is goal-2
+    expect(pickFreeSet(commits, 'goal', '2026-07-27')).toBe('goal-2');
+  });
+
+  it('pickFreeSet returns null when every set of a type is out', () => {
+    const busyAll = ['goal-1', 'goal-2', 'goal-3'].map((setId) =>
+      c({ type: 'goal', setId, takeDate: '2026-07-27', returnDate: '2026-07-30' }));
+    expect(pickFreeSet(busyAll, 'goal', '2026-07-27')).toBe(null);
+  });
+});
