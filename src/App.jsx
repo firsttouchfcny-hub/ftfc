@@ -67,6 +67,7 @@ export default function App() {
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [gearLedger,    setGearLedger]    = useState([]);
   const [loading,       setLoading]       = useState(true);
+  const [playersLoaded, setPlayersLoaded] = useState(false); // first roster snapshot in
   const [, setClockTick] = useState(0); // re-render so time-based open/close updates live
 
   // Register the service worker once so the app is installable and can receive push.
@@ -149,13 +150,16 @@ export default function App() {
   // document (keyed by device id), so simultaneous sign-ins each write a
   // different doc and never contend on a shared roster array.
   useEffect(() => {
+    setPlayersLoaded(false); // reset when the session date changes
     const col = collection(db, 'sessions', today, 'players');
     const unsub = onSnapshot(
       col,
-      (snap) => setPlayers(snap.docs.map((d) => ({ ...d.data(), id: d.id }))),
-      () => setPlayers([])
+      (snap) => { setPlayers(snap.docs.map((d) => ({ ...d.data(), id: d.id }))); setPlayersLoaded(true); },
+      () => { setPlayers([]); setPlayersLoaded(true); }
     );
-    return unsub;
+    // Don't leave the roster on a loading state forever on a slow connection.
+    const timeout = setTimeout(() => setPlayersLoaded(true), 6000);
+    return () => { unsub(); clearTimeout(timeout); };
   }, [today]);
 
   // Listen to the gear ledger (drives Friday gear-priority ordering).
@@ -675,6 +679,7 @@ export default function App() {
               deviceId={deviceId}
               playerName={displayName}
               isOpen={rollOpen}
+              loaded={playersLoaded}
               gearPriorityNames={gearPriorityNames}
               gearRoles={gearRoles}
             />

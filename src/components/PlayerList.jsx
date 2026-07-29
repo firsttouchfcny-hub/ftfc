@@ -4,7 +4,7 @@ import {
 } from '../utils/helpers';
 import { gearIcon } from '../utils/gear';
 
-export default function PlayerList({ players: playersProp, deviceId, playerName, isOpen, gearPriorityNames, gearRoles }) {
+export default function PlayerList({ players: playersProp, deviceId, playerName, isOpen, loaded = true, gearPriorityNames, gearRoles }) {
   const players = playersProp || [];
   const gearPri = gearPriorityNames || new Set();
   const roles = gearRoles || {};
@@ -21,9 +21,11 @@ export default function PlayerList({ players: playersProp, deviceId, playerName,
   if (total === 0) {
     return (
       <div className="list-empty">
-        {isOpen
-          ? 'No players yet — be the first to sign in!'
-          : 'Roll call is not open yet.'}
+        {!loaded
+          ? 'Loading roster…'
+          : isOpen
+            ? 'No players yet — be the first to sign in!'
+            : 'Roll call is not open yet.'}
       </div>
     );
   }

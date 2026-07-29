@@ -66,11 +66,16 @@ export default function GearManager({ playerName, deviceId, uid, amAdmin, suspen
   const [showAdmin, setShowAdmin] = useState(false);
 
   useEffect(() => {
+    // Don't spin on "Loading gear…" forever if the connection is slow/flaky
+    // (e.g. an in-app browser). Render the panel after 6s regardless; the
+    // snapshot updates it whenever it arrives.
+    const timeout = setTimeout(() => setLoaded(true), 6000);
     const unsub = onSnapshot(LEDGER, (snap) => {
+      clearTimeout(timeout);
       setCommitments(snap.exists() ? (snap.data().commitments || []) : []);
       setLoaded(true);
-    }, () => setLoaded(true));
-    return unsub;
+    }, () => { clearTimeout(timeout); setLoaded(true); });
+    return () => { unsub(); clearTimeout(timeout); };
   }, []);
 
   const takeDate = gearTakeDate();
