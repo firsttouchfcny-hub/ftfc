@@ -48,6 +48,26 @@ export async function findAccountByPhone(e164) {
   return verified[0] || null;
 }
 
+// Resolve a phone (E.164) to its account, or create an admin-vouched one stamped
+// with that number. Used by admin gear-add so a person is identified by their
+// number — one phone = one account — instead of a free-typed name that forks
+// identity. The vouched account is marked verified-by-admin, so when the real
+// person later verifies that same number they reunite with it. `name` is used
+// only when creating. Returns { uid, ...data }.
+export async function ensureAccountByPhone(e164, name = '') {
+  const found = await findAccountByPhone(e164);
+  if (found) return found;
+  const uid = newUid();
+  const acct = {
+    uid, name: name.trim() || e164, phone: e164,
+    phoneVerified: true, phoneVerifiedByAdmin: true,
+    isAdmin: false, suspendedUntil: null, suspensionType: null,
+    createdAt: Date.now(),
+  };
+  await setDoc(accountRef(uid), acct);
+  return { ...acct };
+}
+
 // Whether a phone already belongs to a DIFFERENT account (guards against one
 // number being claimed by two accounts).
 export async function phoneOwnedByOther(e164, myUid) {

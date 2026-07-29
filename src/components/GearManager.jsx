@@ -3,8 +3,8 @@ import {
   doc, onSnapshot, runTransaction, collection, getDocs, setDoc, updateDoc,
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
-import { ensureAccount } from '../utils/identity';
-import { isSamePerson, rosterDocId } from '../utils/helpers';
+import { ensureAccount, ensureAccountByPhone } from '../utils/identity';
+import { isSamePerson, rosterDocId, toE164US } from '../utils/helpers';
 import {
   GEAR_TYPE_ORDER, GEAR_DEFS, gearIcon, gearLabel, gearNeed,
   isGearOpen, gearTakeDate, todayKey, gameDaysAfter,
@@ -171,11 +171,13 @@ export default function GearManager({ playerName, deviceId, uid, amAdmin, suspen
     });
 
   const reassign = async (c) => {
-    const name = window.prompt(`Reassign ${gearLabel(c.type)} (currently ${c.takerName}) to:`, c.takerName);
-    if (!name || !name.trim()) return;
-    // Resolve to the person's account so the commitment carries their stable uid
-    // (and canonical name) — it then links to their match signup by uid.
-    const acct = await ensureAccount(name.trim());
+    const input = window.prompt(
+      `Reassign ${gearLabel(c.type)} (currently ${c.takerName}) — enter a phone number (preferred) or a name:`, '');
+    if (!input || !input.trim()) return;
+    // Phone resolves to the one canonical account; name is the fallback. Either
+    // way the commitment carries their stable uid, so it links to their signup.
+    const e164 = toE164US(input.trim());
+    const acct = e164 ? await ensureAccountByPhone(e164) : await ensureAccount(input.trim());
     patchCommitment(c.id, {
       takerName: acct.name, takerUid: acct.uid, takerDeviceId: null, source: adminName || 'admin',
     });
@@ -183,17 +185,25 @@ export default function GearManager({ playerName, deviceId, uid, amAdmin, suspen
 
   // mode: 'take'  → they take it home after the upcoming game, bring back on date
   //       'held'  → they ALREADY have it (seeded starting state), brings back on date
-  const addManual = async (type, takerName, backDate, mode, takeOn) => {
-    if (!takerName.trim()) return;
+  const addManual = async (type, ident, backDate, mode, takeOn) => {
+    // Identify the person by PHONE first (resolves to their one canonical account,
+    // no matter how their name is typed); fall back to a name only for a number
+    // that's brand-new to us. This is what stops "Miguel C" vs "Miguel Cevallos"
+    // from ever forking into two identities again.
+    const phone = (ident.phone || '').trim();
+    const name  = (ident.name  || '').trim();
+    const e164  = phone ? toE164US(phone) : null;
+    if (phone && !e164) { window.alert('Enter a valid 10-digit US number, or leave phone blank and use a name.'); return; }
+    if (!e164 && !name) return; // nothing to identify the person by
     const held = mode === 'held';
     const useTake = held ? todayKey() : (takeOn || takeDate); // held = out now; take = chosen day
     setBusy(true);
     try {
-      // Resolve the typed name to the person's account up front, so the commitment
-      // (and the auto-added roster entry) carry their stable uid. That's what lets
-      // "William Escobar" on the gear list link to "William" on the match list —
-      // same person, one entry — instead of showing up as two.
-      const acct = await ensureAccount(takerName.trim());
+      // Phone → the person's account (created & vouched if the number is new);
+      // else resolve the typed name. Either way the commitment + auto-added roster
+      // entry carry their stable uid, so gear and a match signup converge on one
+      // row instead of forking.
+      const acct = e164 ? await ensureAccountByPhone(e164, name) : await ensureAccount(name);
       let ok = false, dayFull = false;
       await runTransaction(db, async (tx) => {
         const snap = await tx.get(LEDGER);
@@ -464,6 +474,7 @@ export default function GearManager({ playerName, deviceId, uid, amAdmin, suspen
 
 function GearAdmin({ commitments, busy, takeDate, onMarkReturned, onReassign, onRemove, onAdd }) {
   const [addType, setAddType] = useState('goal');
+  const [addPhone, setAddPhone] = useState('');
   const [addName, setAddName] = useState('');
   const [bringDate, setBringDate] = useState('');
   const [takeOn, setTakeOn] = useState(upcomingMornings(7)[0]);
@@ -484,7 +495,9 @@ function GearAdmin({ commitments, busy, takeDate, onMarkReturned, onReassign, on
         <select value={addType} onChange={(e) => setAddType(e.target.value)}>
           {GEAR_TYPE_ORDER.map((t) => <option key={t} value={t}>{gearLabel(t)}</option>)}
         </select>
-        <input placeholder="Player name" value={addName} onChange={(e) => setAddName(e.target.value)} />
+        <input placeholder="Player phone (10-digit)" type="tel" inputMode="numeric"
+          value={addPhone} onChange={(e) => setAddPhone(e.target.value)} />
+        <input placeholder="Name (only if new number)" value={addName} onChange={(e) => setAddName(e.target.value)} />
       </div>
       <div className="gear-admin-add">
         <span className="gear-admin-lbl">Bring in on:</span>
@@ -493,8 +506,8 @@ function GearAdmin({ commitments, busy, takeDate, onMarkReturned, onReassign, on
             {bringDays.map((d) => <option key={d} value={d}>{fmtDay(d)}</option>)}
           </select>
         ) : <span className="gear-note">all days full</span>}
-        <button className="btn btn-success btn-sm" disabled={busy || !addName.trim() || !bringDays.length}
-          onClick={() => { onAdd(addType, addName, bringVal, 'held'); setAddName(''); }}>Assign bring</button>
+        <button className="btn btn-success btn-sm" disabled={busy || (!addPhone.trim() && !addName.trim()) || !bringDays.length}
+          onClick={() => { onAdd(addType, { phone: addPhone, name: addName }, bringVal, 'held'); setAddPhone(''); setAddName(''); }}>Assign bring</button>
       </div>
       <div className="gear-admin-add">
         <span className="gear-admin-lbl">Take home on:</span>
@@ -505,8 +518,8 @@ function GearAdmin({ commitments, busy, takeDate, onMarkReturned, onReassign, on
         <select value={backVal} onChange={(e) => setBackDate(e.target.value)}>
           {backDays.map((d) => <option key={d} value={d}>{fmtDay(d)}</option>)}
         </select>
-        <button className="btn btn-primary btn-sm" disabled={busy || !addName.trim() || !backDays.length}
-          onClick={() => { onAdd(addType, addName, backVal, 'take', takeOn); setAddName(''); }}>Assign take</button>
+        <button className="btn btn-primary btn-sm" disabled={busy || (!addPhone.trim() && !addName.trim()) || !backDays.length}
+          onClick={() => { onAdd(addType, { phone: addPhone, name: addName }, backVal, 'take', takeOn); setAddPhone(''); setAddName(''); }}>Assign take</button>
       </div>
       <p className="gear-note">
         <strong>Assign bring</strong> = just brings a set that day (no take). <strong>Assign take</strong> = takes

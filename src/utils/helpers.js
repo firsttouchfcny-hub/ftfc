@@ -152,6 +152,16 @@ export function normalizeName(name) {
   return name.toLowerCase().trim().replace(/\s+/g, '-');
 }
 
+// Accepts a 10-digit US number, or 11 digits with a leading 1. Returns E.164
+// (+1XXXXXXXXXX) or null. The one place phone strings get normalized, so every
+// entry point (self-verify, admin gear-add) keys on the same canonical form.
+export function toE164US(raw) {
+  const digits = (raw || '').replace(/\D/g, '');
+  if (digits.length === 10) return `+1${digits}`;
+  if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`;
+  return null;
+}
+
 // A person's stable identity anchor. Generated ONCE and stored on their profile,
 // it never changes — not when they edit their name and not when they update
 // their phone number. Roster + gear records reference this so nothing drifts.

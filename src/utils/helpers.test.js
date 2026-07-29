@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   isGameDay, addDaysToKey, nextGameDay, addGameDays,
   getSessionDate, getRollCallPhase,
-  isSamePerson, rosterDocId,
+  isSamePerson, rosterDocId, toE164US,
 } from './helpers.js';
 
 // Reference weekdays: 2026-07-25 Sat, -26 Sun, -27 Mon, -28 Tue, -31 Fri, 08-03 Mon.
@@ -92,6 +92,23 @@ describe('isSamePerson — the one identity matcher', () => {
   it('handles null/empty entry safely', () => {
     expect(isSamePerson(null, me)).toBe(false);
     expect(isSamePerson({}, me)).toBe(false);
+  });
+});
+
+describe('toE164US — canonical phone parsing', () => {
+  it('accepts a 10-digit US number', () => {
+    expect(toE164US('9178266710')).toBe('+19178266710');
+    expect(toE164US('(917) 826-6710')).toBe('+19178266710');
+  });
+  it('accepts 11 digits with a leading 1', () => {
+    expect(toE164US('19178266710')).toBe('+19178266710');
+    expect(toE164US('1 917 826 6710')).toBe('+19178266710');
+  });
+  it('rejects anything else', () => {
+    expect(toE164US('12345')).toBe(null);
+    expect(toE164US('')).toBe(null);
+    expect(toE164US(null)).toBe(null);
+    expect(toE164US('29178266710')).toBe(null); // 11 digits not starting with 1
   });
 });
 
