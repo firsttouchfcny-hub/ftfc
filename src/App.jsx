@@ -5,7 +5,6 @@ import {
   collection, arrayUnion, getDocs, query, where, documentId,
 } from 'firebase/firestore';
 import NameEntry   from './components/NameEntry';
-import AdminLogin  from './components/AdminLogin';
 import PlayerList  from './components/PlayerList';
 import AdminPanel  from './components/AdminPanel';
 import Rules       from './components/Rules';
@@ -43,7 +42,6 @@ export default function App() {
   // When the verify screen is opened by a blocked join, remember the +1s so we
   // can finish that exact sign-up once the phone is verified.
   const [pendingPlusOnes, setPendingPlusOnes] = useState(null);
-  const [showAdminLogin,  setShowAdminLogin]  = useState(false);
   const [showAdminPanel,  setShowAdminPanel]  = useState(false);
   // Which sign-in is in flight (null = none, 0 = "In", 1 = "In +1") — drives the
   // button's submitting state and blocks double taps while the write is pending.
@@ -201,10 +199,17 @@ export default function App() {
   // (a legacy/new device), fall back to the old name-keyed profile just long
   // enough to LEARN the uid, then this effect re-runs on the account.
   useEffect(() => {
-    const grantAdmin = (data) => {
-      if (data?.isAdmin && !isAdmin) {
-        setIsAdmin(true);
-        localStorage.setItem('ftfc_is_admin', 'true');
+    // Admin follows the person's verified ACCOUNT — there is no password login.
+    // Grant when the account is flagged admin; from the account listener also
+    // REVOKE a stale local flag (e.g. left over from the retired PIN) when it
+    // isn't. Never clears on a missing/still-loading profile.
+    const syncAdmin = (data, allowClear) => {
+      if (!data) return;
+      if (data.isAdmin) {
+        if (!isAdmin) { setIsAdmin(true); localStorage.setItem('ftfc_is_admin', 'true'); }
+      } else if (allowClear && isAdmin) {
+        setIsAdmin(false);
+        localStorage.removeItem('ftfc_is_admin');
       }
     };
     if (uid) {
@@ -214,7 +219,7 @@ export default function App() {
           const data = snap.exists() ? { uid, ...snap.data() } : null;
           setPlayerProfile(data);
           setProfileLoaded(true);
-          grantAdmin(data);
+          syncAdmin(data, true); // account is source of truth — may grant or revoke
         },
         () => { setPlayerProfile(null); setProfileLoaded(true); }
       );
@@ -230,7 +235,7 @@ export default function App() {
         setPlayerProfile(data);
         setProfileLoaded(true);
         if (data.uid) setUid(data.uid); // switches this effect to the account listener
-        grantAdmin(data);
+        syncAdmin(data, false); // legacy doc: only grant, don't revoke mid-transition
       },
       () => { setPlayerProfile(null); setProfileLoaded(true); }
     );
@@ -480,18 +485,6 @@ export default function App() {
     }
   };
 
-  const handleAdminLogin = () => {
-    setIsAdmin(true);
-    localStorage.setItem('ftfc_is_admin', 'true');
-    setShowAdminLogin(false);
-    setShowAdminPanel(true);
-  };
-
-  const handleAdminLogout = () => {
-    setIsAdmin(false);
-    setShowAdminPanel(false);
-    localStorage.removeItem('ftfc_is_admin');
-  };
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -700,16 +693,10 @@ export default function App() {
             {/* Rules */}
             <Rules />
 
-            {/* Admin section */}
-            <div className="admin-footer">
-              {!isAdmin ? (
-                <button
-                  className="btn btn-ghost btn-sm"
-                  onClick={() => setShowAdminLogin(true)}
-                >
-                  Admin Login
-                </button>
-              ) : (
+            {/* Admin section — admins are recognized by their verified ACCOUNT
+                (granted in Manage Admins). No password login. */}
+            {amAdmin && (
+              <div className="admin-footer">
                 <div className="admin-controls-bar">
                   <button
                     className="btn btn-ghost btn-sm"
@@ -717,24 +704,18 @@ export default function App() {
                   >
                     {showAdminPanel ? 'Hide Admin Panel' : '⚙️ Admin Panel'}
                   </button>
-                  <button
-                    className="btn btn-ghost btn-sm"
-                    onClick={handleAdminLogout}
-                  >
-                    Log out
-                  </button>
                 </div>
-              )}
 
-              {isAdmin && showAdminPanel && (
-                <AdminPanel
-                  session={session}
-                  players={displayPlayers}
-                  today={adminDate}
-                  adminName={displayName}
-                />
-              )}
-            </div>
+                {showAdminPanel && (
+                  <AdminPanel
+                    session={session}
+                    players={displayPlayers}
+                    today={adminDate}
+                    adminName={displayName}
+                  />
+                )}
+              </div>
+            )}
           </>
         )}
       </main>
@@ -792,9 +773,6 @@ export default function App() {
             }
           }}
         />
-      )}
-      {showAdminLogin && (
-        <AdminLogin onLogin={handleAdminLogin} onClose={() => setShowAdminLogin(false)} />
       )}
     </div>
   );
