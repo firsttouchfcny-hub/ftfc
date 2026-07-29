@@ -37,11 +37,15 @@ export async function ensureAccount(name, extra = {}) {
 }
 
 // Find the account that owns a verified phone (E.164). Returns { uid, ...data }
-// or null. Used at sign-in/verify to resolve a device to its one true account.
+// or null. DETERMINISTIC — if duplicates ever exist, always resolve to the same
+// one (earliest created), so a person sees the same identity on every device.
 export async function findAccountByPhone(e164) {
   const snap = await getDocs(query(collection(db, 'accounts'), where('phone', '==', e164)));
-  const hit = snap.docs.find((d) => d.data()?.phoneVerified);
-  return hit ? { uid: hit.id, ...hit.data() } : null;
+  const verified = snap.docs
+    .map((d) => ({ uid: d.id, ...d.data() }))
+    .filter((a) => a.phoneVerified)
+    .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0) || (a.uid < b.uid ? -1 : 1));
+  return verified[0] || null;
 }
 
 // Whether a phone already belongs to a DIFFERENT account (guards against one

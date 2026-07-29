@@ -64,6 +64,18 @@ export default function App() {
     if (uid) localStorage.setItem('ftfc_uid', uid);
   }, [uid]);
 
+  // Keep my roster entry's display name in sync with my account name, so the list
+  // never shows a stale snapshot (e.g. after a rename, or when I'm recognized on
+  // a new device). Matches my entry by uid.
+  useEffect(() => {
+    if (!uid || !playerProfile?.name || !players.length) return;
+    const mine = players.find((p) => p.uid === uid);
+    if (mine && mine.name !== playerProfile.name) {
+      updateDoc(doc(db, 'sessions', today, 'players', mine.id), { name: playerProfile.name })
+        .catch((e) => console.error('[FTFC] name sync failed', e));
+    }
+  }, [uid, playerProfile?.name, players, today]);
+
   // Re-evaluate Eastern-time state (10 AM reset, 3 PM open) without a manual refresh.
   // The interval covers foreground; visibility/focus covers phones returning from
   // the background (where mobile browsers pause timers) so they flip immediately.
@@ -286,11 +298,11 @@ export default function App() {
     // #5 — confirm before dropping
     if (!window.confirm('Out — are you sure? This removes you from the list.')) return;
 
-    // Act only on THIS device's own entry — match by device id, never by name or
-    // uid. Name would risk deleting a same-named stranger; uid would risk
-    // deleting the same person's doc created on a *different* device. deviceId is
-    // exactly the key sign-in wrote, so we delete precisely our own doc.
-    const mine = players.find((p) => p.deviceId === deviceId);
+    // Act on MY entry — match by uid (the person) first, so OUT works even from a
+    // different device than the one that signed in; deviceId is the fallback for
+    // entries with no uid. (One person only ever has one entry per session, so
+    // this can't hit a stranger.)
+    const mine = players.find((p) => (uid && p.uid === uid) || p.deviceId === deviceId);
     if (!mine) return;
 
     // Position at drop time → was this a playing spot (top 36) or the bench?
@@ -313,7 +325,7 @@ export default function App() {
     } catch (err) {
       console.error('[FTFC] sign-out failed:', err);
     }
-  }, [playerName, players, deviceId, today]);
+  }, [playerName, players, deviceId, uid, today]);
 
   // Adjust my +1 guest count AFTER I'm already signed up — updates my own roster
   // doc in place, so my signup time (and list position) never changes.
