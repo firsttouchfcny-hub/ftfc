@@ -16,7 +16,7 @@ import { accountRef } from './utils/identity';
 import { fridayGearPriorityNames, bringersFor, takersFor } from './utils/gear';
 import {
   getSessionDate, getDeviceId, normalizeName, newUid,
-  isSamePerson, rosterDocId,
+  isSamePerson, rosterDocId, getEasternNow, isGameDay, formatDateShort,
   isSuspended, formatDate, formatTimeET,
   getRollCallPhase, isRollCallOpen, canAdminSignUp,
   buildFlatList, MATCH1_MAX, MATCH2_MAX, MATCH2_MIN_CONFIRM, getMatch2State,
@@ -57,6 +57,10 @@ export default function App() {
   // by uid at render instead of trusting the snapshot.
   const [namesByUid, setNamesByUid] = useState({});
   const inFlightUids = useRef(new Set()); // uids whose name fetch is in flight
+  // This morning's game roster, shown to admins after the list rolls to the next
+  // game (10 AM) until 6 PM, so they can still review who played at 7 AM.
+  const [prevPlayers, setPrevPlayers] = useState([]);
+  const [showPrevRoster, setShowPrevRoster] = useState(false);
   // Whether the profile listener has returned at least once. Until it has, we
   // don't KNOW if this person is phone-verified — so we must not pop the verify
   // screen on a fast "In" tap (that's the "asked me again" bug).
@@ -172,6 +176,7 @@ export default function App() {
     const wanted = new Set();
     players.forEach((p) => { if (p.uid) wanted.add(p.uid); });
     gearLedger.forEach((c) => { if (c.takerUid) wanted.add(c.takerUid); });
+    prevPlayers.forEach((p) => { if (p.uid) wanted.add(p.uid); });
     // Skip uids already resolved OR currently in flight (the ref guards against
     // duplicate concurrent fetches and, on error, a per-snapshot retry storm).
     const need = [...wanted].filter((u) => !(u in namesByUid) && !inFlightUids.current.has(u));
@@ -192,7 +197,7 @@ export default function App() {
       })
       .catch((e) => console.error('[FTFC] name map fetch failed', e))
       .finally(() => { need.forEach((u) => inFlightUids.current.delete(u)); });
-  }, [players, gearLedger, namesByUid]);
+  }, [players, gearLedger, prevPlayers, namesByUid]);
 
   // Listen to this person's ACCOUNT (keyed by their stable uid). Suspension,
   // admin flag, name, phone all live there. If we don't know the uid yet
@@ -262,6 +267,24 @@ export default function App() {
   const rollOpen = isRollCallOpen(session);                  // open to everyone?
   const iCanSignUp = amAdmin ? canAdminSignUp(session) : rollOpen;
 
+  // This morning's game date to show admins at the bottom of the page: once the
+  // main list has rolled to the next game (10 AM), today's 7 AM roster stays
+  // available for review until 6 PM ET. Only on game days, admins only.
+  const etNow = getEasternNow();
+  const prevDate = (amAdmin && isGameDay(etNow.dateKey) && today !== etNow.dateKey && etNow.hour < 18)
+    ? etNow.dateKey : null;
+
+  // Subscribe to this morning's roster while it's on view for admins.
+  useEffect(() => {
+    if (!prevDate) { setPrevPlayers([]); return; }
+    const unsub = onSnapshot(
+      collection(db, 'sessions', prevDate, 'players'),
+      (snap) => setPrevPlayers(snap.docs.map((d) => ({ ...d.data(), id: d.id }))),
+      () => setPrevPlayers([])
+    );
+    return unsub;
+  }, [prevDate]);
+
   // ── My standing (so players don't scan the whole list) ─────────────────────
   const gearPriorityNames = fridayGearPriorityNames(gearLedger, today);
 
@@ -291,6 +314,7 @@ export default function App() {
   // rename shows everywhere at once, without waiting on per-row name syncs.
   const nameOf = (uid, fallback) => (uid && namesByUid[uid]) || fallback;
   const displayPlayers = players.map((p) => ({ ...p, name: nameOf(p.uid, p.name) }));
+  const prevDisplayPlayers = prevPlayers.map((p) => ({ ...p, name: nameOf(p.uid, p.name) }));
 
   const flatList = buildFlatList(displayPlayers, { gearPriorityNames, gearRoles });
   const myFlatIndex = flatList.findIndex((p) => p.isMainEntry && isMe(p));
@@ -714,6 +738,36 @@ export default function App() {
                     today={adminDate}
                     adminName={displayName}
                   />
+                )}
+              </div>
+            )}
+
+            {/* This morning's game roster — admins only, after the list has
+                rolled to the next game (10 AM) and until 6 PM ET. Collapsed by
+                default; a read-only look at who played at 7 AM. */}
+            {prevDate && (
+              <div className="admin-footer prev-roster">
+                <button
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => setShowPrevRoster(!showPrevRoster)}
+                >
+                  {showPrevRoster
+                    ? '▲ Hide this morning’s roster'
+                    : `▼ This morning’s roster · ${formatDateShort(new Date(prevDate + 'T12:00:00').getTime())}`}
+                </button>
+                {showPrevRoster && (
+                  prevDisplayPlayers.length ? (
+                    <PlayerList
+                      players={prevDisplayPlayers}
+                      deviceId={deviceId}
+                      playerName={displayName}
+                      isOpen={false}
+                      gearPriorityNames={new Set()}
+                      gearRoles={{}}
+                    />
+                  ) : (
+                    <p className="gear-note">No one was on this morning’s list.</p>
+                  )
                 )}
               </div>
             )}
