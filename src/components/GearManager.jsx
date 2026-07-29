@@ -3,6 +3,7 @@ import {
   doc, onSnapshot, runTransaction, collection, getDocs, setDoc, updateDoc,
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
+import { ensureAccount } from '../utils/identity';
 import {
   GEAR_TYPE_ORDER, GEAR_DEFS, gearIcon, gearLabel, gearNeed,
   isGearOpen, gearTakeDate, todayKey, gameDaysAfter,
@@ -172,10 +173,15 @@ export default function GearManager({ playerName, deviceId, uid, amAdmin, suspen
       returnedBy: adminName || 'admin',
     });
 
-  const reassign = (c) => {
+  const reassign = async (c) => {
     const name = window.prompt(`Reassign ${gearLabel(c.type)} (currently ${c.takerName}) to:`, c.takerName);
     if (!name || !name.trim()) return;
-    patchCommitment(c.id, { takerName: name.trim(), takerDeviceId: null, source: adminName || 'admin' });
+    // Resolve to the person's account so the commitment carries their stable uid
+    // (and canonical name) — it then links to their match signup by uid.
+    const acct = await ensureAccount(name.trim());
+    patchCommitment(c.id, {
+      takerName: acct.name, takerUid: acct.uid, takerDeviceId: null, source: adminName || 'admin',
+    });
   };
 
   // mode: 'take'  → they take it home after the upcoming game, bring back on date
@@ -186,6 +192,11 @@ export default function GearManager({ playerName, deviceId, uid, amAdmin, suspen
     const useTake = held ? todayKey() : (takeOn || takeDate); // held = out now; take = chosen day
     setBusy(true);
     try {
+      // Resolve the typed name to the person's account up front, so the commitment
+      // (and the auto-added roster entry) carry their stable uid. That's what lets
+      // "William Escobar" on the gear list link to "William" on the match list —
+      // same person, one entry — instead of showing up as two.
+      const acct = await ensureAccount(takerName.trim());
       let ok = false, dayFull = false;
       await runTransaction(db, async (tx) => {
         const snap = await tx.get(LEDGER);
@@ -200,7 +211,7 @@ export default function GearManager({ playerName, deviceId, uid, amAdmin, suspen
         ok = true;
         const entry = {
           id: crypto.randomUUID(), type, setId,
-          takerName: takerName.trim(), takerDeviceId: null, takerIsAdmin: false,
+          takerName: acct.name, takerDeviceId: null, takerUid: acct.uid, takerIsAdmin: !!acct.isAdmin,
           takeDate: useTake, returnDate: backDate, held,
           status: 'committed', returnedOnTime: null,
           createdAt: Date.now(), source: adminName || 'admin',
@@ -209,7 +220,7 @@ export default function GearManager({ playerName, deviceId, uid, amAdmin, suspen
         else tx.set(LEDGER, { commitments: [entry] });
       });
       if (ok) {
-        const who = { name: takerName.trim(), deviceId: `admin-gear-${crypto.randomUUID()}`, isAdmin: false };
+        const who = { name: acct.name, deviceId: `admin-gear-${crypto.randomUUID()}`, uid: acct.uid, isAdmin: !!acct.isAdmin };
         if (held) {
           await setGearRole(backDate, who, 'bringer', type);   // brings it back only
         } else {
