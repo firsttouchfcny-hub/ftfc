@@ -177,6 +177,10 @@ export default function App() {
 
   // ── Derived state ─────────────────────────────────────────────────────────
   const suspended     = isSuspended(playerProfile?.suspendedUntil);
+  // The account name is the source of truth for display — the locally-stored
+  // name can be stale (e.g. renamed on another device). Fall back to it only
+  // until the account loads.
+  const displayName   = playerProfile?.name || playerName;
   // A roster entry is "me" if the stable uid matches, else fall back to device/name.
   const isMe = (p) => (uid && p.uid === uid) || p.deviceId === deviceId ||
     (p.name || '').toLowerCase() === playerName.toLowerCase();
@@ -281,7 +285,7 @@ export default function App() {
       // GearManager's `gearBringer`/`gearTaker` markers. Without merge, a plain
       // setDoc replaces the whole doc and would silently wipe those.
       await setDoc(ref, {
-        name: playerName, deviceId, uid,
+        name: playerProfile?.name || playerName, deviceId, uid,
         isAdmin: playerIsAdmin, plusOnes, signedUpAt: Date.now(),
       }, { merge: true });
     } catch (err) {
@@ -443,7 +447,7 @@ export default function App() {
             {playerName && (
               <div className="you-row">
                 <span className="you-row-label">
-                  Signed in as <strong>{playerName}</strong>
+                  Signed in as <strong>{displayName}</strong>
                   {playerProfile?.phoneVerified && (
                     <span className="badge badge-verified" title="Phone verified">✓ verified</span>
                   )}
@@ -481,12 +485,12 @@ export default function App() {
 
             {/* Gear management */}
             <GearManager
-              playerName={playerName}
+              playerName={displayName}
               deviceId={deviceId}
               uid={uid}
               amAdmin={amAdmin}
               suspended={suspended}
-              adminName={playerName}
+              adminName={displayName}
             />
 
             {/* Signup buttons */}
@@ -565,7 +569,7 @@ export default function App() {
             <PlayerList
               players={players}
               deviceId={deviceId}
-              playerName={playerName}
+              playerName={displayName}
               isOpen={rollOpen}
               gearPriorityNames={gearPriorityNames}
               gearRoles={gearRoles}
@@ -641,7 +645,7 @@ export default function App() {
                   session={session}
                   players={players}
                   today={adminDate}
-                  adminName={playerName}
+                  adminName={displayName}
                 />
               )}
             </div>
@@ -674,7 +678,7 @@ export default function App() {
       {showEditName && (
         <NameEntry
           onSave={handleNameSave}
-          initialName={playerName}
+          initialName={displayName}
           onClose={() => setShowEditName(false)}
         />
       )}
