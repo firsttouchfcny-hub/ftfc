@@ -53,6 +53,10 @@ export default function App() {
   const [session,       setSession]       = useState(null);
   const [players,       setPlayers]       = useState([]);
   const [playerProfile, setPlayerProfile] = useState(null);
+  // Whether the profile listener has returned at least once. Until it has, we
+  // don't KNOW if this person is phone-verified — so we must not pop the verify
+  // screen on a fast "In" tap (that's the "asked me again" bug).
+  const [profileLoaded, setProfileLoaded] = useState(false);
   const [gearLedger,    setGearLedger]    = useState([]);
   const [loading,       setLoading]       = useState(true);
   const [, setClockTick] = useState(0); // re-render so time-based open/close updates live
@@ -154,24 +158,26 @@ export default function App() {
         (snap) => {
           const data = snap.exists() ? { uid, ...snap.data() } : null;
           setPlayerProfile(data);
+          setProfileLoaded(true);
           grantAdmin(data);
         },
-        () => setPlayerProfile(null)
+        () => { setPlayerProfile(null); setProfileLoaded(true); }
       );
       return unsub;
     }
     // Transition fallback: no uid known → read the legacy name profile to resolve it.
-    if (!playerName) return;
+    if (!playerName) { setProfileLoaded(true); return; } // nothing to load
     const unsub = onSnapshot(
       doc(db, 'players', normalizeName(playerName)),
       (snap) => {
-        if (!snap.exists()) { setPlayerProfile(null); return; }
+        if (!snap.exists()) { setPlayerProfile(null); setProfileLoaded(true); return; }
         const data = snap.data();
         setPlayerProfile(data);
+        setProfileLoaded(true);
         if (data.uid) setUid(data.uid); // switches this effect to the account listener
         grantAdmin(data);
       },
-      () => setPlayerProfile(null)
+      () => { setPlayerProfile(null); setProfileLoaded(true); }
     );
     return unsub;
   }, [uid, playerName]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -246,6 +252,11 @@ export default function App() {
       : isRollCallOpen(session);
     if (!playerCanSignUp || !playerName || suspended) return;
 
+    // Wait until we actually know this person's verification status. Tapping "In"
+    // in the split-second before the profile loads used to read as "not verified"
+    // and wrongly pop the verify screen at an already-verified player.
+    if (!assumeVerified && !profileLoaded) return;
+
     // EVERYONE — admins included — must verify their phone before joining, so
     // every roster entry resolves to one verified identity (no anonymous/unlinked
     // sign-ups, which is what created duplicate names). The PIN still grants admin
@@ -298,7 +309,7 @@ export default function App() {
       // to "Out"; on failure the buttons re-enable so the player can retry.
       setSigningIn(null);
     }
-  }, [signingIn, session, players, playerName, deviceId, uid, suspended, isAdmin, playerProfile, today]);
+  }, [signingIn, session, players, playerName, deviceId, uid, suspended, isAdmin, playerProfile, profileLoaded, today]);
 
   const handleSignOut = useCallback(async () => {
     if (!playerName) return;
