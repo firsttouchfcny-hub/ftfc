@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { db } from './firebase/config';
 import {
-  doc, onSnapshot, setDoc, updateDoc, deleteDoc,
+  doc, onSnapshot, setDoc, updateDoc, deleteDoc, runTransaction,
   collection, arrayUnion,
 } from 'firebase/firestore';
 import NameEntry   from './components/NameEntry';
@@ -80,6 +80,25 @@ export default function App() {
         .catch((e) => console.error('[FTFC] name sync failed', e));
     }
   }, [uid, playerProfile?.name, players, today]);
+
+  // Keep my GEAR commitments' display name in sync with my account name too, so a
+  // rename shows the same name on the gear list + badges as on the roster (no
+  // stale "William Escobar" vs "Escobar"). Matches my commitments by uid; a
+  // transaction avoids clobbering a concurrent gear write.
+  useEffect(() => {
+    if (!uid || !playerProfile?.name) return;
+    const myName = playerProfile.name;
+    const stale = (c) => c.takerUid === uid && c.takerName !== myName;
+    if (!gearLedger.some(stale)) return;
+    runTransaction(db, async (tx) => {
+      const ref = doc(db, 'gear', 'ledger');
+      const snap = await tx.get(ref);
+      if (!snap.exists()) return;
+      const cs = snap.data().commitments || [];
+      if (!cs.some(stale)) return;
+      tx.update(ref, { commitments: cs.map((c) => (stale(c) ? { ...c, takerName: myName } : c)) });
+    }).catch((e) => console.error('[FTFC] gear name sync failed', e));
+  }, [uid, playerProfile?.name, gearLedger]);
 
   // Re-evaluate Eastern-time state (10 AM reset, 3 PM open) without a manual refresh.
   // The interval covers foreground; visibility/focus covers phones returning from
