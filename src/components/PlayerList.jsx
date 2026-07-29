@@ -40,7 +40,11 @@ export default function PlayerList({ players: playersProp, deviceId, playerName,
           {isOwn && <span className="green-dot" title="You" />}
           <span className="player-name-text">{player.name}</span>
           {(() => {
-            const r = player.isMainEntry ? roles[player.name?.toLowerCase().trim()] : null;
+            // Match the gear role by stable uid first (so a renamed row keeps its
+            // badge), falling back to the name key for rows without a uid.
+            const r = player.isMainEntry
+              ? (roles[player.uid] || roles[player.name?.toLowerCase().trim()])
+              : null;
             const bring = r?.bring || [];
             const take = r?.take || [];
             return (

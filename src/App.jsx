@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { db } from './firebase/config';
 import {
   doc, onSnapshot, setDoc, updateDoc, deleteDoc, runTransaction,
@@ -58,6 +58,7 @@ export default function App() {
   // name snapshot that can go stale after a rename; we resolve the current name
   // by uid at render instead of trusting the snapshot.
   const [namesByUid, setNamesByUid] = useState({});
+  const inFlightUids = useRef(new Set()); // uids whose name fetch is in flight
   // Whether the profile listener has returned at least once. Until it has, we
   // don't KNOW if this person is phone-verified — so we must not pop the verify
   // screen on a fast "In" tap (that's the "asked me again" bug).
@@ -173,8 +174,11 @@ export default function App() {
     const wanted = new Set();
     players.forEach((p) => { if (p.uid) wanted.add(p.uid); });
     gearLedger.forEach((c) => { if (c.takerUid) wanted.add(c.takerUid); });
-    const need = [...wanted].filter((u) => !(u in namesByUid));
+    // Skip uids already resolved OR currently in flight (the ref guards against
+    // duplicate concurrent fetches and, on error, a per-snapshot retry storm).
+    const need = [...wanted].filter((u) => !(u in namesByUid) && !inFlightUids.current.has(u));
     if (!need.length) return;
+    need.forEach((u) => inFlightUids.current.add(u));
     const chunks = [];
     for (let i = 0; i < need.length; i += 30) chunks.push(need.slice(i, i + 30));
     Promise.all(chunks.map((ch) =>
@@ -188,7 +192,8 @@ export default function App() {
           return next;
         });
       })
-      .catch((e) => console.error('[FTFC] name map fetch failed', e));
+      .catch((e) => console.error('[FTFC] name map fetch failed', e))
+      .finally(() => { need.forEach((u) => inFlightUids.current.delete(u)); });
   }, [players, gearLedger, namesByUid]);
 
   // Listen to this person's ACCOUNT (keyed by their stable uid). Suspension,
@@ -266,9 +271,15 @@ export default function App() {
     if (!gearRoles[key]) gearRoles[key] = { bring: [], take: [] };
     if (!gearRoles[key][kind].includes(type)) gearRoles[key][kind].push(type);
   };
-  const roleKey = (c) => c.takerUid || (c.takerName || '').toLowerCase().trim();
-  bringersFor(gearLedger, today).forEach((c) => addRole(roleKey(c), 'bring', c.type));
-  takersFor(gearLedger, today).forEach((c) => addRole(roleKey(c), 'take', c.type));
+  // Index each role under BOTH the person's uid and their normalized name, so a
+  // roster row matches whether or not it carries a uid (buildFlatList tries uid
+  // first, then falls back to name).
+  const addRoleFor = (c, kind) => {
+    if (c.takerUid) addRole(c.takerUid, kind, c.type);
+    addRole((c.takerName || '').toLowerCase().trim(), kind, c.type);
+  };
+  bringersFor(gearLedger, today).forEach((c) => addRoleFor(c, 'bring'));
+  takersFor(gearLedger, today).forEach((c) => addRoleFor(c, 'take'));
 
   // Resolve the current name for anyone shown from their account (by uid),
   // falling back to the stored snapshot until it loads. Display uses this so a
