@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { db } from '../firebase/config';
 import {
-  doc, setDoc, updateDoc, deleteDoc, writeBatch,
+  doc, setDoc, getDoc, updateDoc, deleteDoc, writeBatch,
   collection, addDoc, query, where, getDocs,
 } from 'firebase/firestore';
 import {
