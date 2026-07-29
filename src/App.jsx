@@ -211,10 +211,12 @@ export default function App() {
       : isRollCallOpen(session);
     if (!playerCanSignUp || !playerName || suspended) return;
 
-    // Everyone must verify their phone before joining. Admins are exempt (they
-    // hold the PIN). If not yet verified, open the verify screen and remember
-    // the +1s so onVerified can finish this exact join.
-    if (!amAdmin && !assumeVerified && !playerProfile?.phoneVerified) {
+    // EVERYONE — admins included — must verify their phone before joining, so
+    // every roster entry resolves to one verified identity (no anonymous/unlinked
+    // sign-ups, which is what created duplicate names). The PIN still grants admin
+    // powers; it just no longer bypasses identity. If not yet verified, open the
+    // verify screen and remember the +1s so onVerified can finish this exact join.
+    if (!assumeVerified && !playerProfile?.phoneVerified) {
       setPendingPlusOnes(plusOnes);
       setShowPhoneVerify(true);
       return;
@@ -258,7 +260,7 @@ export default function App() {
       // to "Out"; on failure the buttons re-enable so the player can retry.
       setSigningIn(null);
     }
-  }, [signingIn, session, players, playerName, deviceId, uid, suspended, isAdmin, amAdmin, playerProfile, today]);
+  }, [signingIn, session, players, playerName, deviceId, uid, suspended, isAdmin, playerProfile, today]);
 
   const handleSignOut = useCallback(async () => {
     if (!playerName) return;
