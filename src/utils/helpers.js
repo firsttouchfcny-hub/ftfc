@@ -261,7 +261,10 @@ export function buildFlatList(players, opts = {}) {
   const gearPriority = opts.gearPriorityNames || new Set();
   const gearRoles = opts.gearRoles || {};
   const nameKey = (p) => (p.name || '').toLowerCase().trim();
-  const roleOf = (p) => gearRoles[nameKey(p)] || null;
+  // Match a person's gear role by their stable uid first (so a badge lands on the
+  // right row even when stored names differ), falling back to the name key for
+  // rows/commitments that predate uids.
+  const roleOf = (p) => (p.uid && gearRoles[p.uid]) || gearRoles[nameKey(p)] || null;
 
   // List order: gear bringers → gear takers → admins/priority → Friday gear
   // priority → everyone else.

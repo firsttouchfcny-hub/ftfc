@@ -53,7 +53,10 @@ async function setGearRole(dateKey, { name, deviceId, uid, isAdmin }, role, type
   }
 }
 
-export default function GearManager({ playerName, deviceId, uid, amAdmin, suspended, adminName }) {
+export default function GearManager({ playerName, deviceId, uid, amAdmin, suspended, adminName, namesByUid = {} }) {
+  // Show the CURRENT name for a commitment by its uid, falling back to the stored
+  // snapshot — so a rename reflects on the gear panel without re-writing history.
+  const nameFor = (u, fallback) => (u && namesByUid[u]) || fallback;
   const [commitments, setCommitments] = useState([]);
   const [loaded, setLoaded] = useState(false); // ledger has arrived from Firebase
   const [pickerType, setPickerType] = useState(null); // type mid-return-date-pick
@@ -284,7 +287,7 @@ export default function GearManager({ playerName, deviceId, uid, amAdmin, suspen
               </div>
               <div className="gear-bring-types">
                 {GEAR_TYPE_ORDER.map((t) => {
-                  const names = bring.filter((c) => c.type === t).map((c) => c.takerName);
+                  const names = bring.filter((c) => c.type === t).map((c) => nameFor(c.takerUid, c.takerName));
                   const short = gearNeed(t) - names.length;
                   return (
                     <div key={t} className="gear-bring-type">
@@ -401,12 +404,12 @@ export default function GearManager({ playerName, deviceId, uid, amAdmin, suspen
                   <span className="gear-sets-id">{s.setId}</span>
                   {s.state === 'out' && (
                     <span className="gear-sets-holder">
-                      <strong>{s.holder}</strong> · back {fmtDay(s.back)}
+                      <strong>{nameFor(s.holderUid, s.holder)}</strong> · back {fmtDay(s.back)}
                     </span>
                   )}
                   {s.state === 'scheduled' && (
                     <span className="gear-sets-holder">
-                      {s.holder} takes {fmtDay(s.take)} · back {fmtDay(s.back)}
+                      {nameFor(s.holderUid, s.holder)} takes {fmtDay(s.take)} · back {fmtDay(s.back)}
                     </span>
                   )}
                   {s.state === 'field' && (
@@ -441,10 +444,10 @@ export default function GearManager({ playerName, deviceId, uid, amAdmin, suspen
                 </div>
                 <div className="gear-day-body">
                   <div><span className="gear-role">Bringing in:</span>{' '}
-                    {bring.length ? bring.map((c) => `${gearIcon(c.type)} ${c.takerName}`).join(', ') : '—'}
+                    {bring.length ? bring.map((c) => `${gearIcon(c.type)} ${nameFor(c.takerUid, c.takerName)}`).join(', ') : '—'}
                   </div>
                   <div><span className="gear-role">Taking home:</span>{' '}
-                    {take.length ? take.map((c) => `${gearIcon(c.type)} ${c.takerName}`).join(', ') : '—'}
+                    {take.length ? take.map((c) => `${gearIcon(c.type)} ${nameFor(c.takerUid, c.takerName)}`).join(', ') : '—'}
                   </div>
                 </div>
               </div>
@@ -463,7 +466,7 @@ export default function GearManager({ playerName, deviceId, uid, amAdmin, suspen
             <GearAdmin
               commitments={commitments} busy={busy} takeDate={takeDate}
               onMarkReturned={markReturned} onReassign={reassign}
-              onRemove={cancelCommitment} onAdd={addManual}
+              onRemove={cancelCommitment} onAdd={addManual} nameFor={nameFor}
             />
           )}
         </>
@@ -472,7 +475,7 @@ export default function GearManager({ playerName, deviceId, uid, amAdmin, suspen
   );
 }
 
-function GearAdmin({ commitments, busy, takeDate, onMarkReturned, onReassign, onRemove, onAdd }) {
+function GearAdmin({ commitments, busy, takeDate, onMarkReturned, onReassign, onRemove, onAdd, nameFor }) {
   const [addType, setAddType] = useState('goal');
   const [addPhone, setAddPhone] = useState('');
   const [addName, setAddName] = useState('');
@@ -531,7 +534,7 @@ function GearAdmin({ commitments, busy, takeDate, onMarkReturned, onReassign, on
       ) : live.map((c) => (
         <div key={c.id} className="gear-admin-row">
           <span className="gear-admin-info">
-            {gearIcon(c.type)} <strong>{c.takerName}</strong> · take {fmtDay(c.takeDate)} → back {fmtDay(c.returnDate)}
+            {gearIcon(c.type)} <strong>{nameFor(c.takerUid, c.takerName)}</strong> · take {fmtDay(c.takeDate)} → back {fmtDay(c.returnDate)}
             <span className="gear-admin-set"> [{c.setId}]</span>
           </span>
           <div className="gear-admin-actions">

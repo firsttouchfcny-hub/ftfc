@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { db } from './firebase/config';
 import {
   doc, onSnapshot, setDoc, updateDoc, deleteDoc, runTransaction,
-  collection, arrayUnion,
+  collection, arrayUnion, getDocs, query, where, documentId,
 } from 'firebase/firestore';
 import NameEntry   from './components/NameEntry';
 import AdminLogin  from './components/AdminLogin';
@@ -53,6 +53,11 @@ export default function App() {
   const [session,       setSession]       = useState(null);
   const [players,       setPlayers]       = useState([]);
   const [playerProfile, setPlayerProfile] = useState(null);
+  // uid → canonical account name, for everyone shown on the list / gear panel.
+  // The source of truth for DISPLAY: a roster row or gear commitment stores a
+  // name snapshot that can go stale after a rename; we resolve the current name
+  // by uid at render instead of trusting the snapshot.
+  const [namesByUid, setNamesByUid] = useState({});
   // Whether the profile listener has returned at least once. Until it has, we
   // don't KNOW if this person is phone-verified — so we must not pop the verify
   // screen on a fast "In" tap (that's the "asked me again" bug).
@@ -160,6 +165,32 @@ export default function App() {
     return unsub;
   }, []);
 
+  // Fetch the canonical account name for every uid shown (today's roster + gear
+  // ledger) that we haven't resolved yet, so display always shows the current
+  // name by uid. Targeted (only the shown uids, in `in` chunks of 30) and each
+  // requested uid is recorded — null if missing — so we never re-fetch it.
+  useEffect(() => {
+    const wanted = new Set();
+    players.forEach((p) => { if (p.uid) wanted.add(p.uid); });
+    gearLedger.forEach((c) => { if (c.takerUid) wanted.add(c.takerUid); });
+    const need = [...wanted].filter((u) => !(u in namesByUid));
+    if (!need.length) return;
+    const chunks = [];
+    for (let i = 0; i < need.length; i += 30) chunks.push(need.slice(i, i + 30));
+    Promise.all(chunks.map((ch) =>
+      getDocs(query(collection(db, 'accounts'), where(documentId(), 'in', ch)))))
+      .then((snaps) => {
+        const found = {};
+        snaps.forEach((s) => s.forEach((d) => { found[d.id] = d.data()?.name || null; }));
+        setNamesByUid((m) => {
+          const next = { ...m };
+          need.forEach((u) => { next[u] = found[u] ?? null; }); // mark attempted
+          return next;
+        });
+      })
+      .catch((e) => console.error('[FTFC] name map fetch failed', e));
+  }, [players, gearLedger, namesByUid]);
+
   // Listen to this person's ACCOUNT (keyed by their stable uid). Suspension,
   // admin flag, name, phone all live there. If we don't know the uid yet
   // (a legacy/new device), fall back to the old name-keyed profile just long
@@ -226,16 +257,26 @@ export default function App() {
 
   // Gear roles for the shown day, derived from the ledger (single source of
   // truth) so roster badges/order can never drift from the coverage figures.
+  // Keyed by the person's uid (falling back to their normalized name only when a
+  // commitment has no uid) so a badge lands on the right row even if the stored
+  // names differ — buildFlatList looks up by uid first.
   const gearRoles = {};
-  const addRole = (name, kind, type) => {
-    const k = (name || '').toLowerCase().trim();
-    if (!gearRoles[k]) gearRoles[k] = { bring: [], take: [] };
-    if (!gearRoles[k][kind].includes(type)) gearRoles[k][kind].push(type);
+  const addRole = (key, kind, type) => {
+    if (!key) return;
+    if (!gearRoles[key]) gearRoles[key] = { bring: [], take: [] };
+    if (!gearRoles[key][kind].includes(type)) gearRoles[key][kind].push(type);
   };
-  bringersFor(gearLedger, today).forEach((c) => addRole(c.takerName, 'bring', c.type));
-  takersFor(gearLedger, today).forEach((c) => addRole(c.takerName, 'take', c.type));
+  const roleKey = (c) => c.takerUid || (c.takerName || '').toLowerCase().trim();
+  bringersFor(gearLedger, today).forEach((c) => addRole(roleKey(c), 'bring', c.type));
+  takersFor(gearLedger, today).forEach((c) => addRole(roleKey(c), 'take', c.type));
 
-  const flatList = buildFlatList(players, { gearPriorityNames, gearRoles });
+  // Resolve the current name for anyone shown from their account (by uid),
+  // falling back to the stored snapshot until it loads. Display uses this so a
+  // rename shows everywhere at once, without waiting on per-row name syncs.
+  const nameOf = (uid, fallback) => (uid && namesByUid[uid]) || fallback;
+  const displayPlayers = players.map((p) => ({ ...p, name: nameOf(p.uid, p.name) }));
+
+  const flatList = buildFlatList(displayPlayers, { gearPriorityNames, gearRoles });
   const myFlatIndex = flatList.findIndex((p) => p.isMainEntry && isMe(p));
   const myPosition = myFlatIndex >= 0 ? myFlatIndex + 1 : null;
 
@@ -524,6 +565,7 @@ export default function App() {
               amAdmin={amAdmin}
               suspended={suspended}
               adminName={displayName}
+              namesByUid={namesByUid}
             />
 
             {/* Signup buttons */}
@@ -600,7 +642,7 @@ export default function App() {
 
             {/* Player list */}
             <PlayerList
-              players={players}
+              players={displayPlayers}
               deviceId={deviceId}
               playerName={displayName}
               isOpen={rollOpen}
@@ -676,7 +718,7 @@ export default function App() {
               {isAdmin && showAdminPanel && (
                 <AdminPanel
                   session={session}
-                  players={players}
+                  players={displayPlayers}
                   today={adminDate}
                   adminName={displayName}
                 />

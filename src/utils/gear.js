@@ -162,7 +162,7 @@ export function setStatuses(type, commitments) {
       (c) => isLive(c) && c.setId === set.id && c.takeDate <= today && c.returnDate > today
     );
     if (held) {
-      return { setId: set.id, state: 'out', holder: held.takerName, back: held.returnDate };
+      return { setId: set.id, state: 'out', holder: held.takerName, holderUid: held.takerUid || null, back: held.returnDate };
     }
     const upcoming = (commitments || [])
       .filter((c) => isLive(c) && c.setId === set.id && c.returnDate > today)
@@ -170,10 +170,11 @@ export function setStatuses(type, commitments) {
     if (upcoming) {
       return {
         setId: set.id, state: 'scheduled',
-        holder: upcoming.takerName, take: upcoming.takeDate, back: upcoming.returnDate,
+        holder: upcoming.takerName, holderUid: upcoming.takerUid || null,
+        take: upcoming.takeDate, back: upcoming.returnDate,
       };
     }
-    return { setId: set.id, state: 'field', holder: null };
+    return { setId: set.id, state: 'field', holder: null, holderUid: null };
   }).sort((a, b) => {
     // Soonest return first; sets with no return date ("at the field") go last.
     if (!a.back && !b.back) return a.setId < b.setId ? -1 : 1;

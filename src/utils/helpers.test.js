@@ -171,10 +171,19 @@ describe('buildFlatList — roster ordering + gear roles + +1 expansion', () => 
     expect(names(buildFlatList(players))).toEqual(['earlier', 'later']);
   });
 
-  it('matches gear roles by NAME, case-insensitively (documents the name-key coupling)', () => {
+  it('matches gear roles by NAME when a row has no uid (legacy fallback)', () => {
     const players = [P('rest', { signedUpAt: 1 }), P('Escobar', { signedUpAt: 2 })];
-    // role keyed by lowercased name — a mismatch here is exactly what drops a badge
     const gearRoles = { escobar: { bring: ['goal'], take: [] } };
+    expect(names(buildFlatList(players, { gearRoles }))).toEqual(['Escobar', 'rest']);
+  });
+
+  it('matches gear roles by UID first — a renamed row still ranks as a bringer', () => {
+    const players = [
+      P('rest',    { uid: 'u_rest', signedUpAt: 1 }),
+      P('Escobar', { uid: 'u_1',    signedUpAt: 2 }), // renamed since the commitment
+    ];
+    // role keyed by uid (commitment stored the OLD name) — no 'escobar' name key
+    const gearRoles = { u_1: { bring: ['goal'], take: [] } };
     expect(names(buildFlatList(players, { gearRoles }))).toEqual(['Escobar', 'rest']);
   });
 
