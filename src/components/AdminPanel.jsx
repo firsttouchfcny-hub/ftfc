@@ -173,7 +173,17 @@ export default function AdminPanel({ session, players, today, adminName }) {
 
   const handleUpdatePlusOnes = async (playerId, value) => {
     try {
-      await updateDoc(playerDoc(playerId), { plusOnes: parseInt(value, 10) });
+      const val = Math.max(0, parseInt(value, 10) || 0);
+      const p = (players || []).find((x) => x.id === playerId);
+      const cur = p?.plusOnes || 0;
+      const hts = p?.signedUpAt || 0;
+      // Keep per-guest add-times: existing +1s keep theirs (backfilled to signup
+      // time), newly added ones get "now" so they fall to the back of the list.
+      const times = Array.isArray(p?.plusOnesAt) ? p.plusOnesAt.slice(0, cur) : [];
+      while (times.length < cur) times.push(hts);
+      if (val > times.length) { const now = Date.now(); while (times.length < val) times.push(now); }
+      else times.length = val;
+      await updateDoc(playerDoc(playerId), { plusOnes: val, plusOnesAt: times });
     } catch (err) {
       fireError('Update +1s', err);
     }

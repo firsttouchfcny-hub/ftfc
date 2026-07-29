@@ -402,9 +402,13 @@ export default function App() {
       // anything another writer put on this same doc — an admin's `priority` or
       // GearManager's `gearBringer`/`gearTaker` markers. Without merge, a plain
       // setDoc replaces the whole doc and would silently wipe those.
+      const now = Date.now();
       await setDoc(ref, {
         name: playerProfile?.name || playerName, deviceId, uid,
-        isAdmin: playerIsAdmin, plusOnes, signedUpAt: Date.now(),
+        isAdmin: playerIsAdmin, plusOnes,
+        // +1s taken at signup share my signup time, so they render next to me.
+        plusOnesAt: Array.from({ length: plusOnes }, () => now),
+        signedUpAt: now,
       }, { merge: true });
     } catch (err) {
       console.error('[FTFC] sign-in failed:', err);
@@ -453,10 +457,20 @@ export default function App() {
   // doc in place, so my signup time (and list position) never changes.
   const handleSetMyPlusOnes = useCallback(async (n) => {
     if (!myEntry) return;
+    const cur = myEntry.plusOnes || 0;
     const val = Math.max(0, Math.min(n, 20)); // clamp to a sane range
-    if (val === (myEntry.plusOnes || 0)) return;
+    if (val === cur) return;
+    // Track a per-guest add-time. Existing +1s keep their time (backfilled to my
+    // signup time so at-signup guests stay next to me); a guest added NOW gets
+    // the current time, so it falls to the back of the list instead of my spot.
+    const hts = myEntry.signedUpAt || 0;
+    const times = Array.isArray(myEntry.plusOnesAt) ? myEntry.plusOnesAt.slice(0, cur) : [];
+    while (times.length < cur) times.push(hts);
+    if (val > times.length) { const now = Date.now(); while (times.length < val) times.push(now); }
+    else times.length = val;
     try {
-      await updateDoc(doc(db, 'sessions', today, 'players', myEntry.id), { plusOnes: val });
+      await updateDoc(doc(db, 'sessions', today, 'players', myEntry.id),
+        { plusOnes: val, plusOnesAt: times });
     } catch (err) {
       console.error('[FTFC] update +1 failed:', err);
     }

@@ -187,10 +187,28 @@ describe('buildFlatList — roster ordering + gear roles + +1 expansion', () => 
     expect(names(buildFlatList(players, { gearRoles }))).toEqual(['Escobar', 'rest']);
   });
 
-  it('expands +1s into non-main entries right after their host', () => {
+  it('expands +1s into non-main entries right after their host (legacy: no add-times)', () => {
     const flat = buildFlatList([P('Host', { plusOnes: 2, signedUpAt: 1 })]);
     expect(flat.map((p) => p.name)).toEqual(['Host', 'Host +1', 'Host +2']);
     expect(flat.map((p) => p.isMainEntry)).toEqual([true, false, false]);
     expect(flat[1].parentId).toBe('Host');
+  });
+
+  it('a +1 taken AT signup stays right next to its host', () => {
+    const players = [
+      { id: 'a', name: 'Jeremy', signedUpAt: 10, plusOnes: 1, plusOnesAt: [10] },
+      { id: 'b', name: 'Bob', signedUpAt: 20 },
+    ];
+    expect(names(buildFlatList(players))).toEqual(['Jeremy', 'Jeremy +1', 'Bob']);
+  });
+
+  it('a +1 added AFTER signup falls to the back of the line by its add-time', () => {
+    const players = [
+      { id: 'a', name: 'Jeremy', signedUpAt: 10, plusOnes: 1, plusOnesAt: [999] }, // added late
+      { id: 'b', name: 'Bob', signedUpAt: 20 },
+      { id: 'c', name: 'Cara', signedUpAt: 30 },
+    ];
+    // Jeremy keeps his spot; his guest lands after everyone who signed up before 999
+    expect(names(buildFlatList(players))).toEqual(['Jeremy', 'Bob', 'Cara', 'Jeremy +1']);
   });
 });
