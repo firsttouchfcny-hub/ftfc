@@ -3,7 +3,7 @@ import {
   gearNeed, returnDateOptions, returnSlotsLeft, availableToTake,
   playerReturnDates, coverageForMorning, setStatuses,
   fridayGearPriorityNames, isFridayKey, myCommitments, takeBlockedByPriority,
-  takersFor, bringersFor, pickFreeSet,
+  takersFor, bringersFor, pickFreeSet, isGearOpen,
 } from './gear.js';
 
 // Helper to build a live commitment.
@@ -203,5 +203,22 @@ describe('return-date rules & set assignment', () => {
     const busyAll = ['goal-1', 'goal-2', 'goal-3'].map((setId) =>
       c({ type: 'goal', setId, takeDate: '2026-07-27', returnDate: '2026-07-30' }));
     expect(pickFreeSet(busyAll, 'goal', '2026-07-27')).toBe(null);
+  });
+});
+
+describe('gear volunteering opens earlier for admins', () => {
+  afterEach(() => vi.useRealTimers());
+  const at = (iso) => { vi.useFakeTimers(); vi.setSystemTime(new Date(iso)); };
+  // July = EDT (UTC-4): 10 AM ET = 14:00 UTC, 11 AM ET = 15:00 UTC.
+  it('opens 11 AM ET for players, 10 AM ET for admins', () => {
+    at('2026-07-27T13:30:00Z'); // 9:30 AM ET — closed for both
+    expect(isGearOpen(false)).toBe(false);
+    expect(isGearOpen(true)).toBe(false);
+    at('2026-07-27T14:30:00Z'); // 10:30 AM ET — admins only
+    expect(isGearOpen(false)).toBe(false);
+    expect(isGearOpen(true)).toBe(true);
+    at('2026-07-27T15:30:00Z'); // 11:30 AM ET — open for all
+    expect(isGearOpen(false)).toBe(true);
+    expect(isGearOpen(true)).toBe(true);
   });
 });

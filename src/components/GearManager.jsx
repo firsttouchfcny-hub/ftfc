@@ -88,7 +88,7 @@ export default function GearManager({ playerName, deviceId, uid, amAdmin, suspen
   }, []);
 
   const takeDate = gearTakeDate();
-  const open = isGearOpen();
+  const open = isGearOpen(amAdmin);
   const coverage = coverageForMorning(commitments, takeDate);
   const bringingRisk = gearBringingAlert(commitments);
   const takingRisk = gearTakingAlert(commitments);
@@ -96,7 +96,7 @@ export default function GearManager({ playerName, deviceId, uid, amAdmin, suspen
 
   // ── Player: claim a set + return date (atomic) ────────────────────────────
   const claimGear = async (type, returnDate) => {
-    if (!playerName || suspended || !isGearOpen() || busy) return;
+    if (!playerName || suspended || !isGearOpen(amAdmin) || busy) return;
     setBusy(true);
     try {
       let assignedSet = null;
@@ -379,7 +379,8 @@ export default function GearManager({ playerName, deviceId, uid, amAdmin, suspen
               const owned = mine.some((c) => c.type === t);
               // Balls is lowest priority — locked until goals AND bibs are taken
               // (based on whether they still need a taker, not return-day quirks).
-              const ballsBlocked = takeBlockedByPriority(commitments, t, takeDate);
+              // Admins are exempt: they can take balls & cones anytime.
+              const ballsBlocked = !amAdmin && takeBlockedByPriority(commitments, t, takeDate);
               const disabled = suspended || owned || left <= 0 || openDays === 0 || ballsBlocked;
               return (
                 <button key={t} className="gear-take-btn" disabled={disabled}

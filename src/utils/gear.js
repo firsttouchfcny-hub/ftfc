@@ -8,7 +8,8 @@ import {
   isGameDay, nextGameDay, addGameDays,
 } from './helpers.js';
 
-export const GEAR_OPEN_HOUR_ET  = 11; // 11 AM ET — gear volunteering opens
+export const GEAR_OPEN_HOUR_ET       = 11; // 11 AM ET — gear volunteering opens
+export const GEAR_ADMIN_OPEN_HOUR_ET = 10; // admins may volunteer an hour earlier
 export const GEAR_ALERT_HOUR_ET = 18; // 6 PM ET the night before — risk flag
 
 // The physical sets the club owns: 3 goals + 1 balls/cones + 5 rotating bib sets.
@@ -47,7 +48,9 @@ export function setsForType(type) { return GEAR_SETS.filter((s) => s.type === ty
 
 // Gear volunteering opens at 11 AM ET (same open-hour gate style as the roll
 // call; there is no separate close — a new game's window begins each day).
-export function isGearOpen() { return getEasternNow().hour >= GEAR_OPEN_HOUR_ET; }
+export function isGearOpen(isAdmin = false) {
+  return getEasternNow().hour >= (isAdmin ? GEAR_ADMIN_OPEN_HOUR_ET : GEAR_OPEN_HOUR_ET);
+}
 
 // Today's date key in Eastern time (used to mark already-held gear as out now).
 export function todayKey() { return getEasternNow().dateKey; }
