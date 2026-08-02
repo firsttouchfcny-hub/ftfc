@@ -265,10 +265,17 @@ export function fridayGearPriorityNames(commitments, dateKey) {
 }
 
 // A person's own live commitments (matched by stable uid, else device id / name).
-export function myCommitments(commitments, deviceId, name, uid) {
+// `activeAsOf` (a date key — the upcoming gear take-date) auto-retires a
+// commitment once its return game has passed: the game is at 7 AM and gear opens
+// at 11 AM, so by the time anyone is taking gear, whatever was due back that
+// morning is already back at the field. So it no longer counts as gear the
+// person is holding — clearing their "you're bringing gear" and letting them
+// take a new set — without needing anyone to click "returned".
+export function myCommitments(commitments, deviceId, name, uid, activeAsOf = null) {
   const n = (name || '').toLowerCase();
   return (commitments || []).filter(
     (c) => isLive(c) &&
+      (!activeAsOf || c.returnDate >= activeAsOf) &&
       ((uid && c.takerUid === uid) ||
         c.takerDeviceId === deviceId ||
         (c.takerName || '').toLowerCase() === n)

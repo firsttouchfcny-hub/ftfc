@@ -92,7 +92,10 @@ export default function GearManager({ playerName, deviceId, uid, amAdmin, suspen
   const coverage = coverageForMorning(commitments, takeDate);
   const bringingRisk = gearBringingAlert(commitments);
   const takingRisk = gearTakingAlert(commitments);
-  const mine = myCommitments(commitments, deviceId, playerName, uid);
+  // takeDate = the upcoming game we're taking gear for. Any commitment due back
+  // before it has already been returned (game's at 7 AM, gear opens 11 AM), so it
+  // auto-drops from "mine" — no manual "returned" needed.
+  const mine = myCommitments(commitments, deviceId, playerName, uid, takeDate);
 
   // ── Player: claim a set + return date (atomic) ────────────────────────────
   const claimGear = async (type, returnDate) => {

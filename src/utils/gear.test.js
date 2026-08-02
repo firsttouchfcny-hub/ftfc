@@ -222,3 +222,22 @@ describe('gear volunteering opens earlier for admins', () => {
     expect(isGearOpen(true)).toBe(true);
   });
 });
+
+describe('gear auto-retires after its return game (no manual "returned")', () => {
+  const commits = [
+    c({ type: 'goal', takerUid: 'u_1', takeDate: '2026-07-28', returnDate: '2026-07-30' }), // due back Thu
+    c({ type: 'bibs', takerUid: 'u_1', takeDate: '2026-07-30', returnDate: '2026-08-03' }), // still out
+  ];
+  it('drops a commitment whose return date is before the upcoming take-date', () => {
+    // As of Friday's take-date, the Thursday-return goal is already back at the field.
+    expect(myCommitments(commits, 'dev', 'x', 'u_1', '2026-07-31').map((m) => m.type)).toEqual(['bibs']);
+  });
+  it('keeps commitments still due back on/after the upcoming take-date', () => {
+    // As of Wednesday, nothing has come back yet.
+    expect(myCommitments(commits, 'dev', 'x', 'u_1', '2026-07-29').map((m) => m.type).sort())
+      .toEqual(['bibs', 'goal']);
+  });
+  it('no cutoff = counts all live commitments (backward compatible)', () => {
+    expect(myCommitments(commits, 'dev', 'x', 'u_1').length).toBe(2);
+  });
+});
