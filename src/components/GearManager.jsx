@@ -165,19 +165,6 @@ export default function GearManager({ playerName, deviceId, uid, amAdmin, suspen
     }
   };
 
-  // Self-service: a player marks their OWN gear as returned once they've brought
-  // it back — no waiting on an admin. This clears their "you're bringing gear"
-  // and frees them to take that gear type again (both were blocked while the
-  // commitment stayed 'committed').
-  const returnMine = async (id) => {
-    if (busy) return;
-    if (!window.confirm("Mark returned? Only do this once you've actually brought the gear back.")) return;
-    await patchCommitment(id, {
-      status: 'returned', returnedOnTime: true, returnedAt: Date.now(),
-      returnedBy: playerName || 'self',
-    });
-  };
-
   // ── Admin actions (#6) ────────────────────────────────────────────────────
   const patchCommitment = async (id, patch) => {
     setBusy(true);
@@ -423,12 +410,8 @@ export default function GearManager({ playerName, deviceId, uid, amAdmin, suspen
           {mine.map((c) => (
             <div key={c.id} className="gear-mine-row">
               <span>{gearIcon(c.type)} You're bringing <strong>{gearLabel(c.type)}</strong> back {fmtDay(c.returnDate)}</span>
-              <div className="gear-mine-actions">
-                <button className="btn btn-success btn-sm" disabled={busy}
-                  onClick={() => returnMine(c.id)}>Returned</button>
-                <button className="btn btn-ghost btn-sm" disabled={busy}
-                  onClick={() => cancelCommitment(c.id)}>Cancel</button>
-              </div>
+              <button className="btn btn-ghost btn-sm" disabled={busy}
+                onClick={() => cancelCommitment(c.id)}>Cancel</button>
             </div>
           ))}
         </div>
