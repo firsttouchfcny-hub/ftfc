@@ -13,7 +13,7 @@ import GearManager from './components/GearManager';
 import PushSetup   from './components/PushSetup';
 import { registerServiceWorker } from './utils/push';
 import { accountRef } from './utils/identity';
-import { fridayGearPriorityNames, bringersFor, takersFor } from './utils/gear';
+import { fridayGearPriorityNames, bringersFor, takersFor, myCommitments, gearTakeDate, gearLabel } from './utils/gear';
 import {
   getSessionDate, getDeviceId, normalizeName, newUid,
   isSamePerson, rosterDocId, getEasternNow, isGameDay, formatDateShort,
@@ -423,6 +423,17 @@ export default function App() {
 
   const handleSignOut = useCallback(async () => {
     if (!playerName) return;
+    // You can't drop while you're holding gear — that would strand the set (this
+    // is exactly how goals went missing). Bring it back on game day (it clears
+    // itself) or tell an admin, who reassigns it in the gear panel.
+    const myGear = myCommitments(gearLedger, deviceId, playerName, uid, gearTakeDate());
+    if (myGear.length) {
+      window.alert(
+        `You're holding ${myGear.map((g) => gearLabel(g.type)).join(' & ')} — you can't drop while you have gear.\n\n` +
+        'Bring it back on game day, or ask an admin to reassign it to whoever takes it.'
+      );
+      return;
+    }
     // #5 — confirm before dropping
     if (!window.confirm('Out — are you sure? This removes you from the list.')) return;
 
@@ -453,7 +464,7 @@ export default function App() {
     } catch (err) {
       console.error('[FTFC] sign-out failed:', err);
     }
-  }, [playerName, players, deviceId, uid, today]);
+  }, [playerName, players, deviceId, uid, gearLedger, today]);
 
   // Adjust my +1 guest count AFTER I'm already signed up — updates my own roster
   // doc in place, so my signup time (and list position) never changes.

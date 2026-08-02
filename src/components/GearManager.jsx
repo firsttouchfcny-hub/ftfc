@@ -141,8 +141,18 @@ export default function GearManager({ playerName, deviceId, uid, amAdmin, suspen
     }
   };
 
+  // You've "got the gear" once you've taken it home (a held set, or the take-day
+  // game has passed). After that you can't cancel — it clears when you bring it
+  // back on game day, or an admin reassigns it.
+  const hasGear = (c) => c.held || c.takeDate < takeDate;
+
   const cancelCommitment = async (id) => {
     if (busy) return;
+    const c = commitments.find((x) => x.id === id);
+    if (c && hasGear(c)) {
+      window.alert('You already have this gear, so it can\'t be cancelled. Bring it back on game day (it clears itself), or ask an admin to reassign it.');
+      return;
+    }
     if (!window.confirm('Cancel this gear commitment?')) return;
     setBusy(true);
     try {
@@ -189,11 +199,20 @@ export default function GearManager({ playerName, deviceId, uid, amAdmin, suspen
     }
   };
 
-  const markReturned = (id, onTime) =>
-    patchCommitment(id, {
+  const markReturned = async (id, onTime) => {
+    await patchCommitment(id, {
       status: 'returned', returnedOnTime: onTime, returnedAt: Date.now(),
       returnedBy: adminName || 'admin',
     });
+    // Update the list too: clear the person's gear markers (removes a gear-only
+    // roster row) so the roster reflects the admin's gear update.
+    const c = commitments.find((x) => x.id === id);
+    if (c) {
+      const who = { name: c.takerName, deviceId: c.takerDeviceId, uid: c.takerUid };
+      await setGearRole(c.takeDate, who, 'taker', null);
+      await setGearRole(c.returnDate, who, 'bringer', null);
+    }
+  };
 
   const reassign = async (c) => {
     const input = window.prompt(
@@ -415,8 +434,12 @@ export default function GearManager({ playerName, deviceId, uid, amAdmin, suspen
           {mine.map((c) => (
             <div key={c.id} className="gear-mine-row">
               <span>{gearIcon(c.type)} You're bringing <strong>{gearLabel(c.type)}</strong> back {fmtDay(c.returnDate)}</span>
-              <button className="btn btn-ghost btn-sm" disabled={busy}
-                onClick={() => cancelCommitment(c.id)}>Cancel</button>
+              {/* Cancel only before you've taken it home; once you have it, only
+                  bringing it back on game day (auto) or an admin clears it. */}
+              {!hasGear(c)
+                ? <button className="btn btn-ghost btn-sm" disabled={busy}
+                    onClick={() => cancelCommitment(c.id)}>Cancel</button>
+                : <span className="gear-note">bring back on game day</span>}
             </div>
           ))}
         </div>
