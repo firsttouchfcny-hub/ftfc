@@ -151,7 +151,12 @@ export default function GearManager({ playerName, deviceId, uid, amAdmin, suspen
         const snap = await tx.get(LEDGER);
         if (!snap.exists()) return;
         const cs = snap.data().commitments || [];
-        tx.update(LEDGER, { commitments: cs.filter((x) => x.id !== id) });
+        // Mark cancelled rather than delete, so gear custody history is never
+        // lost. Cancelled commitments aren't live, so coverage/the tracker ignore
+        // them — but we keep a record of who touched each set.
+        tx.update(LEDGER, {
+          commitments: cs.map((x) => (x.id === id ? { ...x, status: 'cancelled', cancelledAt: Date.now() } : x)),
+        });
       });
       if (c) {
         const who = { name: c.takerName, deviceId: c.takerDeviceId, uid: c.takerUid };
@@ -440,7 +445,9 @@ export default function GearManager({ playerName, deviceId, uid, amAdmin, suspen
                     </span>
                   )}
                   {s.state === 'field' && (
-                    <span className="gear-sets-field">at the field</span>
+                    <span className="gear-sets-field">
+                      at the field{s.holder ? <> · last had by <strong>{nameFor(s.holderUid, s.holder)}</strong></> : ''}
+                    </span>
                   )}
                 </div>
               ))}

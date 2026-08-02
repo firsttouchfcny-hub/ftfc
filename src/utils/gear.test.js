@@ -103,6 +103,17 @@ describe('"Who has the gear" tracker (setStatuses)', () => {
     expect(backs[1]).toBe('2026-07-31');
     expect(backs[backs.length - 1]).toBe('field');  // field last
   });
+
+  it('remembers who last had a set once it is back at the field (custody never lost)', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-02T12:00:00Z')); // today = Aug 2
+    const commits = [
+      c({ type: 'goal', setId: 'goal-1', takeDate: '2026-07-30', returnDate: '2026-07-31', takerName: 'Elle', takerUid: 'u_e' }),
+    ];
+    const g1 = setStatuses('goal', commits).find((s) => s.setId === 'goal-1');
+    expect(g1.state).toBe('field');   // its return day has passed → back at the field
+    expect(g1.holder).toBe('Elle');   // but we still know Elle last had it
+  });
 });
 
 describe('Friday gear priority (reward for taking gear home Mon–Thu)', () => {

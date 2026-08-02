@@ -177,7 +177,18 @@ export function setStatuses(type, commitments) {
         take: upcoming.takeDate, back: upcoming.returnDate,
       };
     }
-    return { setId: set.id, state: 'field', holder: null, holderUid: null };
+    // No one holds it right now — but never lose custody: remember who LAST had
+    // it (the most recent person who took it, committed or returned) so we can
+    // always chase down a set.
+    const last = (commitments || [])
+      .filter((c) => c.setId === set.id && (c.status === 'committed' || c.status === 'returned'))
+      .sort((a, b) => (a.takeDate < b.takeDate ? 1 : -1))[0];
+    return {
+      setId: set.id, state: 'field',
+      holder: last ? last.takerName : null,
+      holderUid: last ? (last.takerUid || null) : null,
+      lastBack: last ? last.returnDate : null,
+    };
   }).sort((a, b) => {
     // Soonest return first; sets with no return date ("at the field") go last.
     if (!a.back && !b.back) return a.setId < b.setId ? -1 : 1;
