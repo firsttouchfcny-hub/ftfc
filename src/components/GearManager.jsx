@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import {
-  doc, onSnapshot, runTransaction, collection, getDocs, setDoc, updateDoc,
+  doc, onSnapshot, runTransaction, collection, getDocs, setDoc, updateDoc, deleteDoc,
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { ensureAccount, ensureAccountByPhone } from '../utils/identity';
@@ -36,8 +36,16 @@ async function setGearRole(dateKey, { name, deviceId, uid, isAdmin }, role, type
   const snap = await getDocs(col);
   const mineDoc = snap.docs.find((d) => isSamePerson(d.data(), { uid, deviceId, name }));
 
-  if (type == null) { // clear the role marker (leaves them on the roster)
-    if (mineDoc) await updateDoc(mineDoc.ref, { [field]: null });
+  if (type == null) { // clear the role marker
+    if (!mineDoc) return;
+    const d = mineDoc.data();
+    const other = field === 'gearBringer' ? 'gearTaker' : 'gearBringer';
+    // If this row exists ONLY because gear auto-added it (gearAdded) and no other
+    // gear role remains, remove it — otherwise a cancelled/returned commitment
+    // leaves the person stranded on the roster. A real sign-up (gearAdded false)
+    // just loses the badge.
+    if (d.gearAdded && !d[other]) await deleteDoc(mineDoc.ref);
+    else await updateDoc(mineDoc.ref, { [field]: null });
     return;
   }
   if (mineDoc) {
@@ -46,9 +54,10 @@ async function setGearRole(dateKey, { name, deviceId, uid, isAdmin }, role, type
     // Not on this day's roster yet → auto-add them, keyed by their stable uid
     // (deviceId only until an account is resolved), matching sign-in so gear and
     // a later self-signup land on the SAME row. Committing to gear signs you up.
+    // gearAdded marks the row as gear-created, so clearing the role can remove it.
     await setDoc(doc(col, rosterDocId({ uid, deviceId })), {
       name, deviceId, uid: uid || null, isAdmin: !!isAdmin,
-      plusOnes: 0, [field]: type, signedUpAt: Date.now(),
+      plusOnes: 0, [field]: type, gearAdded: true, signedUpAt: Date.now(),
     });
   }
 }
@@ -186,9 +195,17 @@ export default function GearManager({ playerName, deviceId, uid, amAdmin, suspen
     // way the commitment carries their stable uid, so it links to their signup.
     const e164 = toE164US(input.trim());
     const acct = e164 ? await ensureAccountByPhone(e164) : await ensureAccount(input.trim());
-    patchCommitment(c.id, {
+    // Move the roster role off the OLD person (so they aren't left stranded on the
+    // list) and onto the new one, then re-point the commitment.
+    const oldWho = { name: c.takerName, deviceId: c.takerDeviceId, uid: c.takerUid };
+    if (!c.held) await setGearRole(c.takeDate, oldWho, 'taker', null);
+    await setGearRole(c.returnDate, oldWho, 'bringer', null);
+    await patchCommitment(c.id, {
       takerName: acct.name, takerUid: acct.uid, takerDeviceId: null, source: adminName || 'admin',
     });
+    const newWho = { name: acct.name, deviceId: `admin-gear-${crypto.randomUUID()}`, uid: acct.uid, isAdmin: !!acct.isAdmin };
+    if (!c.held) await setGearRole(c.takeDate, newWho, 'taker', c.type);
+    await setGearRole(c.returnDate, newWho, 'bringer', c.type);
   };
 
   // mode: 'take'  → they take it home after the upcoming game, bring back on date
