@@ -567,7 +567,9 @@ function GearAdmin({ commitments, busy, takeDate, onMarkReturned, onReassign, on
   const [bringDate, setBringDate] = useState('');
   const [takeOn, setTakeOn] = useState(upcomingMornings(7)[0]);
   const [backDate, setBackDate] = useState('');
-  const live = commitments.filter((c) => c.status === 'committed');
+  // Only current/upcoming gear — a commitment whose return game has passed has
+  // auto-returned, so it's not "active" to manage. Keeps the old schedule out.
+  const live = commitments.filter((c) => c.status === 'committed' && c.returnDate >= takeDate);
 
   // Only offer days that still have an open slot for this gear (no over-booking).
   const bringDays = upcomingMornings(7).filter((d) => returnSlotsLeft(commitments, addType, d) > 0);
