@@ -70,6 +70,7 @@ export default function GearManager({ playerName, deviceId, uid, amAdmin, suspen
   const [commitments, setCommitments] = useState([]);
   const [loaded, setLoaded] = useState(false); // ledger has arrived from Firebase
   const [pickerType, setPickerType] = useState(null); // type mid-return-date-pick
+  const [pickedDate, setPickedDate] = useState(null); // chosen return date, awaiting play/not choice
   const [busy, setBusy] = useState(false);
   const [showSchedule, setShowSchedule] = useState(false);
   const [showSets, setShowSets] = useState(false);
@@ -99,7 +100,7 @@ export default function GearManager({ playerName, deviceId, uid, amAdmin, suspen
   const mine = myCommitments(commitments, deviceId, playerName, uid, takeDate);
 
   // ── Player: claim a set + return date (atomic) ────────────────────────────
-  const claimGear = async (type, returnDate) => {
+  const claimGear = async (type, returnDate, addToGame = true) => {
     if (!playerName || suspended || !isGearOpen(amAdmin) || busy) return;
     setBusy(true);
     try {
@@ -129,7 +130,10 @@ export default function GearManager({ playerName, deviceId, uid, amAdmin, suspen
         if (snap.exists()) tx.update(LEDGER, { commitments: [...cs, entry] });
         else tx.set(LEDGER, { commitments: [entry] });
       });
-      if (assignedSet) {
+      // Only add them to the match roster if they're PLAYING. Someone just
+      // picking up the gear (not playing) gets the commitment (tracked in the
+      // gear panel) but stays off the game list.
+      if (assignedSet && addToGame) {
         const who = { name: playerName, deviceId, uid, isAdmin: amAdmin };
         await setGearRole(takeDate, who, 'taker', type);     // playing the take day
         await setGearRole(returnDate, who, 'bringer', type); // playing the return day
@@ -139,6 +143,7 @@ export default function GearManager({ playerName, deviceId, uid, amAdmin, suspen
     } finally {
       setBusy(false);
       setPickerType(null);
+      setPickedDate(null);
     }
   };
 
@@ -238,7 +243,7 @@ export default function GearManager({ playerName, deviceId, uid, amAdmin, suspen
 
   // mode: 'take'  → they take it home after the upcoming game, bring back on date
   //       'held'  → they ALREADY have it (seeded starting state), brings back on date
-  const addManual = async (type, ident, backDate, mode, takeOn) => {
+  const addManual = async (type, ident, backDate, mode, takeOn, addToGame = true) => {
     // Identify the person by PHONE first (resolves to their one canonical account,
     // no matter how their name is typed); fall back to a name only for a number
     // that's brand-new to us. This is what stops "Miguel C" vs "Miguel Cevallos"
@@ -279,7 +284,10 @@ export default function GearManager({ playerName, deviceId, uid, amAdmin, suspen
         if (snap.exists()) tx.update(LEDGER, { commitments: [...cs, entry] });
         else tx.set(LEDGER, { commitments: [entry] });
       });
-      if (ok) {
+      // Only put them on the match roster if they're playing. Gear-only (not
+      // playing) still gets the commitment — tracked in the gear panel — but no
+      // roster row.
+      if (ok && addToGame) {
         const who = { name: acct.name, deviceId: `admin-gear-${crypto.randomUUID()}`, uid: acct.uid, isAdmin: !!acct.isAdmin };
         if (held) {
           await setGearRole(backDate, who, 'bringer', type);   // brings it back only
@@ -376,24 +384,36 @@ export default function GearManager({ playerName, deviceId, uid, amAdmin, suspen
         (() => {
           const opts = playerReturnDates(commitments, pickerType, takeDate);
           const single = opts.length === 1;
+          const label = gearLabel(pickerType).toLowerCase();
+          const cancel = () => { setPickerType(null); setPickedDate(null); };
+          // Step 1 — pick the return date (auto-picked when there's only one).
+          const chosen = pickedDate || (single ? opts[0] : null);
+          if (!chosen) {
+            return (
+              <div className="gear-picker">
+                <p className="gear-note">When will you bring the {label} back?</p>
+                <div className="gear-date-row">
+                  {opts.map((rd) => (
+                    <button key={rd} className="btn btn-primary btn-sm" disabled={busy}
+                      onClick={() => setPickedDate(rd)}>{fmtDay(rd)}</button>
+                  ))}
+                  <button className="btn btn-ghost btn-sm" onClick={cancel}>Cancel</button>
+                </div>
+              </div>
+            );
+          }
+          // Step 2 — are they playing, or just picking the gear up?
           return (
             <div className="gear-picker">
-              <p className={single ? 'gear-warn' : 'gear-note'}>
-                {single ? (
-                  <>⚠️ You must bring the {gearLabel(pickerType).toLowerCase()} back{' '}
-                    <strong>{fmtDay(opts[0])}</strong> — the very next game. Take them home?</>
-                ) : (
-                  <>When will you bring the {gearLabel(pickerType).toLowerCase()} back?</>
-                )}
+              <p className="gear-note">
+                Taking {label} home, back <strong>{fmtDay(chosen)}</strong>. Are you playing?
               </p>
               <div className="gear-date-row">
-                {opts.map((rd) => (
-                  <button key={rd} className="btn btn-primary btn-sm" disabled={busy}
-                    onClick={() => claimGear(pickerType, rd)}>
-                    {single ? `Yes — I'll bring them ${fmtDay(rd)}` : fmtDay(rd)}
-                  </button>
-                ))}
-                <button className="btn btn-ghost btn-sm" onClick={() => setPickerType(null)}>Cancel</button>
+                <button className="btn btn-primary btn-sm" disabled={busy}
+                  onClick={() => claimGear(pickerType, chosen, true)}>Take &amp; join the game</button>
+                <button className="btn btn-success btn-sm" disabled={busy}
+                  onClick={() => claimGear(pickerType, chosen, false)}>Just take the gear</button>
+                <button className="btn btn-ghost btn-sm" onClick={cancel}>Cancel</button>
               </div>
             </div>
           );
@@ -537,6 +557,7 @@ function GearAdmin({ commitments, busy, takeDate, onMarkReturned, onReassign, on
   const [addType, setAddType] = useState('goal');
   const [addPhone, setAddPhone] = useState('');
   const [addName, setAddName] = useState('');
+  const [addToGame, setAddToGame] = useState(true); // also put them on the match list?
   const [bringDate, setBringDate] = useState('');
   const [takeOn, setTakeOn] = useState(upcomingMornings(7)[0]);
   const [backDate, setBackDate] = useState('');
@@ -568,7 +589,7 @@ function GearAdmin({ commitments, busy, takeDate, onMarkReturned, onReassign, on
           </select>
         ) : <span className="gear-note">all days full</span>}
         <button className="btn btn-success btn-sm" disabled={busy || (!addPhone.trim() && !addName.trim()) || !bringDays.length}
-          onClick={() => { onAdd(addType, { phone: addPhone, name: addName }, bringVal, 'held'); setAddPhone(''); setAddName(''); }}>Assign bring</button>
+          onClick={() => { onAdd(addType, { phone: addPhone, name: addName }, bringVal, 'held', undefined, addToGame); setAddPhone(''); setAddName(''); }}>Assign bring</button>
       </div>
       <div className="gear-admin-add">
         <span className="gear-admin-lbl">Take home on:</span>
@@ -580,8 +601,12 @@ function GearAdmin({ commitments, busy, takeDate, onMarkReturned, onReassign, on
           {backDays.map((d) => <option key={d} value={d}>{fmtDay(d)}</option>)}
         </select>
         <button className="btn btn-primary btn-sm" disabled={busy || (!addPhone.trim() && !addName.trim()) || !backDays.length}
-          onClick={() => { onAdd(addType, { phone: addPhone, name: addName }, backVal, 'take', takeOn); setAddPhone(''); setAddName(''); }}>Assign take</button>
+          onClick={() => { onAdd(addType, { phone: addPhone, name: addName }, backVal, 'take', takeOn, addToGame); setAddPhone(''); setAddName(''); }}>Assign take</button>
       </div>
+      <label className="gear-admin-add gear-admin-check">
+        <input type="checkbox" checked={addToGame} onChange={(e) => setAddToGame(e.target.checked)} />
+        Also add them to the game list (uncheck if they're only picking up gear, not playing)
+      </label>
       <p className="gear-note">
         <strong>Assign bring</strong> = just brings a set that day (no take). <strong>Assign take</strong> = takes
         home one day, brings back another. Only days that still need that gear are shown (max 2 goals / 1 balls / 1 bibs per day).
