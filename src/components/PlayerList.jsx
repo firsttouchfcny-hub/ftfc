@@ -4,7 +4,7 @@ import {
 } from '../utils/helpers';
 import { gearIcon } from '../utils/gear';
 
-export default function PlayerList({ players: playersProp, deviceId, playerName, isOpen, loaded = true, gearPriorityNames, gearRoles }) {
+export default function PlayerList({ players: playersProp, deviceId, playerName, isOpen, loaded = true, amAdmin = false, gearPriorityNames, gearRoles }) {
   const players = playersProp || [];
   const gearPri = gearPriorityNames || new Set();
   const roles = gearRoles || {};
@@ -60,7 +60,7 @@ export default function PlayerList({ players: playersProp, deviceId, playerName,
               </>
             );
           })()}
-          {player.priority && !player.isAdmin && <span className="badge badge-priority">priority</span>}
+          {amAdmin && player.priority && !player.isAdmin && <span className="badge badge-priority">priority</span>}
           {!player.isMainEntry && <span className="badge badge-plus">+1</span>}
         </span>
       </div>

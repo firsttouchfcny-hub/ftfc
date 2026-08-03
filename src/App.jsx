@@ -713,6 +713,7 @@ export default function App() {
               playerName={displayName}
               isOpen={rollOpen}
               loaded={playersLoaded}
+              amAdmin={amAdmin}
               gearPriorityNames={gearPriorityNames}
               gearRoles={gearRoles}
             />
@@ -801,6 +802,7 @@ export default function App() {
                         deviceId={deviceId}
                         playerName={displayName}
                         isOpen={false}
+                        amAdmin={amAdmin}
                         gearPriorityNames={new Set()}
                         gearRoles={{}}
                       />
