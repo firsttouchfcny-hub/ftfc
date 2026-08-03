@@ -408,8 +408,8 @@ export default function App() {
         isAdmin: playerIsAdmin, plusOnes,
         // +1s taken at signup share my signup time, so they render next to me.
         plusOnesAt: Array.from({ length: plusOnes }, () => now),
-        // A real sign-up — so a later gear-role change can't auto-remove this row.
-        gearAdded: false,
+        // Confirmed real sign-up — so clearing a gear role never removes this row.
+        signedUp: true,
         signedUpAt: now,
       }, { merge: true });
     } catch (err) {

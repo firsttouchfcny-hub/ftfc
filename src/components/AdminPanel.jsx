@@ -154,6 +154,7 @@ export default function AdminPanel({ session, players, today, adminName }) {
           isAdmin: acct.isAdmin || false,
           plusOnes: 0,
           priority: false,
+          signedUp: true, // admin put them on the list → a real entry, not gear-only
           // +added keeps a stable signup order within one batch (same-ms writes).
           signedUpAt: Date.now() + added,
         }, { merge: true });

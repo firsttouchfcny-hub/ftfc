@@ -40,11 +40,12 @@ async function setGearRole(dateKey, { name, deviceId, uid, isAdmin }, role, type
     if (!mineDoc) return;
     const d = mineDoc.data();
     const other = field === 'gearBringer' ? 'gearTaker' : 'gearBringer';
-    // If this row exists ONLY because gear auto-added it (gearAdded) and no other
-    // gear role remains, remove it — otherwise a cancelled/returned commitment
-    // leaves the person stranded on the roster. A real sign-up (gearAdded false)
-    // just loses the badge.
-    if (d.gearAdded && !d[other]) await deleteDoc(mineDoc.ref);
+    // Once this role is cleared and no other gear role remains, the row exists for
+    // NO reason unless the person actually signed up. So: keep it only for a
+    // confirmed sign-up (signedUp), otherwise remove it. This means a cancelled/
+    // reassigned/returned gear commitment can never leave a stranded roster row —
+    // for new rows AND old ones (which have no signedUp flag).
+    if (!d[other] && d.signedUp !== true) await deleteDoc(mineDoc.ref);
     else await updateDoc(mineDoc.ref, { [field]: null });
     return;
   }
