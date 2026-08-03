@@ -60,6 +60,7 @@ export default function App() {
   // This morning's game roster, shown to admins after the list rolls to the next
   // game (10 AM) until 6 PM, so they can still review who played at 7 AM.
   const [prevPlayers, setPrevPlayers] = useState([]);
+  const [prevDrops, setPrevDrops] = useState([]); // this morning's drops (list + bench)
   const [showPrevRoster, setShowPrevRoster] = useState(false);
   // Whether the profile listener has returned at least once. Until it has, we
   // don't KNOW if this person is phone-verified — so we must not pop the verify
@@ -278,15 +279,20 @@ export default function App() {
   const prevDate = (amAdmin && isGameDay(etNow.dateKey) && today !== etNow.dateKey && etNow.hour < 18)
     ? etNow.dateKey : null;
 
-  // Subscribe to this morning's roster while it's on view for admins.
+  // Subscribe to this morning's roster + its drops while it's on view for admins.
   useEffect(() => {
-    if (!prevDate) { setPrevPlayers([]); return; }
-    const unsub = onSnapshot(
+    if (!prevDate) { setPrevPlayers([]); setPrevDrops([]); return; }
+    const unsubPlayers = onSnapshot(
       collection(db, 'sessions', prevDate, 'players'),
       (snap) => setPrevPlayers(snap.docs.map((d) => ({ ...d.data(), id: d.id }))),
       () => setPrevPlayers([])
     );
-    return unsub;
+    const unsubMeta = onSnapshot(
+      doc(db, 'sessions', prevDate),
+      (snap) => setPrevDrops(snap.exists() ? (snap.data().drops || []) : []),
+      () => setPrevDrops([])
+    );
+    return () => { unsubPlayers(); unsubMeta(); };
   }, [prevDate]);
 
   // ── My standing (so players don't scan the whole list) ─────────────────────
@@ -788,18 +794,56 @@ export default function App() {
                     : `▼ This morning’s roster · ${formatDateShort(new Date(prevDate + 'T12:00:00').getTime())}`}
                 </button>
                 {showPrevRoster && (
-                  prevDisplayPlayers.length ? (
-                    <PlayerList
-                      players={prevDisplayPlayers}
-                      deviceId={deviceId}
-                      playerName={displayName}
-                      isOpen={false}
-                      gearPriorityNames={new Set()}
-                      gearRoles={{}}
-                    />
-                  ) : (
-                    <p className="gear-note">No one was on this morning’s list.</p>
-                  )
+                  <>
+                    {prevDisplayPlayers.length ? (
+                      <PlayerList
+                        players={prevDisplayPlayers}
+                        deviceId={deviceId}
+                        playerName={displayName}
+                        isOpen={false}
+                        gearPriorityNames={new Set()}
+                        gearRoles={{}}
+                      />
+                    ) : (
+                      <p className="gear-note">No one was on this morning’s list.</p>
+                    )}
+
+                    {/* Who dropped this morning — from the game vs the bench. */}
+                    {prevDrops.length > 0 && (() => {
+                      const sorted = [...prevDrops].sort((a, b) => b.at - a.at);
+                      const gameDrops = sorted.filter((d) => !d.fromBench);
+                      const benchDrops = sorted.filter((d) => d.fromBench);
+                      return (
+                        <div className="drops-log">
+                          <div className="drops-log-title">
+                            📤 Dropped this morning <span className="count-badge">{prevDrops.length}</span>
+                          </div>
+                          {gameDrops.length > 0 && (
+                            <div className="drops-group drops-game">
+                              <div className="drops-group-title">⚠️ From the game ({gameDrops.length}) — opened a spot</div>
+                              {gameDrops.map((d, i) => (
+                                <div key={`pg-${d.deviceId}-${d.at}-${i}`} className="drops-log-row">
+                                  <span className="drops-log-name">{d.name}</span>
+                                  <span className="drops-log-time">{formatTimeET(d.at)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {benchDrops.length > 0 && (
+                            <div className="drops-group drops-bench">
+                              <div className="drops-group-title">🪑 From the bench ({benchDrops.length})</div>
+                              {benchDrops.map((d, i) => (
+                                <div key={`pb-${d.deviceId}-${d.at}-${i}`} className="drops-log-row">
+                                  <span className="drops-log-name">{d.name}</span>
+                                  <span className="drops-log-time">{formatTimeET(d.at)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </>
                 )}
               </div>
             )}
