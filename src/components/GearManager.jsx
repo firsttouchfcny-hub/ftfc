@@ -108,9 +108,12 @@ export default function GearManager({ playerName, deviceId, uid, amAdmin, suspen
       await runTransaction(db, async (tx) => {
         const snap = await tx.get(LEDGER);
         const cs = snap.exists() ? (snap.data().commitments || []) : [];
-        // One person may hold only one set of a given type (e.g. not both goals).
+        // One person may hold only one set of a type AT A TIME. Block only if they
+        // still have it AFTER this take (returnDate > takeDate). A set they're
+        // bringing back ON the take day is a continuation — they hand it in that
+        // morning and take it again after the game — so that's allowed.
         const alreadyHas = cs.some(
-          (c) => c.status === 'committed' && c.type === type &&
+          (c) => c.status === 'committed' && c.type === type && c.returnDate > takeDate &&
             ((uid && c.takerUid === uid) ||
              c.takerDeviceId === deviceId ||
              (c.takerName || '').toLowerCase() === playerName.toLowerCase())
@@ -424,7 +427,10 @@ export default function GearManager({ playerName, deviceId, uid, amAdmin, suspen
             {GEAR_TYPE_ORDER.map((t) => {
               const left = availableToTake(commitments, t, takeDate);
               const openDays = playerReturnDates(commitments, t, takeDate).length;
-              const owned = mine.some((c) => c.type === t);
+              // "Yours" only blocks a re-take if you'd still hold it after this take
+              // (return date is past the take day). A set you bring back that day is
+              // a continuation → you can take it again.
+              const owned = mine.some((c) => c.type === t && c.returnDate > takeDate);
               // Balls is lowest priority — locked until goals AND bibs are taken
               // (based on whether they still need a taker, not return-day quirks).
               // Admins are exempt: they can take balls & cones anytime.
