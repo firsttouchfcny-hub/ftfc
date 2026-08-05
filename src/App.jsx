@@ -10,6 +10,8 @@ import AdminPanel  from './components/AdminPanel';
 import Rules       from './components/Rules';
 import PhoneVerify from './components/PhoneVerify';
 import GearManager from './components/GearManager';
+import DevPanel from './components/DevPanel';
+import { buildMockSession } from './utils/mockSession';
 import { fridayGearPriorityNames, bringersFor, takersFor } from './utils/gear';
 import {
   getSessionDate, getTomorrow, getDeviceId, normalizeName,
@@ -32,11 +34,20 @@ export default function App() {
   const [showAdminLogin,  setShowAdminLogin]  = useState(false);
   const [showAdminPanel,  setShowAdminPanel]  = useState(false);
 
+  // ── Dev-only: preview roster/time states without live data ────────────────
+  // Gated by import.meta.env.DEV so it is impossible to enable in production.
+  const [mock, setMock] = useState({
+    enabled: false, count: 30, mode: 'open', mePos: 5,
+  });
+  const mockOn = import.meta.env.DEV && mock.enabled;
+
   // ── Firebase state ────────────────────────────────────────────────────────
-  const [session,       setSession]       = useState(null);
+  // *Live values from Firebase. In dev preview mode `session`/`loading` below are
+  // derived from the mock instead — the app never sees these live values.
+  const [sessionLive,   setSessionLive]   = useState(null);
   const [playerProfile, setPlayerProfile] = useState(null);
   const [gearLedger,    setGearLedger]    = useState([]);
-  const [loading,       setLoading]       = useState(true);
+  const [loadingLive,   setLoadingLive]   = useState(true);
   const [, setClockTick] = useState(0); // re-render so time-based open/close updates live
 
   // Re-evaluate Eastern-time state (10 AM reset, 3 PM open) without a manual refresh.
@@ -55,25 +66,28 @@ export default function App() {
     };
   }, []);
 
-  // Listen to the player-facing session (today before noon, tomorrow after)
+  // Listen to the player-facing session (today before noon, tomorrow after).
+  // In dev preview mode we skip Firebase entirely — the mock injector below owns
+  // `session` — so no live reads happen and no credentials are needed.
   useEffect(() => {
+    if (mockOn) return; // dev preview owns `session` — skip Firebase entirely
     const ref = doc(db, 'sessions', today);
-    const timeout = setTimeout(() => setLoading(false), 5000);
+    const timeout = setTimeout(() => setLoadingLive(false), 5000);
     const unsub = onSnapshot(
       ref,
       (snap) => {
         clearTimeout(timeout);
-        setSession(snap.exists() ? snap.data() : { date: today, isOpen: false, players: [] });
-        setLoading(false);
+        setSessionLive(snap.exists() ? snap.data() : { date: today, isOpen: false, players: [] });
+        setLoadingLive(false);
       },
       () => {
         clearTimeout(timeout);
-        setSession({ date: today, isOpen: false, players: [] });
-        setLoading(false);
+        setSessionLive({ date: today, isOpen: false, players: [] });
+        setLoadingLive(false);
       }
     );
     return () => { unsub(); clearTimeout(timeout); };
-  }, [today]);
+  }, [today, mockOn]);
 
   // Listen to the gear ledger (drives Friday gear-priority ordering).
   useEffect(() => {
@@ -106,6 +120,14 @@ export default function App() {
     return unsub;
   }, [playerName]);
 
+  // ── Session source ────────────────────────────────────────────────────────
+  // Normally the live Firebase session; in dev preview mode, a mock roster built
+  // from the DevPanel controls (no Firebase, no credentials needed).
+  const session = mockOn
+    ? buildMockSession(mock.count, mock.mode, mock.mePos, deviceId, playerName)
+    : sessionLive;
+  const loading = mockOn ? false : loadingLive;
+
   // ── Derived state ─────────────────────────────────────────────────────────
   const suspended     = isSuspended(playerProfile?.suspendedUntil);
   const myEntry       = session?.players?.find((p) => p.deviceId === deviceId);
@@ -115,10 +137,13 @@ export default function App() {
   const isOnList      = !!myEntry || onListByName;
 
   // ── Time-based roll-call state (Eastern) ───────────────────────────────────
-  const phase    = getRollCallPhase();                       // closed | admins-only | open
   const amAdmin  = isAdmin || playerProfile?.isAdmin || false;
-  const rollOpen = isRollCallOpen(session);                  // open to everyone?
-  const iCanSignUp = amAdmin ? canAdminSignUp(session) : rollOpen;
+  // In dev preview mode, the panel drives the time-of-day state directly.
+  const phase    = mockOn ? mock.mode : getRollCallPhase();  // closed | admins-only | open
+  const rollOpen = mockOn ? mock.mode === 'open' : isRollCallOpen(session); // open to everyone?
+  const iCanSignUp = mockOn
+    ? (mock.mode === 'open' ? true : mock.mode === 'admins-only' ? amAdmin : false)
+    : (amAdmin ? canAdminSignUp(session) : rollOpen);
 
   // ── My standing (so players don't scan the whole list) ─────────────────────
   const gearPriorityNames = fridayGearPriorityNames(gearLedger, today);
@@ -514,6 +539,9 @@ export default function App() {
       {showAdminLogin && (
         <AdminLogin onLogin={handleAdminLogin} onClose={() => setShowAdminLogin(false)} />
       )}
+
+      {/* Dev-only design preview panel — never rendered in production builds */}
+      {import.meta.env.DEV && <DevPanel mock={mock} onChange={setMock} />}
     </div>
   );
 }
