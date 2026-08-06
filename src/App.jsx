@@ -323,7 +323,32 @@ export default function App() {
   // falling back to the stored snapshot until it loads. Display uses this so a
   // rename shows everywhere at once, without waiting on per-row name syncs.
   const nameOf = (uid, fallback) => (uid && namesByUid[uid]) || fallback;
-  const displayPlayers = players.map((p) => ({ ...p, name: nameOf(p.uid, p.name) }));
+
+  // Anyone bringing or taking gear for the shown day is on the game automatically,
+  // derived straight from the ledger — so a gear-bringer can never be missing from
+  // the list just because a roster row was never written for them. The one
+  // exception is gear that was taken as "just take gear" (gearOnly): that person is
+  // handling gear without playing, so they stay off the roster. Skips anyone who
+  // already has a real roster row (matched by uid) to avoid duplicates.
+  const rosterUids = new Set(players.map((p) => p.uid).filter(Boolean));
+  const derivedGear = [];
+  const derivedSeen = new Set();
+  for (const c of gearLedger) {
+    if (c.status !== 'committed' || c.gearOnly || !c.takerUid) continue;
+    const isBringer = c.returnDate === today;
+    const isTaker = !c.held && c.takeDate === today;
+    if (!isBringer && !isTaker) continue;
+    if (rosterUids.has(c.takerUid) || derivedSeen.has(c.takerUid)) continue;
+    derivedSeen.add(c.takerUid);
+    derivedGear.push({
+      id: `gear-${c.takerUid}`, uid: c.takerUid, deviceId: `gear-${c.takerUid}`,
+      name: nameOf(c.takerUid, c.takerName), plusOnes: 0, gearAdded: true,
+      [isBringer ? 'gearBringer' : 'gearTaker']: c.type,
+      signedUpAt: c.createdAt || 0,
+    });
+  }
+
+  const displayPlayers = [...players, ...derivedGear].map((p) => ({ ...p, name: nameOf(p.uid, p.name) }));
   const prevDisplayPlayers = prevPlayers.map((p) => ({ ...p, name: nameOf(p.uid, p.name) }));
 
   const flatList = buildFlatList(displayPlayers, { gearPriorityNames, gearRoles });

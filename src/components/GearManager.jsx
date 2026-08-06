@@ -8,7 +8,7 @@ import { isSamePerson, rosterDocId, toE164US } from '../utils/helpers';
 import {
   GEAR_TYPE_ORDER, GEAR_DEFS, gearIcon, gearLabel, gearNeed,
   isGearOpen, gearTakeDate, todayKey, gameDaysAfter,
-  availableReturnDates, playerReturnDates, returnSlotsLeft,
+  playerReturnDates, returnSlotsLeft,
   availableToTake, takeBlockedByPriority, pickFreeSet, coverageForMorning,
   bringersFor, takersFor, gearBringingAlert, gearTakingAlert,
   myCommitments, upcomingMornings, setStatuses,
@@ -128,6 +128,7 @@ export default function GearManager({ playerName, deviceId, uid, amAdmin, suspen
           takerName: playerName, takerDeviceId: deviceId, takerUid: uid || null,
           takerIsAdmin: !!amAdmin,
           takeDate, returnDate, status: 'committed', returnedOnTime: null,
+          gearOnly: !addToGame,
           createdAt: Date.now(), source: 'player',
         };
         if (snap.exists()) tx.update(LEDGER, { commitments: [...cs, entry] });
@@ -282,6 +283,7 @@ export default function GearManager({ playerName, deviceId, uid, amAdmin, suspen
           takerName: acct.name, takerDeviceId: null, takerUid: acct.uid, takerIsAdmin: !!acct.isAdmin,
           takeDate: useTake, returnDate: backDate, held,
           status: 'committed', returnedOnTime: null,
+          gearOnly: !addToGame,
           createdAt: Date.now(), source: adminName || 'admin',
         };
         if (snap.exists()) tx.update(LEDGER, { commitments: [...cs, entry] });
