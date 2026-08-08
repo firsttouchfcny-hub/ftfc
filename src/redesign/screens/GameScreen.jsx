@@ -1,33 +1,31 @@
-// "You're in" — post-sign-up game details + roster. Skeleton shows the header
-// and the structure that will fill in (gear takers strip + Match 1/2/Bench list).
+// "You're in" — post-sign-up game screen. Built from Figma node 2730:10542.
+// Top built: the confirmation header + the gear-takers section. The Match 1/2/
+// Bench table is intentionally not built yet (next).
 
-import { useNavigate } from 'react-router-dom';
-import Scaffold from '../components/Scaffold';
-import PillButton from '../components/PillButton';
+import Confirmation from '../components/Confirmation';
+import GearTakers from '../components/GearTakers';
+import RosterSection from '../components/RosterSection';
+import TableCard from '../components/TableCard';
+import { mockRoster } from '../state/mockRoster';
 
 export default function GameScreen() {
-  const navigate = useNavigate();
   return (
-    <>
-      <div style={{ textAlign: 'center', padding: '16px 20px 0' }}>
-        <h1 className="type-heading-h1" style={{ marginBottom: 4 }}>You&rsquo;re in</h1>
-        <p className="type-body-regular" style={{ color: 'var(--color-dark-gray-50)' }}>
-          Thursday, Oct 11th · 07:00 AM · McCarren Park
-        </p>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 32, alignItems: 'center', padding: '8px 16px 32px' }}>
+      <Confirmation headline="You’re in" />
+      <GearTakers headline="Tomorrow’s gear takers" />
+
+      {/* Roster: the two matches share one card; the bench is its own card. */}
+      <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <TableCard>
+          <RosterSection label="Match 1" players={mockRoster.match1} />
+          <div style={{ height: 1, background: 'var(--color-light-olive)', width: '100%' }} />
+          <RosterSection label="Match 2" players={mockRoster.match2} />
+        </TableCard>
+
+        <TableCard>
+          <RosterSection label="Bench" players={mockRoster.bench} />
+        </TableCard>
       </div>
-      <Scaffold
-        title="Game & roster"
-        blurb="Where a signed-up player lands."
-        planned={[
-          'Tomorrow’s gear takers strip (Goals / Goals / Balls / Bibs)',
-          'Match 1 (18) · Match 2 (18) · Bench sections',
-          'Player rows: avatar, name, gear "Bringing" badge, admin crown',
-          'Standing variants: Match 2 on-hold / cancelled, bench',
-          'Out / leave action',
-        ]}
-      >
-        <PillButton variant="secondary" onClick={() => navigate('/')}>← Back to home</PillButton>
-      </Scaffold>
-    </>
+    </div>
   );
 }

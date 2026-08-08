@@ -6,13 +6,10 @@
 // the live countdown-to-3pm and the real next-game date wire in with the time logic.
 
 import GameHeader from '../../components/GameHeader';
-import GearTile from '../../components/GearTile';
+import GearTakers from '../../components/GearTakers';
 import StatusBadge from '../../components/StatusBadge';
 import { countdownToOpen } from '../../state/rollCall';
 import dividerIcon from '../../assets/icons/divider.svg';
-import goalIcon from '../../assets/gear/goal.png';
-import ballsIcon from '../../assets/gear/balls.png';
-import bibsIcon from '../../assets/gear/bibs.png';
 
 export default function HomeWaiting() {
   // Live countdown to when roll call opens (3 PM ET). HomeScreen's tick re-renders
@@ -34,15 +31,7 @@ export default function HomeWaiting() {
       </div>
 
       {/* Take gear & skip the wait */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'center', width: '100%' }}>
-        <p className="type-body-regular" style={{ color: 'var(--color-dark-gray)' }}>Or take gear and skip the wait</p>
-        <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', justifyContent: 'center', width: '100%' }}>
-          <GearTile icon={goalIcon} label="Goals" />
-          <GearTile icon={goalIcon} label="Goals" />
-          <GearTile icon={ballsIcon} label="Balls" />
-          <GearTile icon={bibsIcon} label="Bibs" />
-        </div>
-      </div>
+      <GearTakers headline="Or take gear and skip the wait" />
     </div>
   );
 }
