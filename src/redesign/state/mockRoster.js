@@ -39,7 +39,7 @@ const match1 = [
   P('Max Fischer', { photo: true }),
 ];
 
-// Match 2 (next batch).
+// Match 2 (positions 19–36; full at 18).
 const match2 = [
   P('Leo Duarte', { photo: true }),
   P('Pablo Vega', {}),
@@ -53,9 +53,15 @@ const match2 = [
   P('Uri Katz', {}),
   P('Vin Alvarez', { photo: true }),
   P('Wes Turner', {}),
+  P('Xavi Moreno', { photo: true }),
+  P('Yuki Tanaka', {}),
+  P('Zeke Palmer', { photo: true }),
+  P('Aron Beck', {}),
+  P('Bo Nakamura', { photo: true }),
+  P('Cy Ferreira', {}),
 ];
 
-// Bench (waiting for a spot).
+// Bench (positions 37+; only exists once both matches are full).
 const bench = [
   P('Noah Bright', {}),
   P('Otis Grant', { photo: true }),

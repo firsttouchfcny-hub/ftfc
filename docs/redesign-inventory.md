@@ -11,7 +11,7 @@ see at a glance what's designed and what still needs a mockup before we build.
 - Gear need per game: **2 Goals · 1 Balls · 1 Bibs** (4 slots) · balls-gate: Balls locked until Goals & Bibs are exhausted
 - Games run **Mon–Fri**; weekends show Monday's game (already open since Fri 3 PM)
 
-**🔨 Built so far** (redesign branch, at `/r`): design tokens (color + type) · routing shell + 6 screens · the **frosted sticky top nav** (progressive blur + olive scrim) · the **home roll-call screen — all 4 variants** (waiting w/ live countdown, open, admin, suspended) wired to the real Eastern-time logic. Reusable components: `GameHeader`, `GearTile`, `Fab`, `StatusBadge`, `ProgressiveBlur`, `Avatar`, plus the mock-identity seam.
+**🔨 Built so far** (redesign branch, at `/r`): design tokens — color (incl. the new **Expressive** set) + type · routing shell + 6 screens · the **frosted sticky top nav** (progressive blur + olive scrim) · the **home roll-call screen — all 4 variants** (waiting w/ live countdown, open, admin, suspended) · the **"You're in" game screen** — confirmation header, gear-takers, and the full **Match 1 / Match 2 / Bench roster table** with all three **Match 2 states** (confirmed · on-hold · cancelled — top message *and* section header, driven by `getMatch2State`). Reusable components: `GameHeader`, `Confirmation`, `GearTile`, `GearTakers`, `Fab`, `StatusBadge`, `ProgressiveBlur`, `Avatar`, `PlayerAvatar`, `PlayerRow`, `RosterSection`, `TableCard`, plus the mock-identity seam.
 
 ---
 
@@ -41,7 +41,7 @@ see at a glance what's designed and what still needs a mockup before we build.
 | Add profile pic — empty | ✅ | Selfie / Upload / Skip |
 | ↳ capturing / uploading | ⬜ | Camera + upload-in-progress |
 | Add profile pic — filled | ✅ | Continue |
-| Skipped photo → initials fallback | 🟡 | Fallback shown in roster ("JC"), not in flow |
+| Skipped photo → initials fallback | 🟡 🔨 | Built in roster (`PlayerAvatar`); the account-flow step still TBD |
 | **Returning user sign-in** | ⬜ | Existing account: phone → OTP → home (distinct from "create") |
 
 ---
@@ -77,33 +77,33 @@ see at a glance what's designed and what still needs a mockup before we build.
 
 | Variant | Status | Notes |
 |---|---|---|
-| You're in — Match 1 | ✅ | Screenshot 5 |
-| You're in — Match 2 confirmed (30+) | ⬜ | Headline/subcopy differ |
-| Match 2 ON HOLD (<30, decides 9 PM) | ⬜ | "waiting for N more · decides 9 PM" |
-| Match 2 cancelled (past 9 PM, <30) | ⬜ | You were Match 2 → not playing |
-| Bench (#N in line) | ⬜ | 37+ |
+| You're in — Match 1 | ✅ 🔨 | Built |
+| You're in — Match 2 confirmed (30+) | ✅ 🔨 | Built (default game screen) |
+| Match 2 ON HOLD (<30, pre-9pm) | ✅ 🔨 | Built · top "In match 2 waitlist" + orange pill; section "Match 2 on hold" + count · dimmed (`?match2=onhold`) |
+| Match 2 cancelled (past 9 PM, <30) | ✅ 🔨 | Built · top "No game — match 2 cancelled"; section "Match 2 — NO GAME" · dimmed (`?match2=cancelled`) |
+| Bench (#N in line) — my standing | 🟡 🔨 | Bench *section* built; the "you're on the bench" standing message TBD |
 
 **Roster list**
 
 | Element / state | Status | Notes |
 |---|---|---|
-| Match 1 section (top 18) | ✅ | |
-| Match 2 section (18) — confirmed / on-hold / off | ⬜ | Styling differs by state |
-| Bench section | ⬜ | |
-| Row — gear bringer badge (🥅 Goals) | ✅ | |
-| Row — bringer badge ⚽ Balls / 🧺 Bibs variants | ⬜ | Only Goals shown; respect caps (2/1/1) |
-| Row — gear taker | ⬜ | Tier below bringer, above admin |
-| Row — admin (crown), no gear | ⬜ | Pure-admin treatment |
+| Match 1 section (top 18) | ✅ 🔨 | Built · in a Cream `TableCard` |
+| Match 2 section (18) — confirmed / on-hold / off | ✅ 🔨 | Built · all three states (header + icon + dimming) |
+| Bench section | ✅ 🔨 | Built · own card; only shows on 37+ overflow |
+| Row — gear bringer badge (🥅 Goals) | ✅ 🔨 | Built |
+| Row — bringer badge ⚽ Balls / 🧺 Bibs variants | ✅ 🔨 | Built · badge takes any gear emoji |
+| Row — gear taker | ⬜ | Tier below bringer, above admin — not distinctly styled yet |
+| Row — admin (crown), no gear | ✅ 🔨 | Built · crown badge on avatar |
 | Row — Friday gear-priority | ⬜ | Bumped up on Fridays |
 | Row — you (highlight) | ⬜ | Self-locator in a long list |
 | Row — +1 guest | ⬜ | Sub-row under the host |
-| Row — long name / initials fallback | ✅ | Both handled |
+| Row — long name / initials fallback | ✅ 🔨 | Both handled (`PlayerAvatar` photo/initials, name truncates) |
 
 **Actions & overlays on this screen**
 
 | Element | Status | Notes |
 |---|---|---|
-| Gear takers strip ("Tomorrow's gear takers") | ✅ | Align label to taker/bringer vocabulary |
+| Gear takers strip ("Tomorrow's gear takers") | ✅ 🔨 | Built · shared `GearTakers` component |
 | Out / leave + confirm | ⬜ | Removes you; logs a drop |
 | Drops log (game drops vs bench drops) | ⬜ | Kept |
 | ⚠️ Gear at risk alert | ⬜ | Kept — nobody bringing gear in |
@@ -171,8 +171,8 @@ see at a glance what's designed and what still needs a mockup before we build.
 
 ## Gap summary
 
-- **Designed:** ~10 screens/states (the happy paths across all four flows)
-- **Biggest missing clusters:** Match 2 / Bench outcome variants · gear tile sub-states · roster row variants · the three detail surfaces (Rules, Gear, Profile) · the entire Admin panel
-- **Design-the-data-model-first item:** identity moving from device → phone account, first/last name split, and profile-photo storage — settle this before screens, since roster + gear + identity all depend on it.
+- **🔨 Built:** the home roll-call screen (4 variants) and the "You're in" game screen (roster table + all Match 2 states) are done on the mock seam; tokens + frosted nav in place.
+- **Biggest missing clusters:** gear tile sub-states (taken → avatar, locked) · a few roster row variants (you-highlight, +1 guest, gear-taker, Friday-priority) · the bench standing message · the account-creation flow · the three detail surfaces (Rules, Gear, Profile) · the entire Admin panel
+- **Design-the-data-model-first item:** identity moving from device → phone account, first/last name split, and profile-photo storage — settle this before wiring real data, since roster + gear + identity all depend on it.
 
-**Suggested build order:** (1) ✅ design tokens → (2) 🟡 identity/data model *(proposal open — awaiting team; screens built on a mock seam)* → (3) ✅ routing skeleton + top nav → (4) ✅ home roll-call screen (all variants) → (5) **← next: game + roster** (all outcome variants) → (6) gear tile states → (7) detail surfaces (Rules / Gear / Profile) → (8) admin panel.
+**Suggested build order:** (1) ✅ design tokens → (2) 🟡 identity/data model *(proposal open — awaiting team; screens built on a mock seam)* → (3) ✅ routing skeleton + top nav → (4) ✅ home roll-call screen (all variants) → (5) ✅ game + roster (table + Match 2 states) → (6) **← next: gear tile states** → (7) detail surfaces (Rules / Gear / Profile) → (8) admin panel.

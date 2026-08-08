@@ -29,6 +29,17 @@ const COLOR_GROUPS = [
       { name: 'Red', token: '--color-red', note: '#D80505' },
     ],
   },
+  {
+    title: 'Expressive',
+    swatches: [
+      { name: 'Olive Dark',  token: '--color-expressive-olive-dark',  note: '#434D36' },
+      { name: 'Olive Light', token: '--color-expressive-olive-light', note: '#9F9C7C' },
+      { name: 'Gold',        token: '--color-expressive-gold',        note: '#EAAF61' },
+      { name: 'Orange',      token: '--color-expressive-orange',      note: '#E68756' },
+      { name: 'Navy',        token: '--color-expressive-navy',        note: '#2F4768' },
+      { name: 'Steel',       token: '--color-expressive-steel',       note: '#808285' },
+    ],
+  },
 ];
 
 const FOX = 'The quick brown fox jumps over the lazy dog';
