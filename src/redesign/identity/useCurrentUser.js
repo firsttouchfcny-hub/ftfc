@@ -16,6 +16,7 @@ const MOCK_USER = {
   displayName: 'Cristian Lugo',
   photoURL: null, // null → initials fallback in <Avatar>
   isAdmin: true,
+  suspendedUntil: null, // ms timestamp when a suspension ends, or null if not suspended
 };
 
 export function useCurrentUser() {

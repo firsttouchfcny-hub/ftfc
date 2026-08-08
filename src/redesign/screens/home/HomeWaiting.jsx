@@ -7,34 +7,25 @@
 
 import GameHeader from '../../components/GameHeader';
 import GearTile from '../../components/GearTile';
+import StatusBadge from '../../components/StatusBadge';
+import { countdownToOpen } from '../../state/rollCall';
 import dividerIcon from '../../assets/icons/divider.svg';
 import goalIcon from '../../assets/gear/goal.png';
 import ballsIcon from '../../assets/gear/balls.png';
 import bibsIcon from '../../assets/gear/bibs.png';
 
 export default function HomeWaiting() {
-  // Placeholder — replaced by a live countdown to the next roll call (3 PM ET).
-  const countdown = '03:20:34';
+  // Live countdown to when roll call opens (3 PM ET). HomeScreen's tick re-renders
+  // this each second, so it recomputes without a per-screen timer here.
+  const countdown = countdownToOpen();
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 32, alignItems: 'center', padding: '64px 24px 32px' }}>
       {/* Game details */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 32, alignItems: 'center', width: '100%' }}>
         <GameHeader />
-        {/* Timer badge.
-            TODO: `countdown` is a static placeholder. Wire it to a live
-            countdown to when the next roll call opens (3 PM ET), ticking each
-            second. */}
-        <div
-          style={{
-            height: 90, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            padding: '24px 32px', borderRadius: 24, background: '#DAD8CA',
-          }}
-        >
-          <span className="type-body-bold" style={{ color: 'var(--color-dark-gray)', textAlign: 'center', whiteSpace: 'nowrap' }}>
-            Roll call opens in {countdown}
-          </span>
-        </div>
+        {/* Live countdown to 3 PM ET (see countdownToOpen) */}
+        <StatusBadge>Roll call opens in {countdown}</StatusBadge>
       </div>
 
       {/* Asterisk divider */}

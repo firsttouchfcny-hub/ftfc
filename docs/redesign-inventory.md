@@ -3,13 +3,15 @@
 A working checklist of every screen × every state for the redesign, so we can
 see at a glance what's designed and what still needs a mockup before we build.
 
-**Status legend:** ✅ Designed (mockup exists) · 🟡 Partial (some states drawn) · ⬜ Missing
+**Status legend:** ✅ Designed (mockup exists) · 🟡 Partial (some states drawn) · ⬜ Missing · **🔨 Built** (coded on the redesign branch, viewable at `/r`)
 
 **Logic anchors** (from the current app, all times US Eastern):
-- Windows: **10 AM** list resets → admins can sign up · **11 AM** gear opens (everyone) · **3 PM** roll call opens (everyone) · **6 PM** (eve) taking-home alert · **9 PM** Match 2 decision
+- Windows: **10 AM** list resets → admins can sign up **+ gear opens** *(redesign decision; the current app opens gear at 11 AM)* · **3 PM** roll call opens (everyone) · **6 PM** (eve) taking-home alert · **9 PM** Match 2 decision
 - Roster caps: **Match 1 = 18** · **Match 2 confirms at 30**, cap **36** · **37+ = bench**
 - Gear need per game: **2 Goals · 1 Balls · 1 Bibs** (4 slots) · balls-gate: Balls locked until Goals & Bibs are exhausted
 - Games run **Mon–Fri**; weekends show Monday's game (already open since Fri 3 PM)
+
+**🔨 Built so far** (redesign branch, at `/r`): design tokens (color + type) · routing shell + 6 screens · the **frosted sticky top nav** (progressive blur + olive scrim) · the **home roll-call screen — all 4 variants** (waiting w/ live countdown, open, admin, suspended) wired to the real Eastern-time logic. Reusable components: `GameHeader`, `GearTile`, `Fab`, `StatusBadge`, `ProgressiveBlur`, `Avatar`, plus the mock-identity seam.
 
 ---
 
@@ -20,7 +22,7 @@ see at a glance what's designed and what still needs a mockup before we build.
 | Loading (session / gear ledger) | ⬜ | Skeleton vs spinner; avoid the false "gear at risk" flash |
 | Empty roster (0 signed up) | ⬜ | First person to sign up sees an empty list |
 | Offline / error | ⬜ | Firestore unreachable; read-only fallback |
-| Suspended user | ⬜ | Can't sign in or take gear; suspension banner + appeal path |
+| Suspended user | 🟡 🔨 | Home suspended screen built; appeal path + other screens' suspended states TBD |
 | Admin vs non-admin | 🟡 | Admin sees early sign-up + admin panel entry; toggled everywhere |
 | Weekend (Mon's game shown) | ⬜ | Sat/Sun display Monday, already open |
 
@@ -51,12 +53,11 @@ see at a glance what's designed and what still needs a mockup before we build.
 | Variant | Status | Notes |
 |---|---|---|
 | Before 10 AM — closed | ⬜ | Nothing to join yet; countdown to 10 AM reset? |
-| 10–11 AM, non-admin | ⬜ | **Gap:** roll call closed *and* gear not open — countdown, no gear tiles |
-| 11 AM–2:55 PM, non-admin — countdown + gear | ✅ | "Or take gear and skip the wait" |
-| 3 PM–8:59 PM, everyone — I'm in / +1 | ✅ | |
-| 10 AM–8:59 PM, admin — I'm in / +1 | ✅ | Admin signs up early |
+| 10 AM–2:55 PM, non-admin — countdown + gear | ✅ 🔨 | Built · live countdown to 3 PM ET; gear available from 10 AM |
+| 3 PM–8:59 PM, everyone — I'm in / +1 | ✅ 🔨 | Built |
+| 10 AM–8:59 PM, admin — I'm in / +1 | ✅ 🔨 | Built · same screen as "open", shown early to admins |
 | After 9 PM / overnight | ⬜ | Post-Match-2-decision; does sign-up stay open until the game? |
-| Suspended user variant | ⬜ | Buttons disabled + banner |
+| Suspended user variant | ✅ 🔨 | Built · strike message, no actions (frame 2934:3005) |
 
 **Gear tile sub-states** (4 tiles: Goals, Goals, Balls, Bibs)
 
@@ -114,9 +115,9 @@ see at a glance what's designed and what still needs a mockup before we build.
 
 | Element | Status | Notes |
 |---|---|---|
-| Rules button (top-left) | ⬜ | Per decision |
-| Gear detail icon(s) (top-left) | 🟡 | Icons shown; destinations below |
-| Profile avatar (top-right) | ✅ | Opens profile + admin panel |
+| Rules button (top-left) | ✅ 🔨 | Built · exact icon; frosted sticky nav |
+| Gear detail icon(s) (top-left) | ✅ 🔨 | Built |
+| Profile avatar (top-right) | ✅ 🔨 | Built · photo / initials fallback; opens profile + admin |
 | Admin-only affordances | ⬜ | Admin panel entry lives in profile |
 | Alert/unread indicators | ⬜ | Optional — surface gear-at-risk in nav? |
 
@@ -174,4 +175,4 @@ see at a glance what's designed and what still needs a mockup before we build.
 - **Biggest missing clusters:** Match 2 / Bench outcome variants · gear tile sub-states · roster row variants · the three detail surfaces (Rules, Gear, Profile) · the entire Admin panel
 - **Design-the-data-model-first item:** identity moving from device → phone account, first/last name split, and profile-photo storage — settle this before screens, since roster + gear + identity all depend on it.
 
-**Suggested build order:** (1) design tokens → (2) identity/data model + account flow → (3) routing skeleton + top nav → (4) home roll-call screen (all window variants) → (5) game + roster (all outcome variants) → (6) gear tile states → (7) detail surfaces → (8) admin panel.
+**Suggested build order:** (1) ✅ design tokens → (2) 🟡 identity/data model *(proposal open — awaiting team; screens built on a mock seam)* → (3) ✅ routing skeleton + top nav → (4) ✅ home roll-call screen (all variants) → (5) **← next: game + roster** (all outcome variants) → (6) gear tile states → (7) detail surfaces (Rules / Gear / Profile) → (8) admin panel.
