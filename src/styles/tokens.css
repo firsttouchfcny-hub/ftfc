@@ -19,12 +19,24 @@
   /* ---- Color · Neutrals --------------------------------------------------- */
   --color-white:          #FFFFFF;
   --color-cream:          #FBF9F0;
-  --color-light-olive:    #E6E4D7;
+  /* Light Olive is defined via RGB channels so opacity variants + gradients can
+     derive from the single base value (keeps them in sync if the color changes). */
+  --color-light-olive-rgb: 230 228 215;
+  --color-light-olive:     rgb(var(--color-light-olive-rgb));
   --color-tan:            #D2CFBD;
   --color-tan-20:         rgba(210, 207, 189, 0.20);
 
   /* ---- Color · Accent ----------------------------------------------------- */
   --color-red:            #D80505;
+
+  /* ---- Gradients / effects ------------------------------------------------ */
+  /* Nav scrim (from Figma 2708:8602): Light Olive fading 40% (top) → 0% (bottom),
+     so content softly fades under the sticky top nav. */
+  --gradient-nav-scrim: linear-gradient(
+    to top,
+    rgb(var(--color-light-olive-rgb) / 0),
+    rgb(var(--color-light-olive-rgb) / 0.4)
+  );
 
   /* ---- Typography · primitives ------------------------------------------- */
   --font-family-base: 'Plus Jakarta Sans Variable', 'Plus Jakarta Sans',

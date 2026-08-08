@@ -7,6 +7,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useCurrentUser } from '../identity/useCurrentUser';
 import Avatar from './Avatar';
+import ProgressiveBlur from './ProgressiveBlur';
 import rulesIcon from '../assets/icons/rules.svg';
 import gearIcon from '../assets/icons/gear.svg';
 
@@ -43,19 +44,31 @@ export default function TopNav() {
   const user = useCurrentUser();
 
   return (
-    <header
-      style={{
-        position: 'sticky', top: 0, zIndex: 20,          // stays visible on scroll
-        background: 'var(--color-light-olive)',           // content scrolls under it
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '16px', width: '100%',
-      }}
-    >
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        <NavIconButton icon="rules" label="Rules" onClick={() => navigate('/rules')} />
-        <NavIconButton icon="gear" label="Gear" onClick={() => navigate('/gear')} />
+    <header style={{ position: 'sticky', top: 0, zIndex: 20 }}>
+      {/* Frosted backdrop (color-agnostic) — blurs content scrolling under the nav */}
+      <ProgressiveBlur height={112} maxBlur={8} />
+      {/* Olive scrim tint, over the frost (extends slightly below for a soft tail) */}
+      <div
+        aria-hidden
+        style={{
+          position: 'absolute', top: 0, left: 0, right: 0, height: 112,
+          background: 'var(--gradient-nav-scrim)', pointerEvents: 'none', zIndex: 0,
+        }}
+      />
+      {/* Nav content, above the frost + tint */}
+      <div
+        style={{
+          position: 'relative', zIndex: 1,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '24px 16px', width: '100%',
+        }}
+      >
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <NavIconButton icon="rules" label="Rules" onClick={() => navigate('/rules')} />
+          <NavIconButton icon="gear" label="Gear" onClick={() => navigate('/gear')} />
+        </div>
+        <Avatar user={user} size={44} title="Profile" onClick={() => navigate('/profile')} />
       </div>
-      <Avatar user={user} size={44} title="Profile" onClick={() => navigate('/profile')} />
     </header>
   );
 }
