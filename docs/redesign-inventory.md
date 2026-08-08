@@ -81,7 +81,7 @@ see at a glance what's designed and what still needs a mockup before we build.
 | You're in — Match 2 confirmed (30+) | ✅ 🔨 | Built (default game screen) |
 | Match 2 ON HOLD (<30, pre-9pm) | ✅ 🔨 | Built · top "In match 2 waitlist" + orange pill; section "Match 2 on hold" + count · dimmed (`?match2=onhold`) |
 | Match 2 cancelled (past 9 PM, <30) | ✅ 🔨 | Built · top "No game — match 2 cancelled"; section "Match 2 — NO GAME" · dimmed (`?match2=cancelled`) |
-| Bench (#N in line) — my standing | 🟡 🔨 | Bench *section* built; the "you're on the bench" standing message TBD |
+| Bench (#N in line) — my standing | ✅ 🔨 | Built · "You are Nth in bench" (dynamic ordinal); `?standing=bench` |
 
 **Roster list**
 

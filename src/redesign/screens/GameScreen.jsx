@@ -12,6 +12,13 @@ import { mockRoster } from '../state/mockRoster';
 import alertIcon from '../assets/icons/alert.svg';
 import noGameIcon from '../assets/icons/no-game.svg';
 
+// "1st", "2nd", "3rd", "4th"… for the bench standing headline.
+const ordinal = (n) => {
+  const s = ['th', 'st', 'nd', 'rd'];
+  const v = n % 100;
+  return `${n}${s[(v - 20) % 10] || s[v] || s[0]}`;
+};
+
 export default function GameScreen() {
   const [params] = useSearchParams();
   const preview = params.get('match2'); // 'onhold' | 'cancelled' | null
@@ -36,16 +43,23 @@ export default function GameScreen() {
   // while Match 2 is on hold or cancelled.
   const bench = match2State === 'confirmed' ? mockRoster.bench : [];
 
+  // Current user's standing headline. `?standing=bench` previews the bench spot;
+  // the position is dynamic — it comes from the user's real place in the line.
+  const benchPosition = 2; // mock — real value comes from the user's spot in line
+  let headline = 'You’re in';
+  let badge;
+  if (params.get('standing') === 'bench') {
+    headline = `You are ${ordinal(benchPosition)} in bench`;
+  } else if (cancelled) {
+    headline = 'No game — match 2 cancelled';
+  } else if (onHold) {
+    headline = 'In match 2 waitlist';
+    badge = `${needed} more players needed for 2nd match`;
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 32, alignItems: 'center', padding: '8px 16px 32px' }}>
-      <Confirmation
-        headline={
-          cancelled ? 'No game — match 2 cancelled'
-          : onHold ? 'In match 2 waitlist'
-          : 'You’re in'
-        }
-        badge={onHold ? `${needed} more players needed for 2nd match` : undefined}
-      />
+      <Confirmation headline={headline} badge={badge} />
       <GearTakers headline="Tomorrow’s gear takers" />
 
       {/* Roster: the two matches share one card; the bench is its own card. */}
