@@ -95,7 +95,7 @@ see at a glance what's designed and what still needs a mockup before we build.
 | Row — gear taker | ⬜ | Tier below bringer, above admin — not distinctly styled yet |
 | Row — admin (crown), no gear | ✅ 🔨 | Built · crown badge on avatar |
 | Row — Friday gear-priority | ⬜ | Bumped up on Fridays |
-| Row — you (highlight) | ⬜ | Self-locator in a long list |
+| Row — you (highlight) | ✅ 🔨 | Built · Light Olive inset pill (`you` prop, matched via `useCurrentUser`); rows padded 8px so the highlight insets from the card edge |
 | Row — +1 guest | ⬜ | Sub-row under the host |
 | Row — long name / initials fallback | ✅ 🔨 | Both handled (`PlayerAvatar` photo/initials, name truncates) |
 

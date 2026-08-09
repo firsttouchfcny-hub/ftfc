@@ -9,6 +9,7 @@ import RosterSection from '../components/RosterSection';
 import TableCard from '../components/TableCard';
 import { MATCH2_MIN_CONFIRM, getMatch2State } from '../../utils/helpers';
 import { mockRoster } from '../state/mockRoster';
+import { useCurrentUser } from '../identity/useCurrentUser';
 import alertIcon from '../assets/icons/alert.svg';
 import noGameIcon from '../assets/icons/no-game.svg';
 
@@ -21,6 +22,8 @@ const ordinal = (n) => {
 
 export default function GameScreen() {
   const [params] = useSearchParams();
+  const user = useCurrentUser();
+  const youName = user.displayName; // highlights the current user's row in the roster
   const preview = params.get('match2'); // 'onhold' | 'cancelled' | null
 
   // A short Match 2 for the on-hold / cancelled previews.
@@ -65,8 +68,8 @@ export default function GameScreen() {
       {/* Roster: the two matches share one card; the bench is its own card. */}
       <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 16 }}>
         <TableCard>
-          <RosterSection label="Match 1" players={mockRoster.match1} />
-          <div style={{ height: 1, background: 'var(--color-light-olive)', width: '100%' }} />
+          <RosterSection label="Match 1" players={mockRoster.match1} youName={youName} />
+          <div style={{ height: 1, background: 'var(--color-light-olive)', margin: '0 9px' }} />
           <RosterSection
             label={cancelled ? 'Match 2 — NO GAME' : onHold ? 'Match 2 on hold' : 'Match 2'}
             subtitle={
@@ -77,12 +80,13 @@ export default function GameScreen() {
             icon={cancelled ? noGameIcon : onHold ? alertIcon : undefined}
             dimmed={onHold || cancelled}
             players={match2}
+            youName={youName}
           />
         </TableCard>
 
         {bench.length > 0 && (
           <TableCard>
-            <RosterSection label="Bench" players={bench} />
+            <RosterSection label="Bench" players={bench} youName={youName} />
           </TableCard>
         )}
       </div>

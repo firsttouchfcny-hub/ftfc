@@ -6,12 +6,12 @@
 
 import PlayerRow from './PlayerRow';
 
-export default function RosterSection({ label, subtitle, icon, dimmed, players }) {
+export default function RosterSection({ label, subtitle, icon, dimmed, players, youName }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
-      {/* Header */}
+      {/* Header — 8px left inset aligns the label with the padded rows */}
       {subtitle ? (
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', width: '100%', marginBottom: 20 }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', width: '100%', marginBottom: 12, paddingLeft: 8 }}>
           {icon && <img src={icon} alt="" style={{ width: 24, height: 24, flexShrink: 0 }} />}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2, color: 'var(--color-dark-gray)' }}>
             <span className="type-caption-semibold">{label}</span>
@@ -19,15 +19,15 @@ export default function RosterSection({ label, subtitle, icon, dimmed, players }
           </div>
         </div>
       ) : (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, paddingLeft: 8 }}>
           <span className="type-caption-semibold" style={{ color: 'rgba(31, 31, 31, 0.6)' }}>{label}</span>
         </div>
       )}
 
       {/* Rows (dimmed when the match isn't confirmed yet) */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16, opacity: dimmed ? 0.5 : 1 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, opacity: dimmed ? 0.5 : 1 }}>
         {players.map((p) => (
-          <PlayerRow key={p.id} {...p} />
+          <PlayerRow key={p.id} {...p} you={!!youName && p.name === youName} />
         ))}
       </div>
     </div>
