@@ -13,13 +13,15 @@ export default function PlayerRow({ position, name, photoURL, admin, bringing, y
       }}
     >
       <div style={{ display: 'flex', gap: 8, height: 32, alignItems: 'center', minWidth: 0 }}>
-        {/* Position */}
-        <span
-          className="type-caption-bold"
-          style={{ color: 'var(--color-dark-gray)', width: 18, textAlign: 'center', flexShrink: 0 }}
-        >
-          {position}
-        </span>
+        {/* Position (omitted in listings without ranks, e.g. emergency contacts) */}
+        {position != null && (
+          <span
+            className="type-caption-bold"
+            style={{ color: 'var(--color-dark-gray)', width: 18, textAlign: 'center', flexShrink: 0 }}
+          >
+            {position}
+          </span>
+        )}
 
         {/* Avatar + name + badge */}
         <div style={{ display: 'flex', flex: '1 0 0', gap: 12, alignItems: 'center', minWidth: 0 }}>
