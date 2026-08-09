@@ -21,6 +21,8 @@ const COLOR_GROUPS = [
       { name: 'Cream',       token: '--color-cream',       note: '#FBF9F0' },
       { name: 'Light Olive', token: '--color-light-olive', note: '#E6E4D7' },
       { name: 'Tan',         token: '--color-tan',         note: '#D2CFBD' },
+      { name: 'Tan/40%',     token: '--color-tan-40',      note: '#D2CFBD @ 40%' },
+      { name: 'Tan/60%',     token: '--color-tan-60',      note: '#D2CFBD @ 60%' },
     ],
   },
   {

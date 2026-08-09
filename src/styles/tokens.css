@@ -25,6 +25,8 @@
   --color-light-olive:     rgb(var(--color-light-olive-rgb));
   --color-tan:            #D2CFBD;
   --color-tan-20:         rgba(210, 207, 189, 0.20);
+  --color-tan-40:         rgba(210, 207, 189, 0.40);
+  --color-tan-60:         rgba(210, 207, 189, 0.60);
 
   /* ---- Color · Accent ----------------------------------------------------- */
   --color-red:            #D80505;
