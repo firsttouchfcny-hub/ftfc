@@ -13,12 +13,13 @@ import { useEffect, useRef, useState } from 'react';
 const REVEAL_ABOVE = 80;
 const JITTER = 6;
 
-function ActionButton({ label, variant = 'secondary', onClick, disabled }) {
+function ActionButton({ label, variant = 'secondary', onClick, disabled, title }) {
   const primary = variant === 'primary';
   return (
     <button
       onClick={onClick}
       disabled={disabled}
+      title={title}
       style={{
         // border-box so the secondary button's 1px border doesn't make it wider
         // than the primary — the design has both exactly equal.
@@ -39,7 +40,9 @@ function ActionButton({ label, variant = 'secondary', onClick, disabled }) {
   );
 }
 
-export default function BottomActions({ onAddPlusOne, onOut, addDisabled }) {
+export default function BottomActions({
+  onAddPlusOne, onOut, addDisabled, outDisabled, outDisabledReason,
+}) {
   const [hidden, setHidden] = useState(false);
   const lastY = useRef(0);
 
@@ -78,7 +81,16 @@ export default function BottomActions({ onAddPlusOne, onOut, addDisabled }) {
         }}
       >
         <ActionButton label="Add a +1" onClick={onAddPlusOne} disabled={addDisabled} />
-        <ActionButton label="Out" variant="primary" onClick={onOut} />
+        {/* INTERIM: while you're holding gear the drop is blocked, so the button
+            is disabled and carries the reason as a tooltip. Production explains
+            it in a dialog — that designed message is the next piece of work. */}
+        <ActionButton
+          label="Out"
+          variant="primary"
+          onClick={onOut}
+          disabled={outDisabled}
+          title={outDisabledReason}
+        />
       </div>
     </div>
   );

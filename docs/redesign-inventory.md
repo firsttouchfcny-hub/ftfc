@@ -5,11 +5,14 @@ see at a glance what's designed and what still needs a mockup before we build.
 
 **Status legend:** ✅ Designed (mockup exists) · 🟡 Partial (some states drawn) · ⬜ Missing · ➖ Dropped (intentionally not building) · **🔨 Built** (coded on the redesign branch, viewable at `/r`)
 
-**Logic anchors** (from the current app, all times US Eastern):
-- Windows: **10 AM** list resets → admins can sign up **+ gear opens** *(redesign decision; the current app opens gear at 11 AM)* · **3 PM** roll call opens (everyone) · **6 PM** (eve) taking-home alert · **9 PM** Match 2 decision
+**Logic anchors** (from the current app, all times US Eastern) — *refreshed after merging main 2026-08-10*:
+- Windows: roll call opens **the day before the game** — **10 AM** list resets → admins sign up **+ gear opens** *(redesign decision; production opens gear at 11 AM)* · **3 PM** roll call opens (everyone), staying open through the game morning until the 10 AM reset · **6 PM** (eve) taking-home alert · **9 PM** Match 2 decision
 - Roster caps: **Match 1 = 18** · **Match 2 confirms at 30**, cap **36** · **37+ = bench**
-- Gear need per game: **2 Goals · 1 Balls · 1 Bibs** (4 slots) · balls-gate: Balls locked until Goals & Bibs are exhausted
-- Games run **Mon–Fri**; weekends show Monday's game (already open since Fri 3 PM)
+- Gear need per game: **2 Goals · 1 Balls · 1 Bibs** (4 slots) · balls-gate: Balls locked until Goals & Bibs are actually taken
+- Games run **Mon–Fri**. **Changed on main:** a game 2+ days out is now `closed` — Monday's roll call opens **Sunday** 3 PM, no longer Friday. So Fri evening/Sat are genuinely closed.
+- **You can't drop or cancel while holding gear** (it would strand the set)
+- A **+1 added after signup takes a back-of-line spot**, not the host's (`plusOnesAt`); a +1 taken *at* signup still sits with its host
+- Identity is **uid-keyed / phone-first** (`newUid`, `isSamePerson`, `rosterDocId`, one phone = one account)
 
 **🔨 Built so far** (redesign branch, at `/r`): design tokens — color (incl. the new **Expressive** set) + type · routing shell + 6 screens · the **frosted sticky top nav** (progressive blur + olive scrim) · the **home roll-call screen — all 4 variants** (waiting w/ live countdown, open, admin, suspended) · the **"You're in" game screen** — confirmation header, gear-takers, and the full **Match 1 / Match 2 / Bench roster table** with all three **Match 2 states** (confirmed · on-hold · cancelled — top message *and* section header, driven by `getMatch2State`). Reusable components: `GameHeader`, `Confirmation`, `GearTile`, `GearTakers`, `Fab`, `StatusBadge`, `ProgressiveBlur`, `Avatar`, `PlayerAvatar`, `PlayerRow`, `RosterSection`, `TableCard`, plus the mock-identity seam. Also built: the **Rules & code of conduct** content screen + the top-nav **back** variant it uses.
 
@@ -52,7 +55,7 @@ see at a glance what's designed and what still needs a mockup before we build.
 
 | Variant | Status | Notes |
 |---|---|---|
-| Before 10 AM — closed | ⬜ | Nothing to join yet; countdown to 10 AM reset? |
+| Closed — before 10 AM, **or 2+ days out** | ⬜ | **Grew after the main merge.** Roll call now opens the day before the game, so Fri evening/Sat are genuinely closed for Monday's game. Today `useRollCallWindow` folds `closed` into `waiting`, which shows a multi-hour countdown — needs its own designed state |
 | 10 AM–2:55 PM, non-admin — countdown + gear | ✅ 🔨 | Built · live countdown to 3 PM ET; gear available from 10 AM |
 | 3 PM–8:59 PM, everyone — I'm in / +1 | ✅ 🔨 | Built |
 | 10 AM–8:59 PM, admin — I'm in / +1 | ✅ 🔨 | Built · same screen as "open", shown early to admins |
@@ -105,9 +108,10 @@ see at a glance what's designed and what still needs a mockup before we build.
 |---|---|---|
 | Gear takers strip ("Tomorrow's gear takers") | ✅ 🔨 | Built · shared `GearTakers` component |
 | **Floating action bar** (Add a +1 · Out) | ✅ 🔨 | Built · `BottomActions`, 32px above the viewport bottom; slides down on scroll-down and back up on scroll-up (frame 3024:5347) |
-| ↳ "Add a +1" action | ✅ 🔨 | Built · wired to state; inserts the guest right after the host and re-sorts. **New in redesign** — production only sets `plusOnes` at sign-up |
-| ↳ "Add a +1" — already have one | 🟡 | Capped at 1 guest (the row badge reads a literal "+1"); button is disabled/dimmed as an interim. **Needs a designed state** — disabled? "Remove +1"? hidden? |
+| ↳ "Add a +1" action | ✅ 🔨 | Built · wired to state; sets `plusOnesAt` so a late guest takes a **back-of-line** spot (matches main `3db7b27`). Production has this too (`21b59ae`) — it is *not* redesign-only |
+| ↳ "Add a +1" — already have one | 🟡 | Capped at 1; button disabled as an interim. **Needs a designed state** — production supports **remove** as well (`21b59ae` "add/remove a +1 … no drop, keeps your spot"), so this most likely wants to become a "Remove +1" affordance |
 | Out / leave — action | ✅ 🔨 | Built · removes you from the list and returns to roll call |
+| ↳ Out — blocked while holding gear | 🟡 🔨 | Logic built (guard mirrors production `f5c9b09`); button disabled with the reason as a tooltip **as interim scaffolding**. Needs the designed message. Production copy: *"You're holding {gear} — you can't drop while you have gear. / Bring it back on game day, or ask an admin to reassign it to whoever takes it."* |
 | ↳ Out — confirm step | ⬜ | Production uses a native `window.confirm`; needs a designed sheet/modal |
 | ↳ **Out after the 9 PM deadline — strike warning** | ⬜ | **Needs design.** The Rules screen states that dropping after 9 PM (or the morning of) earns a strike, but production's `handleSignOut` has no time check and issues no strike — strikes are added by hand in the Admin panel. This screen should warn you of the consequence before you drop late |
 | Drops log (game drops vs bench drops) | ⬜ | Kept · `session.drops[]`, split game ("opened a spot") vs bench ("no game impact"), newest first, clears at the 10 AM rollover. **Open question:** stay on this screen, or move to Profile/Gear? |
@@ -179,7 +183,7 @@ see at a glance what's designed and what still needs a mockup before we build.
 
 - **🔨 Built:** the home roll-call screen (4 variants) and the "You're in" game screen (roster table + all Match 2 states) are done on the mock seam; tokens + frosted nav in place.
 - **Biggest missing clusters:** gear tile sub-states (taken → avatar, locked) · the account-creation flow · two detail surfaces (Gear, Profile) · the entire Admin panel — the roster rows are now all built
-- **Design-the-data-model-first item:** identity moving from device → phone account, first/last name split, and profile-photo storage — settle this before wiring real data, since roster + gear + identity all depend on it. *(Note: roster **ordering** is already on the real `buildFlatList` and is independent of this — the identity decision changes the matching key, not the algorithm.)*
+- **~~Design-the-data-model-first item~~ → RESOLVED on main (merged 2026-08-10).** Identity is now **uid-keyed and phone-first**: `newUid()` mints a stable per-person id, `isSamePerson()` is the single matcher (uid → deviceId → name), `rosterDocId()` makes "one person = one row" true by construction, `toE164US()` canonicalizes numbers, and one phone = one account. The redesign's mock identity seam (`useCurrentUser`) should now be pointed at this real model — the proposal in `docs/data-model-proposal.md` is effectively answered. Still open for the redesign: the **first/last name split** and **profile-photo storage**, which main did not add.
 - **Logic parity ledger** — what's real vs. still mocked:
   - ✅ Real: roster tiering + slicing + `+1` expansion (`buildFlatList`), Match 2 state (`getMatch2State`), roll-call windows/countdown/suspension, Friday-priority badge suppression.
   - ✅ Real: roster **mutations** too — "Out" and "Add a +1" write to local state and the list re-sorts through `buildFlatList` live.

@@ -13,8 +13,10 @@ import {
   MATCH1_MAX, MATCH2_MAX, MATCH2_MIN_CONFIRM,
   buildFlatList, getMatch2State,
 } from '../../utils/helpers';
-import { gearIcon } from '../../utils/gear';
-import { mockPlayers, mockGearRoles, mockGearPriorityNames } from '../state/mockRoster';
+import { gearIcon, gearLabel, myCommitments } from '../../utils/gear';
+import {
+  mockPlayers, mockGearRoles, mockGearPriorityNames, mockCommitments, mockGameDate,
+} from '../state/mockRoster';
 import { useCurrentUser } from '../identity/useCurrentUser';
 import alertIcon from '../assets/icons/alert.svg';
 import noGameIcon from '../assets/icons/no-game.svg';
@@ -93,14 +95,32 @@ export default function GameScreen() {
   const me = players.find((p) => p.name === youName);
   const hasPlusOne = (me?.plusOnes ?? 0) > 0;
 
+  // `plusOnesAt` records WHEN the guest was added. buildFlatList reads it: a +1
+  // taken at signup renders right after its host, but one added later (like this)
+  // falls into line by add-time in the rest tier — a late +1 takes a back-of-line
+  // spot rather than jumping to the host's position.
   const handleAddPlusOne = () => {
-    setPlayers((ps) => ps.map((p) => (p.name === youName ? { ...p, plusOnes: 1 } : p)));
+    const at = Date.now();
+    setPlayers((ps) => ps.map((p) => (
+      p.name === youName ? { ...p, plusOnes: 1, plusOnesAt: [at] } : p
+    )));
   };
 
+  // You can't drop while holding gear — dropping would strand the set. Same rule
+  // as production (App.jsx): bring it back on game day, or an admin reassigns it.
+  //
+  // deviceId is passed as null on purpose: this identity seam is uid/name-based,
+  // and myCommitments matches `c.takerDeviceId === deviceId` — so passing
+  // undefined would match every commitment that also lacks one.
+  const myGear = myCommitments(mockCommitments, null, youName, user.uid, mockGameDate);
+  const holdingGear = myGear.length > 0;
+  const holdingLabel = myGear.map((g) => gearLabel(g.type)).join(' & ');
+
   // Leaving drops you from the list, so the "You're in" screen no longer applies
-  // — back to roll call. The designed confirm step (and the past-9 PM strike
-  // warning) are still pending frames.
+  // — back to roll call. The designed confirm step, the past-9 PM strike warning,
+  // and the "you're holding gear" blocker are all still pending frames.
   const handleOut = () => {
+    if (holdingGear) return; // guarded; the explanatory dialog is next up
     setPlayers((ps) => ps.filter((p) => p.name !== youName));
     navigate('/');
   };
@@ -165,6 +185,10 @@ export default function GameScreen() {
         onAddPlusOne={handleAddPlusOne}
         onOut={handleOut}
         addDisabled={hasPlusOne}
+        outDisabled={holdingGear}
+        outDisabledReason={holdingGear
+          ? `You're holding ${holdingLabel} — you can't drop while you have gear. Bring it back on game day, or ask an admin to reassign it.`
+          : undefined}
       />
     </div>
   );
