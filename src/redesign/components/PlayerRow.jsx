@@ -4,7 +4,12 @@
 
 import PlayerAvatar from './PlayerAvatar';
 
-export default function PlayerRow({ position, name, photoURL, admin, bringing, you }) {
+export default function PlayerRow({ position, name, photoURL, admin, bringing, plusOne, priority, you }) {
+  // Friday gear-priority badge — mirrors production (PlayerList.jsx): only shown
+  // when the player isn't already distinguished as a bringer or an admin. Real
+  // eligibility (took a set home Mon–Thu; Fridays only) comes from the gear ledger
+  // via fridayGearPriorityNames when data is wired.
+  const showPriority = priority && !bringing && !admin;
   return (
     <div
       style={{
@@ -28,12 +33,26 @@ export default function PlayerRow({ position, name, photoURL, admin, bringing, y
           <PlayerAvatar name={name} photoURL={photoURL} admin={admin} />
 
           <div style={{ display: 'flex', flex: '1 0 0', gap: 10, alignItems: 'center', minWidth: 0 }}>
-            <span
-              className="type-small-regular"
-              style={{ color: 'var(--color-dark-gray)', flex: '1 0 0', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-            >
-              {name}
-            </span>
+            {/* Name + optional "+1" guest badge (hugs the name; name truncates first) */}
+            <div style={{ display: 'flex', flex: '1 0 0', gap: 4, alignItems: 'center', minWidth: 0 }}>
+              <span
+                className="type-small-regular"
+                style={{ color: 'var(--color-dark-gray)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+              >
+                {name}
+              </span>
+
+              {plusOne && (
+                <div
+                  style={{
+                    background: 'var(--color-tan-60)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    padding: '4px 6px', borderRadius: 6, flexShrink: 0,
+                  }}
+                >
+                  <span className="type-caption-bold" style={{ color: 'var(--color-dark-gray)', whiteSpace: 'nowrap' }}>+1</span>
+                </div>
+              )}
+            </div>
 
             {bringing && (
               <div
@@ -44,6 +63,19 @@ export default function PlayerRow({ position, name, photoURL, admin, bringing, y
               >
                 <span className="type-caption-semibold" style={{ color: 'var(--color-dark-gray)', whiteSpace: 'nowrap' }}>
                   Bringing {bringing}
+                </span>
+              </div>
+            )}
+
+            {showPriority && (
+              <div
+                style={{
+                  background: 'var(--color-tan-20)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  padding: '4px 6px', borderRadius: 4, flexShrink: 0,
+                }}
+              >
+                <span className="type-caption-bold" style={{ color: 'var(--color-dark-gray)', whiteSpace: 'nowrap' }}>
+                  Priority
                 </span>
               </div>
             )}

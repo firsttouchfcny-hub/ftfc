@@ -14,6 +14,8 @@ const P = (name, opts = {}) => {
     photoURL: opts.photo ? sampleAvatar : null,
     admin: !!opts.admin,
     bringing: opts.bringing || null,
+    plusOne: !!opts.plusOne, // a guest row: repeats the host's avatar + name
+    priority: !!opts.priority, // Friday gear-priority (took a set home Mon–Thu)
   };
 };
 
@@ -25,8 +27,9 @@ const match1 = [
   P('Marco Silva', { photo: true, bringing: '🧺' }),
   P('Jordan Chen', {}),
   P('Luis Gómez', { photo: true }),
-  P('Theo Walsh', {}),
+  P('Theo Walsh', { priority: true }), // Friday gear-priority demo (took gear home this week)
   P('Sam Okafor', { photo: true }),
+  P('Sam Okafor', { photo: true, plusOne: true }), // Sam's +1 guest (repeats the host row)
   P('Nico Bruno', {}),
   P('Andre Costa', { photo: true }),
   P('Kofi Mensah', {}),
@@ -36,7 +39,6 @@ const match1 = [
   P('Gabe Ellison', {}),
   P('Hugo Park', { photo: true }),
   P('Iker Ruiz', {}),
-  P('Max Fischer', { photo: true }),
 ];
 
 // Match 2 (positions 19–36; full at 18).

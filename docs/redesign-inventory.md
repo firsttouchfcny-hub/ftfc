@@ -3,7 +3,7 @@
 A working checklist of every screen × every state for the redesign, so we can
 see at a glance what's designed and what still needs a mockup before we build.
 
-**Status legend:** ✅ Designed (mockup exists) · 🟡 Partial (some states drawn) · ⬜ Missing · **🔨 Built** (coded on the redesign branch, viewable at `/r`)
+**Status legend:** ✅ Designed (mockup exists) · 🟡 Partial (some states drawn) · ⬜ Missing · ➖ Dropped (intentionally not building) · **🔨 Built** (coded on the redesign branch, viewable at `/r`)
 
 **Logic anchors** (from the current app, all times US Eastern):
 - Windows: **10 AM** list resets → admins can sign up **+ gear opens** *(redesign decision; the current app opens gear at 11 AM)* · **3 PM** roll call opens (everyone) · **6 PM** (eve) taking-home alert · **9 PM** Match 2 decision
@@ -92,11 +92,11 @@ see at a glance what's designed and what still needs a mockup before we build.
 | Bench section | ✅ 🔨 | Built · own card; only shows on 37+ overflow |
 | Row — gear bringer badge (🥅 Goals) | ✅ 🔨 | Built |
 | Row — bringer badge ⚽ Balls / 🧺 Bibs variants | ✅ 🔨 | Built · badge takes any gear emoji |
-| Row — gear taker | ⬜ | Tier below bringer, above admin — not distinctly styled yet |
+| Row — gear taker | ➖ | **Dropped** — gear *takers* are shown by their avatar in the "Tomorrow's gear takers" strip, so no roster-row badge (keeps the table uncluttered). Note: gear *bringers* still get the "Bringing 🥅" badge. |
 | Row — admin (crown), no gear | ✅ 🔨 | Built · crown badge on avatar |
-| Row — Friday gear-priority | ⬜ | Bumped up on Fridays |
+| Row — Friday gear-priority | ✅ 🔨 | Built · Tan/20% "Priority" badge (`priority` prop); mirrors prod suppression (hidden for bringers/admins). Real eligibility (took a set home Mon–Thu, Fridays only) + the position bump come from the gear ledger via `fridayGearPriorityNames`/`buildFlatList` when data is wired |
 | Row — you (highlight) | ✅ 🔨 | Built · Tan/40% inset pill, 16px radius (`you` prop, matched via `useCurrentUser`); rows padded 8px so the highlight insets from the card edge |
-| Row — +1 guest | ⬜ | Sub-row under the host |
+| Row — +1 guest | ✅ 🔨 | Built · own roster slot repeating the host's avatar + name with a Tan/60% "+1" badge (`plusOne` prop) |
 | Row — long name / initials fallback | ✅ 🔨 | Both handled (`PlayerAvatar` photo/initials, name truncates) |
 
 **Actions & overlays on this screen**
@@ -173,7 +173,7 @@ see at a glance what's designed and what still needs a mockup before we build.
 ## Gap summary
 
 - **🔨 Built:** the home roll-call screen (4 variants) and the "You're in" game screen (roster table + all Match 2 states) are done on the mock seam; tokens + frosted nav in place.
-- **Biggest missing clusters:** gear tile sub-states (taken → avatar, locked) · a couple of roster row variants (+1 guest, gear-taker, Friday-priority) · the account-creation flow · two detail surfaces (Gear, Profile) · the entire Admin panel
+- **Biggest missing clusters:** gear tile sub-states (taken → avatar, locked) · the account-creation flow · two detail surfaces (Gear, Profile) · the entire Admin panel — the roster rows are now all built
 - **Design-the-data-model-first item:** identity moving from device → phone account, first/last name split, and profile-photo storage — settle this before wiring real data, since roster + gear + identity all depend on it.
 
 **Suggested build order:** (1) ✅ design tokens → (2) 🟡 identity/data model *(proposal open — awaiting team; screens built on a mock seam)* → (3) ✅ routing skeleton + top nav → (4) ✅ home roll-call screen (all variants) → (5) ✅ game + roster (table + Match 2 states) → (6) **← next: gear tile states** → (7) detail surfaces (Rules / Gear / Profile) → (8) admin panel.
