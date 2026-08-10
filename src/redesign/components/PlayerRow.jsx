@@ -4,12 +4,16 @@
 
 import PlayerAvatar from './PlayerAvatar';
 
-export default function PlayerRow({ position, name, photoURL, admin, bringing, plusOne, priority, you }) {
+export default function PlayerRow({ position, name, photoURL, admin, bringing, plusOne, gearPriority, you }) {
   // Friday gear-priority badge — mirrors production (PlayerList.jsx): only shown
   // when the player isn't already distinguished as a bringer or an admin. Real
   // eligibility (took a set home Mon–Thu; Fridays only) comes from the gear ledger
   // via fridayGearPriorityNames when data is wired.
-  const showPriority = priority && !bringing && !admin;
+  //
+  // NOTE: `gearPriority` is the Friday gear reward — deliberately NOT production's
+  // `player.priority`, which is a separate admin-set per-day pin that ranks with
+  // admins and carries no badge of its own.
+  const showPriority = gearPriority && !bringing && !admin;
   return (
     <div
       style={{

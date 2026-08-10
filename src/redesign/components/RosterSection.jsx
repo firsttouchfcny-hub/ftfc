@@ -24,10 +24,12 @@ export default function RosterSection({ label, subtitle, icon, dimmed, players, 
         </div>
       )}
 
-      {/* Rows (dimmed when the match isn't confirmed yet) */}
+      {/* Rows (dimmed when the match isn't confirmed yet). The `!p.plusOne`
+          guard keeps a guest row from also highlighting as "you" — it repeats
+          the host's name by design. */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2, opacity: dimmed ? 0.5 : 1 }}>
         {players.map((p) => (
-          <PlayerRow key={p.id} {...p} you={!!youName && p.name === youName} />
+          <PlayerRow key={p.id} {...p} you={!!youName && !p.plusOne && p.name === youName} />
         ))}
       </div>
     </div>

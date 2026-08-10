@@ -1,48 +1,58 @@
-// Demo roster for the "You're in" screen — exercises every row variant: photo vs
-// initials avatars, admins (crown), and the four gear bringers (badge). Real
-// session data replaces this once the backend is wired.
+// Demo roster data, shaped exactly like production so the redesign can run the
+// REAL roster logic (`buildFlatList`) instead of a hand-sorted list.
+//
+// Three exports mirror what App.jsx passes around today:
+//   · mockPlayers           → session.players (one entry per signup, +1s as a count)
+//   · mockGearRoles         → name → { bring: [], take: [] }, derived from the ledger
+//   · mockGearPriorityNames → Set of names with the Friday gear reward
+//
+// Swapping these for Firestore is the single seam that makes the roster live.
+// `photoURL` is the one redesign-only addition (production has no avatars yet).
 
 import sampleAvatar from '../assets/sample-avatar.png';
 
-let n = 0;
+const nameKey = (n) => (n || '').toLowerCase().trim();
+
+// signedUpAt increments with listing order, so the untiered majority keeps a
+// stable, realistic signup ordering.
+let seq = 0;
 const P = (name, opts = {}) => {
-  n += 1;
+  seq += 1;
   return {
-    id: `p-${n}`,
-    position: String(n).padStart(2, '0'),
+    id: `p-${seq}`,
     name,
     photoURL: opts.photo ? sampleAvatar : null,
-    admin: !!opts.admin,
-    bringing: opts.bringing || null,
-    plusOne: !!opts.plusOne, // a guest row: repeats the host's avatar + name
-    priority: !!opts.priority, // Friday gear-priority (took a set home Mon–Thu)
+    isAdmin: !!opts.admin,
+    // Production's admin-set per-day pin — ranks with admins, carries no badge.
+    // Distinct from the Friday gear reward (mockGearPriorityNames below).
+    priority: !!opts.pin,
+    plusOnes: opts.plusOnes || 0,
+    signedUpAt: seq * 60_000,
+    deviceId: `dev-${seq}`,
   };
 };
 
-// Match 1 (top 18). Gear bringers cap at 2 goals + 1 balls + 1 bibs.
-const match1 = [
-  P('Cristian Lugo', { photo: true, admin: true, bringing: '🥅' }),
-  P('Dave Rappaport', { photo: true, admin: true, bringing: '🥅' }),
-  P('This is a really long name', { admin: true, bringing: '⚽' }),
-  P('Marco Silva', { photo: true, bringing: '🧺' }),
-  P('Jordan Chen', {}),
+// One flat signup list — deliberately NOT pre-sorted. buildFlatList applies the
+// real tiering: gear bringers → gear takers → admins/pinned → Friday gear
+// priority → everyone else (then by signup time).
+export const mockPlayers = [
+  P('Cristian Lugo', { photo: true, admin: true }),   // brings a goal · the "you" row
+  P('Dave Rappaport', { photo: true, admin: true }),  // brings a goal
+  P('This is a really long name', { admin: true }),   // brings balls
+  P('Marco Silva', { photo: true }),                  // brings bibs
+  P('Jordan Chen', { admin: true }),                  // admin, no gear
   P('Luis Gómez', { photo: true }),
-  P('Theo Walsh', { priority: true }), // Friday gear-priority demo (took gear home this week)
-  P('Sam Okafor', { photo: true }),
-  P('Sam Okafor', { photo: true, plusOne: true }), // Sam's +1 guest (repeats the host row)
-  P('Nico Bruno', {}),
+  P('Theo Walsh', {}),                                // Friday gear priority
+  P('Sam Okafor', { photo: true, plusOnes: 1 }),      // brings a +1 guest
+  P('Nico Bruno', {}),                                // takes a goal home
   P('Andre Costa', { photo: true }),
-  P('Kofi Mensah', {}),
+  P('Kofi Mensah', {}),                               // takes bibs home
   P('Omar Haddad', { photo: true }),
-  P('Rafa Núñez', {}),
+  P('Rafa Núñez', { pin: true }),                     // admin-pinned for today
   P('Ben Whitfield', { photo: true }),
   P('Gabe Ellison', {}),
   P('Hugo Park', { photo: true }),
   P('Iker Ruiz', {}),
-];
-
-// Match 2 (positions 19–36; full at 18).
-const match2 = [
   P('Leo Duarte', { photo: true }),
   P('Pablo Vega', {}),
   P('Dario Fuentes', { photo: true }),
@@ -61,14 +71,61 @@ const match2 = [
   P('Aron Beck', {}),
   P('Bo Nakamura', { photo: true }),
   P('Cy Ferreira', {}),
-];
-
-// Bench (positions 37+; only exists once both matches are full).
-const bench = [
   P('Noah Bright', {}),
   P('Otis Grant', { photo: true }),
   P('Pip Hollis', {}),
   P('Quinn Ryder', { photo: true }),
 ];
+// 39 players + Sam's guest = 40 roster entries → Match 1 (18) · Match 2 (18) · Bench (4).
 
-export const mockRoster = { match1, match2, bench };
+// ── Gear ledger ────────────────────────────────────────────────────────────
+// The commitment is the source of truth, exactly as in production: someone takes
+// a set HOME on `takeDate` and brings it back IN on `returnDate`. Everything else
+// (roles, coverage, the alerts) derives from these — so the gear tiles, the gear
+// detail surface and the alerts can all read one shape.
+//
+// Dates are relative to GAME_DATE (tomorrow's game) so the mock stays coherent
+// no matter when it's viewed.
+const GAME_DATE = '2026-10-11';   // the morning this screen is about
+const PREV_GAME = '2026-10-10';
+
+export const mockCommitments = [
+  // Taken home before → coming back IN on game day (these are the "bringers").
+  { id: 'c1', takerName: 'Cristian Lugo', type: 'goal', takeDate: PREV_GAME, returnDate: GAME_DATE, status: 'committed' },
+  { id: 'c2', takerName: 'Dave Rappaport', type: 'goal', takeDate: PREV_GAME, returnDate: GAME_DATE, status: 'committed' },
+  { id: 'c3', takerName: 'This is a really long name', type: 'balls', takeDate: PREV_GAME, returnDate: GAME_DATE, status: 'committed' },
+  { id: 'c4', takerName: 'Marco Silva', type: 'bibs', takeDate: PREV_GAME, returnDate: GAME_DATE, status: 'committed' },
+
+  // Taking a set HOME after game day (these are the "takers"). Deliberately
+  // short of full coverage so the alert states are previewable.
+  { id: 'c5', takerName: 'Nico Bruno', type: 'goal', takeDate: GAME_DATE, returnDate: '2026-10-12', status: 'committed' },
+  { id: 'c6', takerName: 'Kofi Mensah', type: 'bibs', takeDate: GAME_DATE, returnDate: '2026-10-12', status: 'committed' },
+];
+
+// Derive name → { bring: [], take: [] } for the game-day morning, the same way
+// App.jsx builds `gearRoles` before handing it to buildFlatList.
+export const mockGearRoles = (() => {
+  const roles = {};
+  const add = (name, kind, type) => {
+    const k = nameKey(name);
+    if (!roles[k]) roles[k] = { bring: [], take: [] };
+    if (!roles[k][kind].includes(type)) roles[k][kind].push(type);
+  };
+
+  for (const c of mockCommitments) {
+    if (c.status !== 'committed') continue;
+    // Bringing it IN on game day…
+    if (c.returnDate === GAME_DATE) add(c.takerName, 'bring', c.type);
+    // …or taking it HOME after game day. Takers keep their queue privilege but
+    // show no row badge — they're surfaced by their avatar in the gear strip.
+    if (c.takeDate === GAME_DATE) add(c.takerName, 'take', c.type);
+  }
+  return roles;
+})();
+
+export const mockGameDate = GAME_DATE;
+
+// Friday reward: took a set home earlier this week (Mon–Thu). Production derives
+// this from the ledger via fridayGearPriorityNames() and it is empty except on
+// Fridays; here it's fixed so the badge + tier are always previewable.
+export const mockGearPriorityNames = new Set([nameKey('Theo Walsh')]);

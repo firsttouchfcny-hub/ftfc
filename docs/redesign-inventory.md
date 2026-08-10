@@ -83,7 +83,7 @@ see at a glance what's designed and what still needs a mockup before we build.
 | Match 2 cancelled (past 9 PM, <30) | ✅ 🔨 | Built · top "No game — match 2 cancelled"; section "Match 2 — NO GAME" · dimmed (`?match2=cancelled`) |
 | Bench (#N in line) — my standing | ✅ 🔨 | Built · "You are Nth in bench" (dynamic ordinal); `?standing=bench` |
 
-**Roster list**
+**Roster list** — 🔗 *now built by the real production logic:* the screen calls `buildFlatList` from `src/utils/helpers.js` with a production-shaped mock (`mockPlayers` + `mockGearRoles` + `mockGearPriorityNames`), so tiering (bringers → takers → admins/pinned → Friday gear priority → rest, then signup time), the 18/18/overflow slicing, and +1 expansion are all genuine. Only the *data source* is mocked — swapping it for Firestore is the remaining seam.
 
 | Element / state | Status | Notes |
 |---|---|---|
@@ -104,10 +104,15 @@ see at a glance what's designed and what still needs a mockup before we build.
 | Element | Status | Notes |
 |---|---|---|
 | Gear takers strip ("Tomorrow's gear takers") | ✅ 🔨 | Built · shared `GearTakers` component |
-| Out / leave + confirm | ⬜ | Removes you; logs a drop |
-| Drops log (game drops vs bench drops) | ⬜ | Kept |
-| ⚠️ Gear at risk alert | ⬜ | Kept — nobody bringing gear in |
-| ⏳ Nobody taking gear home alert | ⬜ | Kept — from 6 PM |
+| **Floating action bar** (Add a +1 · Out) | ✅ 🔨 | Built · `BottomActions`, 32px above the viewport bottom; slides down on scroll-down and back up on scroll-up (frame 3024:5347) |
+| ↳ "Add a +1" action | ✅ 🔨 | Built · wired to state; inserts the guest right after the host and re-sorts. **New in redesign** — production only sets `plusOnes` at sign-up |
+| ↳ "Add a +1" — already have one | 🟡 | Capped at 1 guest (the row badge reads a literal "+1"); button is disabled/dimmed as an interim. **Needs a designed state** — disabled? "Remove +1"? hidden? |
+| Out / leave — action | ✅ 🔨 | Built · removes you from the list and returns to roll call |
+| ↳ Out — confirm step | ⬜ | Production uses a native `window.confirm`; needs a designed sheet/modal |
+| ↳ **Out after the 9 PM deadline — strike warning** | ⬜ | **Needs design.** The Rules screen states that dropping after 9 PM (or the morning of) earns a strike, but production's `handleSignOut` has no time check and issues no strike — strikes are added by hand in the Admin panel. This screen should warn you of the consequence before you drop late |
+| Drops log (game drops vs bench drops) | ⬜ | Kept · `session.drops[]`, split game ("opened a spot") vs bench ("no game impact"), newest first, clears at the 10 AM rollover. **Open question:** stay on this screen, or move to Profile/Gear? |
+| ⚠️ Gear at risk alert | ⬜ | Kept — nobody bringing gear in · `gearBringingAlert()`, shows from the 10 AM reset until coverage is filled |
+| ⏳ Nobody taking gear home alert | ⬜ | Kept — from 6 PM · `gearTakingAlert()`, gated by `GEAR_ALERT_HOUR_ET` |
 
 ---
 
@@ -174,6 +179,12 @@ see at a glance what's designed and what still needs a mockup before we build.
 
 - **🔨 Built:** the home roll-call screen (4 variants) and the "You're in" game screen (roster table + all Match 2 states) are done on the mock seam; tokens + frosted nav in place.
 - **Biggest missing clusters:** gear tile sub-states (taken → avatar, locked) · the account-creation flow · two detail surfaces (Gear, Profile) · the entire Admin panel — the roster rows are now all built
-- **Design-the-data-model-first item:** identity moving from device → phone account, first/last name split, and profile-photo storage — settle this before wiring real data, since roster + gear + identity all depend on it.
+- **Design-the-data-model-first item:** identity moving from device → phone account, first/last name split, and profile-photo storage — settle this before wiring real data, since roster + gear + identity all depend on it. *(Note: roster **ordering** is already on the real `buildFlatList` and is independent of this — the identity decision changes the matching key, not the algorithm.)*
+- **Logic parity ledger** — what's real vs. still mocked:
+  - ✅ Real: roster tiering + slicing + `+1` expansion (`buildFlatList`), Match 2 state (`getMatch2State`), roll-call windows/countdown/suspension, Friday-priority badge suppression.
+  - ✅ Real: roster **mutations** too — "Out" and "Add a +1" write to local state and the list re-sorts through `buildFlatList` live.
+  - 🟡 Mocked data source: `mockCommitments` (the gear ledger, in production's commitment shape) is now the single source — `mockGearRoles` is **derived** from it exactly as `App.jsx` does, and `mockPlayers` stands in for the Firestore session. `mockGearPriorityNames` is fixed so the badge is always previewable (production computes it only on Fridays). State is per-visit: it resets on reload, since there's no backend behind it yet.
+  - ⬜ Not built: `player.priority` (admin per-day pin) has no UI yet — it ranks correctly but is only settable from the Admin panel.
+  - ⚠️ Intentional rule delta: redesign opens gear at **10 AM**; production opens at **11 AM** (`GEAR_OPEN_HOUR_ET`). Don't "fix" this when wiring.
 
 **Suggested build order:** (1) ✅ design tokens → (2) 🟡 identity/data model *(proposal open — awaiting team; screens built on a mock seam)* → (3) ✅ routing skeleton + top nav → (4) ✅ home roll-call screen (all variants) → (5) ✅ game + roster (table + Match 2 states) → (6) **← next: gear tile states** → (7) detail surfaces (Rules / Gear / Profile) → (8) admin panel.
