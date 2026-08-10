@@ -4,8 +4,8 @@ import {
 } from '../utils/helpers';
 import { gearIcon } from '../utils/gear';
 
-export default function PlayerList({ session, deviceId, playerName, isOpen, gearPriorityNames, gearRoles }) {
-  const players = session?.players || [];
+export default function PlayerList({ players: playersProp, deviceId, playerName, isOpen, loaded = true, amAdmin = false, gearPriorityNames, gearRoles }) {
+  const players = playersProp || [];
   const gearPri = gearPriorityNames || new Set();
   const roles = gearRoles || {};
   const flat = buildFlatList(players, { gearPriorityNames: gearPri, gearRoles: roles });
@@ -21,9 +21,11 @@ export default function PlayerList({ session, deviceId, playerName, isOpen, gear
   if (total === 0) {
     return (
       <div className="list-empty">
-        {isOpen
-          ? 'No players yet — be the first to sign in!'
-          : 'Roll call is not open yet.'}
+        {!loaded
+          ? 'Loading roster…'
+          : isOpen
+            ? 'No players yet — be the first to sign in!'
+            : 'Roll call is not open yet.'}
       </div>
     );
   }
@@ -40,7 +42,11 @@ export default function PlayerList({ session, deviceId, playerName, isOpen, gear
           {isOwn && <span className="green-dot" title="You" />}
           <span className="player-name-text">{player.name}</span>
           {(() => {
-            const r = player.isMainEntry ? roles[player.name?.toLowerCase().trim()] : null;
+            // Match the gear role by stable uid first (so a renamed row keeps its
+            // badge), falling back to the name key for rows without a uid.
+            const r = player.isMainEntry
+              ? (roles[player.uid] || roles[player.name?.toLowerCase().trim()])
+              : null;
             const bring = r?.bring || [];
             const take = r?.take || [];
             return (
@@ -54,7 +60,7 @@ export default function PlayerList({ session, deviceId, playerName, isOpen, gear
               </>
             );
           })()}
-          {player.priority && !player.isAdmin && <span className="badge badge-priority">priority</span>}
+          {amAdmin && player.priority && !player.isAdmin && <span className="badge badge-priority">priority</span>}
           {!player.isMainEntry && <span className="badge badge-plus">+1</span>}
         </span>
       </div>

@@ -617,3 +617,37 @@ body {
 }
 .form-input:focus { outline: none; border-color: var(--green); }
 .form-error { color: var(--red); font-size: .82rem; margin-top: 4px; }
+
+/* Push notifications opt-in */
+.push-setup { margin: 6px 0 2px; }
+.push-note {
+  font-size: .82rem;
+  color: var(--text);
+  opacity: .8;
+  margin: 6px 2px 0;
+  line-height: 1.4;
+}
+
+/* "Who has the gear" per-set tracker */
+.gear-sets { padding: 4px 2px 8px; }
+.gear-sets-type { margin-bottom: 10px; }
+.gear-sets-head { font-weight: 700; font-size: .9rem; margin-bottom: 4px; }
+.gear-sets-row {
+  display: flex; align-items: baseline; gap: 8px;
+  font-size: .85rem; padding: 3px 0 3px 8px;
+}
+.gear-sets-id {
+  font-variant: tabular-nums; color: var(--text); opacity: .6;
+  min-width: 52px; font-size: .78rem;
+}
+.gear-sets-holder { color: var(--text); }
+.gear-sets-field { color: var(--text); opacity: .5; font-style: italic; }
+
+/* Add/remove a +1 guest while signed up */
+.signed-in-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.plus-stepper { display: inline-flex; align-items: center; gap: 8px; }
+.plus-btn { min-width: 42px; padding: 6px 10px; }
+.plus-stepper-count {
+  font-size: .9rem; font-weight: 600; color: var(--text);
+  min-width: 72px; text-align: center; font-variant: tabular-nums;
+}

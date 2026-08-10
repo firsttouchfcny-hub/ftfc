@@ -1,26 +1,44 @@
 import { useState, useEffect } from 'react';
 import { db } from '../firebase/config';
 import {
-  doc, setDoc, getDoc, updateDoc,
+  doc, setDoc, getDoc, updateDoc, deleteDoc, writeBatch,
   collection, addDoc, query, where, getDocs,
 } from 'firebase/firestore';
 import {
   normalizeName, parseNames, calculateSuspensionEnd,
   formatDateShort, getCurrentYear, buildFlatList,
-  getRollCallPhase, isRollCallOpen,
+  getRollCallPhase, isRollCallOpen, toE164US,
 } from '../utils/helpers';
+import { accountRef, findAccountByName, ensureAccount, ensureAccountByPhone } from '../utils/identity';
 
-export default function AdminPanel({ session, today, adminName }) {
+export default function AdminPanel({ session, players, today, adminName }) {
   const [bulkAddInput, setBulkAddInput]   = useState('');
   const [strikeInput, setStrikeInput]     = useState('');
   const [strikeLog, setStrikeLog]         = useState([]);
   const [showStrikeLog, setShowStrikeLog] = useState(false);
   const [toast, setToast]                 = useState('');
   const [toastError, setToastError]       = useState(false);
+  const [manageInput, setManageInput]     = useState('');
+  const [admins, setAdmins]               = useState([]);
 
   useEffect(() => {
     if (showStrikeLog) loadStrikeLog();
   }, [showStrikeLog]);
+
+  useEffect(() => { loadAdmins(); }, []);
+
+  const loadAdmins = async () => {
+    try {
+      const snap = await getDocs(query(collection(db, 'accounts'), where('isAdmin', '==', true)));
+      setAdmins(
+        snap.docs
+          .map((d) => ({ id: d.id, ...d.data() }))
+          .sort((a, b) => (a.name || a.id).localeCompare(b.name || b.id))
+      );
+    } catch (err) {
+      console.error('load admins', err);
+    }
+  };
 
   const flash = (msg, isError = false) => {
     setToast(isError ? `❌ ${msg}` : msg);
@@ -55,7 +73,6 @@ export default function AdminPanel({ session, today, adminName }) {
       await setDoc(ref, {
         date: today,
         isOpen: false,
-        players: [],
         createdAt: Date.now(),
       });
     }
@@ -67,22 +84,8 @@ export default function AdminPanel({ session, today, adminName }) {
     await updateDoc(ref, data);
   }
 
-  async function ensurePlayerProfile(name) {
-    const id = normalizeName(name);
-    const ref = doc(db, 'players', id);
-    const snap = await getDoc(ref);
-    if (!snap.exists()) {
-      await setDoc(ref, {
-        name,
-        isAdmin: false,
-        suspendedUntil: null,
-        suspensionType: null,
-        createdAt: Date.now(),
-      });
-      return { name, isAdmin: false };
-    }
-    return snap.data();
-  }
+  // A player is now its own document in the session's players subcollection.
+  const playerDoc = (id) => doc(db, 'sessions', today, 'players', id);
 
   // ── Roll call ─────────────────────────────────────────────────────────────
 
@@ -107,7 +110,13 @@ export default function AdminPanel({ session, today, adminName }) {
   const handleResetList = async () => {
     if (!confirm('Reset the player list for today? This cannot be undone.')) return;
     try {
-      await updateSession({ players: [], isOpen: false });
+      // Delete every player doc in one atomic batch (batching is the right tool
+      // here: one admin clearing many docs at once, not many clients contending).
+      const snap = await getDocs(collection(db, 'sessions', today, 'players'));
+      const batch = writeBatch(db);
+      snap.docs.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+      await updateSession({ isOpen: false, drops: [] });
       flash('List reset');
     } catch (err) {
       fireError('Reset list', err);
@@ -120,30 +129,42 @@ export default function AdminPanel({ session, today, adminName }) {
     const names = parseNames(bulkAddInput);
     if (!names.length) return;
 
-    const ref = await getOrCreateSession();
-    const snap = await getDoc(ref);
-    const current = snap.data()?.players || [];
-    const existing = new Set(current.map((p) => p.name.toLowerCase()));
-
-    const toAdd = [];
-    for (const name of names) {
-      if (existing.has(name.toLowerCase())) continue;
-      const profile = await ensurePlayerProfile(name);
-      toAdd.push({
-        id: crypto.randomUUID(),
-        name,
-        deviceId: `admin-added-${crypto.randomUUID()}`,
-        isAdmin: profile.isAdmin || false,
-        plusOnes: 0,
-        signedUpAt: Date.now(),
-      });
-      existing.add(name.toLowerCase());
-    }
+    await getOrCreateSession();
+    const existingNames = new Set((players || []).map((p) => p.name.toLowerCase()));
+    const existingUids  = new Set((players || []).map((p) => p.uid).filter(Boolean));
 
     try {
-      await updateDoc(ref, { players: [...current, ...toAdd] });
+      const batch = writeBatch(db);
+      let added = 0;
+      for (const name of names) {
+        if (existingNames.has(name.toLowerCase())) continue;
+        // Resolve (or create) the person's account so the row ties to a real
+        // identity by uid, carries any existing admin flag, and shows the
+        // canonical name.
+        const acct = await ensureAccount(name);
+        // Already on today's list under a different name? Same person → skip.
+        if (existingUids.has(acct.uid)) continue;
+        // Key the row by the person's uid (not the typed name), so if they later
+        // self-sign-up it lands on THIS row instead of forking a duplicate.
+        const id = acct.uid;
+        batch.set(playerDoc(id), {
+          name: acct.name,
+          deviceId: `admin-${normalizeName(acct.name)}`,
+          uid: acct.uid,
+          isAdmin: acct.isAdmin || false,
+          plusOnes: 0,
+          priority: false,
+          signedUp: true, // admin put them on the list → a real entry, not gear-only
+          // +added keeps a stable signup order within one batch (same-ms writes).
+          signedUpAt: Date.now() + added,
+        }, { merge: true });
+        existingNames.add(acct.name.toLowerCase());
+        existingUids.add(acct.uid);
+        added++;
+      }
+      await batch.commit();
       setBulkAddInput('');
-      flash(`Added ${toAdd.length} player(s)`);
+      flash(`Added ${added} player(s)`);
     } catch (err) {
       fireError('Bulk add', err);
     }
@@ -153,10 +174,17 @@ export default function AdminPanel({ session, today, adminName }) {
 
   const handleUpdatePlusOnes = async (playerId, value) => {
     try {
-      const newPlayers = (session?.players || []).map((p) =>
-        p.id === playerId ? { ...p, plusOnes: parseInt(value, 10) } : p
-      );
-      await updateSession({ players: newPlayers });
+      const val = Math.max(0, parseInt(value, 10) || 0);
+      const p = (players || []).find((x) => x.id === playerId);
+      const cur = p?.plusOnes || 0;
+      const hts = p?.signedUpAt || 0;
+      // Keep per-guest add-times: existing +1s keep theirs (backfilled to signup
+      // time), newly added ones get "now" so they fall to the back of the list.
+      const times = Array.isArray(p?.plusOnesAt) ? p.plusOnesAt.slice(0, cur) : [];
+      while (times.length < cur) times.push(hts);
+      if (val > times.length) { const now = Date.now(); while (times.length < val) times.push(now); }
+      else times.length = val;
+      await updateDoc(playerDoc(playerId), { plusOnes: val, plusOnesAt: times });
     } catch (err) {
       fireError('Update +1s', err);
     }
@@ -167,37 +195,74 @@ export default function AdminPanel({ session, today, adminName }) {
   // password login) and never touches the player's profile.
   const handleTogglePriority = async (playerId, current) => {
     try {
-      const newPlayers = (session?.players || []).map((p) =>
-        p.id === playerId ? { ...p, priority: !current } : p
-      );
-      await updateSession({ players: newPlayers });
+      await updateDoc(playerDoc(playerId), { priority: !current });
     } catch (err) {
       fireError('Toggle priority', err);
     }
   };
 
-  // Admin badge is a deliberate label (separate from Priority). Writes both the
-  // session entry and the profile so it persists / stops on future signups.
-  const handleToggleAdmin = async (playerId, name, current) => {
+  // Admin is a flag on the person's ACCOUNT (keyed by uid) — so it follows them
+  // across name/phone changes and can't be lost to a duplicate. We also tag the
+  // roster entry so the badge shows immediately on today's list.
+  const handleToggleAdmin = async (playerId, uid, name, current) => {
     try {
       const newVal = !current;
-      const newPlayers = (session?.players || []).map((p) =>
-        p.id === playerId ? { ...p, isAdmin: newVal } : p
-      );
-      await updateSession({ players: newPlayers });
-      const ref = doc(db, 'players', normalizeName(name));
-      const snap = await getDoc(ref);
-      if (snap.exists()) await updateDoc(ref, { isAdmin: newVal });
-      else await setDoc(ref, { name, isAdmin: newVal, suspendedUntil: null, createdAt: Date.now() });
+      await updateDoc(playerDoc(playerId), { isAdmin: newVal });
+      const acct = uid ? { uid } : await ensureAccount(name);
+      await setDoc(accountRef(acct.uid), { isAdmin: newVal }, { merge: true });
+      loadAdmins();
     } catch (err) {
       fireError('Toggle admin', err);
     }
   };
 
+  // ── Manage admins & verification BY NAME. Resolves the name to the person's
+  // account (creating one if they've never signed up) and flags THAT — the
+  // single source of truth for admin power and the verify override. ────────────
+  const handleGrantAdminByName = async () => {
+    const name = manageInput.trim();
+    if (!name) return;
+    try {
+      const acct = await ensureAccount(name);
+      await setDoc(accountRef(acct.uid), { isAdmin: true }, { merge: true });
+      setManageInput('');
+      flash(`${name} is now an admin.`);
+      loadAdmins();
+    } catch (err) {
+      fireError('Make admin', err);
+    }
+  };
+
+  const handleRevokeAdmin = async (uid, name) => {
+    try {
+      await setDoc(accountRef(uid), { isAdmin: false }, { merge: true });
+      flash(`Removed admin from ${name || uid}.`);
+      loadAdmins();
+    } catch (err) {
+      fireError('Remove admin', err);
+    }
+  };
+
+  // Safety valve: manually mark a player verified when their phone can't complete
+  // SMS verification, so the sign-up gate never permanently locks anyone out.
+  const handleMarkVerifiedByName = async () => {
+    const name = manageInput.trim();
+    if (!name) return;
+    try {
+      const acct = await ensureAccount(name);
+      await setDoc(accountRef(acct.uid), {
+        phoneVerified: true, phoneVerifiedByAdmin: true, phoneVerifiedAt: Date.now(),
+      }, { merge: true });
+      setManageInput('');
+      flash(`${name} marked verified (admin override).`);
+    } catch (err) {
+      fireError('Mark verified', err);
+    }
+  };
+
   const handleRemovePlayer = async (playerId) => {
     try {
-      const newPlayers = (session?.players || []).filter((p) => p.id !== playerId);
-      await updateSession({ players: newPlayers });
+      await deleteDoc(playerDoc(playerId));
     } catch (err) {
       fireError('Remove player', err);
     }
@@ -205,36 +270,45 @@ export default function AdminPanel({ session, today, adminName }) {
 
   // ── Strikes ───────────────────────────────────────────────────────────────
 
+  // Every active strike this year for a person — counted across BOTH the new uid
+  // key and the legacy normalized-name key, so switching the key never loses
+  // history and a person's escalation count can't be split by a name variant.
+  // Returns the raw strike docs (id + data), deduped.
+  const activeStrikesFor = async (acct, year, excludeId = null) => {
+    const seen = new Map();
+    for (const key of [acct.uid, normalizeName(acct.name || '')]) {
+      if (!key) continue;
+      const snap = await getDocs(query(collection(db, 'strikes'), where('playerId', '==', key)));
+      snap.docs.forEach((d) => seen.set(d.id, d.data()));
+    }
+    return [...seen.entries()]
+      .filter(([id, s]) => id !== excludeId && s.year === year && !s.undone)
+      .map(([id, s]) => ({ id, ...s }));
+  };
+
   const handleIssueStrikes = async () => {
-    const names = parseNames(strikeInput);
-    if (!names.length) return;
+    const entries = parseNames(strikeInput);
+    if (!entries.length) return;
     try {
       const year = getCurrentYear();
-      for (const name of names) {
-        const playerId = normalizeName(name);
-        const q = query(collection(db, 'strikes'), where('playerId', '==', playerId));
-        const snap = await getDocs(q);
-        const activeCount = snap.docs.filter(
-          (d) => d.data().year === year && !d.data().undone
-        ).length;
-        const newCount = activeCount + 1;
+      for (const entry of entries) {
+        // Resolve to the ONE canonical account by phone (preferred) or name, so a
+        // strike always attaches to the right person — "Miguel C", "Miguel
+        // Cevallos", or his number all land on the same account and never split.
+        const e164 = toE164US(entry);
+        const acct = e164 ? await ensureAccountByPhone(e164) : await ensureAccount(entry);
+        const newCount = (await activeStrikesFor(acct, year)).length + 1;
         const suspendedUntil = calculateSuspensionEnd(newCount);
-        const profileRef = doc(db, 'players', playerId);
-        const profileSnap = await getDoc(profileRef);
-        if (profileSnap.exists()) {
-          await updateDoc(profileRef, { suspendedUntil, suspensionType: 'strike' });
-        } else {
-          await setDoc(profileRef, {
-            name, isAdmin: false, suspendedUntil, suspensionType: 'strike', createdAt: Date.now(),
-          });
-        }
+        // The suspension lives on the person's ACCOUNT (what the app reads).
+        await setDoc(accountRef(acct.uid), { suspendedUntil, suspensionType: 'strike' }, { merge: true });
+        // Key the strike by the stable uid; keep the canonical name for the log.
         await addDoc(collection(db, 'strikes'), {
-          playerName: name, playerId, issuedAt: Date.now(), year,
+          playerName: acct.name, playerId: acct.uid, playerUid: acct.uid, issuedAt: Date.now(), year,
           strikeNumber: newCount, undone: false, issuedBy: adminName || 'admin', suspendedUntil,
         });
       }
       setStrikeInput('');
-      flash(`Strike(s) issued to ${names.length} player(s)`);
+      flash(`Strike(s) issued to ${entries.length} player(s)`);
       if (showStrikeLog) loadStrikeLog();
     } catch (err) {
       fireError('Issue strikes', err);
@@ -243,22 +317,20 @@ export default function AdminPanel({ session, today, adminName }) {
 
   const handleUndoStrike = async (strike) => {
     try {
-      const strikeRef = doc(db, 'strikes', strike.id);
-      await updateDoc(strikeRef, { undone: true });
+      await updateDoc(doc(db, 'strikes', strike.id), { undone: true });
       const year = getCurrentYear();
-      const q = query(collection(db, 'strikes'), where('playerId', '==', strike.playerId));
-      const snap = await getDocs(q);
-      const remaining = snap.docs.filter(
-        (d) => d.id !== strike.id && d.data().year === year && !d.data().undone
-      ).length;
-      const profileRef = doc(db, 'players', strike.playerId);
-      if (remaining === 0) {
-        await updateDoc(profileRef, { suspendedUntil: null, suspensionType: null });
-      } else {
-        await updateDoc(profileRef, {
-          suspendedUntil: calculateSuspensionEnd(remaining),
-          suspensionType: 'strike',
-        });
+      // Resolve the struck person's account: prefer the uid the strike carries
+      // (new strikes) and fall back to the name (legacy strikes).
+      const acct = strike.playerUid
+        ? { uid: strike.playerUid, name: strike.playerName }
+        : await findAccountByName(strike.playerName);
+      if (acct) {
+        // Recount across both keys, excluding the one we just undid.
+        const remaining = (await activeStrikesFor(acct, year, strike.id)).length;
+        await setDoc(accountRef(acct.uid), remaining === 0
+          ? { suspendedUntil: null, suspensionType: null }
+          : { suspendedUntil: calculateSuspensionEnd(remaining), suspensionType: 'strike' },
+          { merge: true });
       }
       loadStrikeLog();
       flash('Strike undone');
@@ -269,7 +341,7 @@ export default function AdminPanel({ session, today, adminName }) {
 
   // ── Render ────────────────────────────────────────────────────────────────
 
-  const mainPlayers = buildFlatList(session?.players || []).filter((p) => p.isMainEntry);
+  const mainPlayers = buildFlatList(players || []).filter((p) => p.isMainEntry);
 
   const phase    = getRollCallPhase();           // closed | admins-only | open
   const rollOpen = isRollCallOpen(session);
@@ -328,6 +400,51 @@ export default function AdminPanel({ session, today, adminName }) {
         </button>
       </div>
 
+      {/* Manage Admins & Verification */}
+      <div className="admin-block">
+        <h4>Admins &amp; Verification</h4>
+        <p className="admin-hint">
+          Assign admin roles, or manually mark a player verified (safety valve if
+          their phone can’t get the SMS code). Works by name — even if they’re not
+          on today’s list.
+        </p>
+        <input
+          className="form-input"
+          placeholder="Player’s name…"
+          value={manageInput}
+          onChange={(e) => setManageInput(e.target.value)}
+        />
+        <div className="btn-row">
+          <button className="btn btn-primary" onClick={handleGrantAdminByName}>
+            Make admin
+          </button>
+          <button className="btn btn-success" onClick={handleMarkVerifiedByName}>
+            Mark verified
+          </button>
+        </div>
+        {admins.length > 0 && (
+          <div className="admin-player-list" style={{ marginTop: 10 }}>
+            {admins.map((a) => (
+              <div key={a.id} className="admin-player-row">
+                <span className="admin-player-name">
+                  {a.name || a.id}
+                  <span className="badge badge-admin">admin</span>
+                  {a.phoneVerified && (
+                    <span className="badge badge-verified">✓ verified</span>
+                  )}
+                </span>
+                <button
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => handleRevokeAdmin(a.id, a.name)}
+                >
+                  Remove admin
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* Manage Players */}
       {mainPlayers.length > 0 && (
         <div className="admin-block">
@@ -365,7 +482,7 @@ export default function AdminPanel({ session, today, adminName }) {
                     <input
                       type="checkbox"
                       checked={p.isAdmin || false}
-                      onChange={() => handleToggleAdmin(p.id, p.name, p.isAdmin)}
+                      onChange={() => handleToggleAdmin(p.id, p.uid, p.name, p.isAdmin)}
                     />
                     Admin
                   </label>
@@ -387,7 +504,7 @@ export default function AdminPanel({ session, today, adminName }) {
         <h4>Issue Strikes</h4>
         <textarea
           className="admin-textarea"
-          placeholder="Names separated by commas or line breaks…"
+          placeholder="Phone numbers (best) or names, comma/line separated…"
           value={strikeInput}
           onChange={(e) => setStrikeInput(e.target.value)}
           rows={3}

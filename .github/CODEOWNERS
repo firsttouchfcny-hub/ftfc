@@ -1,0 +1,4 @@
+# Code owners for First Touch FC.
+# Ivo (@ivanoffalexander) is the owner of all code — his review is required
+# on every pull request before it can be merged into main.
+* @ivanoffalexander

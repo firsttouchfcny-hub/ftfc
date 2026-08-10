@@ -77,18 +77,29 @@ export function getSessionDate() {
   return isGameDay(base) ? base : nextGameDay(base);
 }
 
-// Roll-call phase for the active signup day, in Eastern time:
-//   'closed'      → before 10 AM (prior game still showing; nothing to join yet)
-//   'admins-only' → 10 AM–3 PM (admins may sign up early)
-//   'open'        → 3 PM onward (everyone may sign up)
-// On weekends the next game (Monday) already opened Friday 3 PM, so it stays open.
+// Roll-call phase for the active signup day, in Eastern time. A game's roll call
+// opens the DAY BEFORE the game — including Sunday for a Monday game (so it no
+// longer springs open on Friday over the weekend):
+//   'closed'      → more than a day out, or before 10 AM the day before
+//   'admins-only' → 10 AM–3 PM the day before (admins may sign up early)
+//   'open'        → 3 PM the day before, through the game morning
 export function getRollCallPhase() {
   const et = getEasternNow();
-  if (!isGameDay(et.dateKey)) return 'open'; // Sat/Sun → Monday's signup already open
-  const { hour } = et;
-  if (hour < RESET_HOUR_ET) return 'closed';
-  if (hour < OPEN_HOUR_ET) return 'admins-only';
-  return 'open';
+  const target = getSessionDate();              // the game we're currently showing
+  const dayBefore = addDaysToKey(target, -1);   // roll call opens on this day at 3 PM ET
+
+  // Morning of the game itself: stays open until the 10 AM reset moves to the next game.
+  if (et.dateKey === target) {
+    return et.hour < RESET_HOUR_ET ? 'open' : 'closed';
+  }
+  // The day before the game (e.g. Sunday for a Monday game).
+  if (et.dateKey === dayBefore) {
+    if (et.hour < RESET_HOUR_ET) return 'closed';
+    if (et.hour < OPEN_HOUR_ET) return 'admins-only';
+    return 'open';
+  }
+  // Two or more days before the next game (e.g. Fri/Sat for a Monday game).
+  return 'closed';
 }
 
 // Effective open state. An admin override ('open' | 'closed') only applies
@@ -139,6 +150,45 @@ export function getDeviceId() {
 
 export function normalizeName(name) {
   return name.toLowerCase().trim().replace(/\s+/g, '-');
+}
+
+// Accepts a 10-digit US number, or 11 digits with a leading 1. Returns E.164
+// (+1XXXXXXXXXX) or null. The one place phone strings get normalized, so every
+// entry point (self-verify, admin gear-add) keys on the same canonical form.
+export function toE164US(raw) {
+  const digits = (raw || '').replace(/\D/g, '');
+  if (digits.length === 10) return `+1${digits}`;
+  if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`;
+  return null;
+}
+
+// A person's stable identity anchor. Generated ONCE and stored on their profile,
+// it never changes — not when they edit their name and not when they update
+// their phone number. Roster + gear records reference this so nothing drifts.
+export function newUid() {
+  return 'u_' + crypto.randomUUID();
+}
+
+// The one place that decides whether a roster/gear entry `p` is the same person
+// as { uid, deviceId, name }. uid is the strong signal (a person's stable
+// account id); deviceId and name are fallbacks for rows created before the
+// person had a resolved account. Used for "is this me?", sign-out, gear tagging,
+// and duplicate detection — so every path agrees on identity.
+export function isSamePerson(p, { uid, deviceId, name } = {}) {
+  if (!p) return false;
+  if (uid && p.uid === uid) return true;
+  if (deviceId && p.deviceId === deviceId) return true;
+  if (name && (p.name || '').toLowerCase() === name.toLowerCase()) return true;
+  return false;
+}
+
+// The roster document id for a person in a session. Prefer the id of a row they
+// ALREADY own (so a re-tap — even from another device, or onto an admin's
+// pre-add — updates that one row); otherwise key by their stable uid, falling
+// back to deviceId only when no account is resolved yet. This makes
+// "one person = one row per session" true by construction, not by cleanup.
+export function rosterDocId({ existingId, uid, deviceId }) {
+  return existingId || uid || deviceId || null;
 }
 
 export function parseNames(input) {
@@ -211,7 +261,10 @@ export function buildFlatList(players, opts = {}) {
   const gearPriority = opts.gearPriorityNames || new Set();
   const gearRoles = opts.gearRoles || {};
   const nameKey = (p) => (p.name || '').toLowerCase().trim();
-  const roleOf = (p) => gearRoles[nameKey(p)] || null;
+  // Match a person's gear role by their stable uid first (so a badge lands on the
+  // right row even when stored names differ), falling back to the name key for
+  // rows/commitments that predate uids.
+  const roleOf = (p) => (p.uid && gearRoles[p.uid]) || gearRoles[nameKey(p)] || null;
 
   // List order: gear bringers → gear takers → admins/priority → Friday gear
   // priority → everyone else.
@@ -231,29 +284,39 @@ export function buildFlatList(players, opts = {}) {
     return i === -1 ? 99 : i;
   };
 
-  const sorted = [...players].sort((a, b) => {
-    const ga = groupRank(a), gb = groupRank(b);
-    if (ga !== gb) return ga - gb;                          // bringers, takers, admins, rest
-    if (ga <= 1) {                                          // within gear groups, order by type
-      const ta = typeRank(a), tb = typeRank(b);
-      if (ta !== tb) return ta - tb;
-    }
-    return (a.signedUpAt || 0) - (b.signedUpAt || 0);       // then by signup time
-  });
-
-  const flat = [];
-  for (const player of sorted) {
-    flat.push({ ...player, isMainEntry: true });
-    for (let i = 1; i <= (player.plusOnes || 0); i++) {
-      flat.push({
-        id: `${player.id}-plus${i}`,
-        name: `${player.name} +${i}`,
+  // Expand into main entries + one entry per +1 guest, each tagged with the sort
+  // keys we order by: rank, gear-type, time, and a per-host sequence. A +1 taken
+  // AT signup (its add-time equals the host's signup time, or it has no recorded
+  // time — legacy) inherits the host's keys so it renders right after them. A +1
+  // added LATER carries its own add-time in the rest tier, so it falls into line
+  // by when it was added instead of jumping to the host's spot.
+  const entries = [];
+  for (const p of players) {
+    const hr = groupRank(p), hty = typeRank(p), hts = p.signedUpAt || 0;
+    entries.push({ ...p, isMainEntry: true, _r: hr, _ty: hty, _t: hts, _seq: 0 });
+    const times = Array.isArray(p.plusOnesAt) ? p.plusOnesAt : [];
+    for (let i = 1; i <= (p.plusOnes || 0); i++) {
+      const t = times[i - 1] ?? hts;
+      const attached = t === hts; // taken at signup (or legacy with no time)
+      entries.push({
+        id: `${p.id}-plus${i}`,
+        name: `${p.name} +${i}`,
         isMainEntry: false,
-        parentId: player.id,
+        parentId: p.id,
         isAdmin: false,
-        deviceId: `__plus__${player.id}__${i}`,
+        deviceId: `__plus__${p.id}__${i}`,
+        _r: attached ? hr : 4,       // late guests always rank in the rest tier
+        _ty: attached ? hty : 99,
+        _t: attached ? hts : t,      // late guests sort by when they were added
+        _seq: attached ? i : 0,
       });
     }
   }
-  return flat;
+
+  entries.sort((a, b) =>
+    (a._r - b._r) || (a._ty - b._ty) || (a._t - b._t) || (a._seq - b._seq));
+
+  // Drop the internal sort keys before returning.
+  for (const e of entries) { delete e._r; delete e._ty; delete e._t; delete e._seq; }
+  return entries;
 }

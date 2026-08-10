@@ -1,0 +1,77 @@
+rules_version = '2';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FTFC Firestore rules.
+//
+// IMPORTANT constraint: the app talks to Firestore WITHOUT a signed-in user.
+// Phone auth is used only transiently to prove a number, then the session is
+// signed out (PhoneVerify.jsx). So `request.auth` is null on every normal read
+// and write — these rules CANNOT tell an admin from anyone else, and therefore
+// cannot, on their own, stop someone from setting `isAdmin` or editing the
+// roster. True per-user authorization needs Firebase App Check (to block
+// non-app clients) and/or a persistent auth session. See docs/NEXT_STEPS.md.
+//
+// What these rules DO buy us over the old blanket `allow read, write: if true`:
+//   • Scope access to the known collections only — no creating arbitrary
+//     collections/documents to pollute the database.
+//   • Make the legacy name-keyed `players/*` profiles read-only.
+//   • Light shape/size validation to reject obviously-malformed or oversized
+//     writes.
+// ─────────────────────────────────────────────────────────────────────────────
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function okStr(v, max) { return v is string && v.size() <= max; }
+    function smallDoc()    { return request.resource.data.keys().size() <= 40; }
+    // On delete, request.resource is null — allow it past the shape checks.
+    function shapedName()  {
+      return request.resource == null
+        || !('name' in request.resource.data)
+        || okStr(request.resource.data.name, 200);
+    }
+
+    // Accounts — the person's canonical identity.
+    match /accounts/{uid} {
+      allow read: if true;
+      allow write: if smallDoc() && shapedName()
+        && (request.resource == null
+            || !('phone' in request.resource.data)
+            || request.resource.data.phone == null
+            || okStr(request.resource.data.phone, 20));
+    }
+
+    // Sessions + their per-player roster subcollection.
+    match /sessions/{date} {
+      allow read: if true;
+      allow write: if smallDoc();
+
+      match /players/{pid} {
+        allow read: if true;
+        allow write: if smallDoc() && shapedName();
+      }
+    }
+
+    // Gear ledger (single doc holding the commitments array).
+    match /gear/{docId} {
+      allow read: if true;
+      allow write: if request.resource == null
+        || request.resource.data.keys().size() <= 5;
+    }
+
+    // Strikes log.
+    match /strikes/{id} {
+      allow read: if true;
+      allow write: if smallDoc();
+    }
+
+    // Legacy name-keyed profiles — the app only READS these now (to learn a uid
+    // during the transition). No client should write them.
+    match /players/{name} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Anything else is denied by default (no match = no access).
+  }
+}

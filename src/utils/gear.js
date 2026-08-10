@@ -8,17 +8,18 @@ import {
   isGameDay, nextGameDay, addGameDays,
 } from './helpers.js';
 
-export const GEAR_OPEN_HOUR_ET  = 11; // 11 AM ET — gear volunteering opens
+export const GEAR_OPEN_HOUR_ET       = 11; // 11 AM ET — gear volunteering opens
+export const GEAR_ADMIN_OPEN_HOUR_ET = 10; // admins may volunteer an hour earlier
 export const GEAR_ALERT_HOUR_ET = 18; // 6 PM ET the night before — risk flag
 
-// The physical sets the club owns: 4 goals + 1 balls/cones + 5 rotating bib sets.
-// Per-game need is set in GEAR_DEFS (goals 2, balls 1, bibs 1). Balls has a
+// The physical sets the club owns: 3 goals + 1 balls/cones + 5 rotating bib sets.
+// Per-game need is set in GEAR_DEFS (goals 2, balls 1, bibs 1) — so 2 of the 3
+// goal sets are in play each game and 1 is the rotating spare. Balls has a
 // single set that always comes back the next game day (returnWindow 1).
 export const GEAR_SETS = [
   { id: 'goal-1',  type: 'goal' },
   { id: 'goal-2',  type: 'goal' },
   { id: 'goal-3',  type: 'goal' },
-  { id: 'goal-4',  type: 'goal' },
   { id: 'balls-1', type: 'balls' },
   { id: 'bibs-1',  type: 'bibs' },
   { id: 'bibs-2',  type: 'bibs' },
@@ -27,11 +28,14 @@ export const GEAR_SETS = [
   { id: 'bibs-5',  type: 'bibs' },
 ];
 
-// Per-type definitions. returnWindow = how many days out a return date may be.
-//   goals / balls → tomorrow or the day after (2-day window)
-//   bibs          → any day within the next 5 days
+// Per-type definitions. returnWindow = how many game days out a return may be.
+//   goals → next game OR the day after (2-day window): the 2 goals at the field
+//           must be carried to an upcoming match; if the next game already has
+//           its 2 goals covered, the taker brings them the day after instead.
+//   balls → next game (1-day)
+//   bibs  → any day within the next 5 days
 export const GEAR_DEFS = {
-  goal:  { icon: '🥅', label: 'Goals',         need: 2, returnWindow: 1 },
+  goal:  { icon: '🥅', label: 'Goals',         need: 2, returnWindow: 2 },
   balls: { icon: '⚽', label: 'Balls & cones', need: 1, returnWindow: 1 },
   bibs:  { icon: '🧺', label: 'Bibs',          need: 1, returnWindow: 5 },
 };
@@ -44,7 +48,9 @@ export function setsForType(type) { return GEAR_SETS.filter((s) => s.type === ty
 
 // Gear volunteering opens at 11 AM ET (same open-hour gate style as the roll
 // call; there is no separate close — a new game's window begins each day).
-export function isGearOpen() { return getEasternNow().hour >= GEAR_OPEN_HOUR_ET; }
+export function isGearOpen(isAdmin = false) {
+  return getEasternNow().hour >= (isAdmin ? GEAR_ADMIN_OPEN_HOUR_ET : GEAR_OPEN_HOUR_ET);
+}
 
 // Today's date key in Eastern time (used to mark already-held gear as out now).
 export function todayKey() { return getEasternNow().dateKey; }
@@ -88,11 +94,20 @@ export function availableReturnDates(commitments, type, takeDate) {
 // UNLESS Monday is already full for that gear — then the normal window applies.
 export function playerReturnDates(commitments, type, takeDate) {
   const opts = availableReturnDates(commitments, type, takeDate);
-  if (isFridayKey(takeDate) && opts.length) {
-    const monday = addGameDays(takeDate, 1); // next game day after Friday
-    if (opts[0] === monday) return [monday];  // Monday still needs it → force it
+  if (!opts.length) return opts;
+  // A Friday take should come back Monday when that slot is still open.
+  if (isFridayKey(takeDate)) {
+    const monday = addGameDays(takeDate, 1);
+    if (opts[0] === monday) return [monday];
   }
-  return opts;
+  // Goals & balls: short window (1–2 days) — always fix to the earliest open day
+  // so every game stays covered.
+  if (type === 'goal' || type === 'balls') return [opts[0]];
+  // Bibs (long window): only FORCE the earliest open day when a CLOSE game — the
+  // next one or two — is uncovered (fill the urgent gap). If the near games are
+  // already covered, leave the player free to pick a day within the window.
+  const closeGap = opts[0] === addGameDays(takeDate, 1) || opts[0] === addGameDays(takeDate, 2);
+  return closeGap ? [opts[0]] : opts;
 }
 
 // Bring-back dates for gear ALREADY held (admin "has it" onboarding): unlike a
@@ -127,6 +142,61 @@ export function availableToTake(commitments, type, takeDate) {
   const atGame = gearNeed(type);
   const alreadyTaking = takersFor(commitments, takeDate).filter((c) => c.type === type).length;
   return Math.max(0, atGame - alreadyTaking);
+}
+
+// Priority lock: balls (lowest priority) can't be taken home until goals AND
+// bibs are fully taken for the game — every game needs those two, so they go
+// first. Keyed strictly on whether they still NEED a taker (availableToTake),
+// NOT on whether they can be returned — otherwise a temporarily over-supplied
+// bibs would unlock balls before bibs was actually taken.
+export function takeBlockedByPriority(commitments, type, takeDate) {
+  if (type !== 'balls') return false;
+  return availableToTake(commitments, 'goal', takeDate) > 0 ||
+         availableToTake(commitments, 'bibs', takeDate) > 0;
+}
+
+// Per-set custody for the admin tracker: for each physical set of `type`, who
+// holds it right now and when it's due back — the next scheduled hand-off, or
+// "at the field" if it's free. Sorted by set id.
+export function setStatuses(type, commitments) {
+  const today = todayKey();
+  return setsForType(type).map((set) => {
+    const held = (commitments || []).find(
+      (c) => isLive(c) && c.setId === set.id && c.takeDate <= today && c.returnDate > today
+    );
+    if (held) {
+      return { setId: set.id, state: 'out', holder: held.takerName, holderUid: held.takerUid || null, back: held.returnDate };
+    }
+    const upcoming = (commitments || [])
+      .filter((c) => isLive(c) && c.setId === set.id && c.returnDate > today)
+      .sort((a, b) => (a.takeDate < b.takeDate ? -1 : 1))[0];
+    if (upcoming) {
+      return {
+        setId: set.id, state: 'scheduled',
+        holder: upcoming.takerName, holderUid: upcoming.takerUid || null,
+        take: upcoming.takeDate, back: upcoming.returnDate,
+      };
+    }
+    // No one holds it right now — but never lose custody: remember who LAST had
+    // it (the most recent person who took it, committed or returned) so we can
+    // always chase down a set.
+    const last = (commitments || [])
+      .filter((c) => c.setId === set.id && (c.status === 'committed' || c.status === 'returned'))
+      .sort((a, b) => (a.takeDate < b.takeDate ? 1 : -1))[0];
+    return {
+      setId: set.id, state: 'field',
+      holder: last ? last.takerName : null,
+      holderUid: last ? (last.takerUid || null) : null,
+      lastBack: last ? last.returnDate : null,
+    };
+  }).sort((a, b) => {
+    // Soonest return first; sets with no return date ("at the field") go last.
+    if (!a.back && !b.back) return a.setId < b.setId ? -1 : 1;
+    if (!a.back) return 1;
+    if (!b.back) return -1;
+    if (a.back !== b.back) return a.back < b.back ? -1 : 1;
+    return a.setId < b.setId ? -1 : 1;
+  });
 }
 
 // Pick a concrete free physical set of the type for a take on `takeDate`.
@@ -205,12 +275,21 @@ export function fridayGearPriorityNames(commitments, dateKey) {
   return names;
 }
 
-// A person's own live commitments (matched by device id or name).
-export function myCommitments(commitments, deviceId, name) {
+// A person's own live commitments (matched by stable uid, else device id / name).
+// `activeAsOf` (a date key — the upcoming gear take-date) auto-retires a
+// commitment once its return game has passed: the game is at 7 AM and gear opens
+// at 11 AM, so by the time anyone is taking gear, whatever was due back that
+// morning is already back at the field. So it no longer counts as gear the
+// person is holding — clearing their "you're bringing gear" and letting them
+// take a new set — without needing anyone to click "returned".
+export function myCommitments(commitments, deviceId, name, uid, activeAsOf = null) {
   const n = (name || '').toLowerCase();
   return (commitments || []).filter(
     (c) => isLive(c) &&
-      (c.takerDeviceId === deviceId || (c.takerName || '').toLowerCase() === n)
+      (!activeAsOf || c.returnDate >= activeAsOf) &&
+      ((uid && c.takerUid === uid) ||
+        c.takerDeviceId === deviceId ||
+        (c.takerName || '').toLowerCase() === n)
   );
 }
 

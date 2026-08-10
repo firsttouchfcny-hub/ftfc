@@ -4,9 +4,9 @@ import {
   signInWithPhoneNumber,
   signOut,
 } from 'firebase/auth';
-import { doc, updateDoc } from 'firebase/firestore';
-import { auth, db } from '../firebase/config';
-import { normalizeName } from '../utils/helpers';
+import { setDoc } from 'firebase/firestore';
+import { auth } from '../firebase/config';
+import { accountRef, findAccountByPhone } from '../utils/identity';
 
 const RECAPTCHA_ID = 'ftfc-recaptcha-container';
 
@@ -18,7 +18,7 @@ function toE164US(raw) {
   return null;
 }
 
-export default function PhoneVerify({ playerName, onClose, onVerified }) {
+export default function PhoneVerify({ uid, onClose, onVerified, onboarding = false, updating = false }) {
   const [step, setStep] = useState('phone');
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
@@ -67,7 +67,7 @@ export default function PhoneVerify({ playerName, onClose, onVerified }) {
           ? 'Too many attempts. Try again later.'
           : err.code === 'auth/operation-not-allowed'
             ? 'Phone sign-in is not enabled in Firebase. Enable it in the console.'
-            : 'Could not send the code. Try again.';
+            : `Could not send the code. Try again. [${err.code}]`;
       setError(msg);
       resetRecaptcha();
     } finally {
@@ -92,14 +92,36 @@ export default function PhoneVerify({ playerName, onClose, onVerified }) {
     try {
       await confirmRef.current.confirm(code);
       const e164 = toE164US(phone);
-      await updateDoc(doc(db, 'players', normalizeName(playerName)), {
-        phoneVerified: true,
-        phone: e164,
-        phoneVerifiedAt: Date.now(),
-      });
-      // We only used Firebase Auth to verify ownership of the number — no need to keep the session.
+
+      // Who (if anyone) already owns this verified number?
+      const owner = await findAccountByPhone(e164);
+      // We only used Firebase Auth to prove ownership of the number — drop the session.
       try { await signOut(auth); } catch { /* noop */ }
-      onVerified?.();
+
+      // No account resolved for this device yet (onboarding, or a legacy device):
+      // adopt the number's account if one exists, else hand a brand-new number to
+      // name entry.
+      if (onboarding || !uid) {
+        if (owner) onVerified?.({ adoptedName: owner.name, uid: owner.uid });
+        else onVerified?.({ newPhone: e164 });
+        onClose?.();
+        return;
+      }
+
+      // A signed-in account is verifying a number. If it already belongs to a
+      // DIFFERENT account, that's who they really are → adopt it (one number, one
+      // person — this is what collapses typo'd duplicates).
+      if (owner && owner.uid !== uid) {
+        onVerified?.({ adoptedName: owner.name, uid: owner.uid });
+        onClose?.();
+        return;
+      }
+
+      // Stamp the verified number on my own account.
+      await setDoc(accountRef(uid), {
+        phone: e164, phoneVerified: true, phoneVerifiedAt: Date.now(),
+      }, { merge: true });
+      onVerified?.({ phone: e164 });
       onClose?.();
     } catch (err) {
       console.error('[FTFC] confirm failed:', err);
@@ -119,12 +141,15 @@ export default function PhoneVerify({ playerName, onClose, onVerified }) {
       <div className="modal">
         <div className="modal-icon-wrap">📱</div>
         <h2 className="modal-title">
-          {step === 'phone' ? 'Verify your phone' : 'Enter the code'}
+          {step === 'code' ? 'Enter the code'
+            : updating ? 'Update your phone' : 'Verify your phone'}
         </h2>
         <p className="modal-subtitle">
-          {step === 'phone'
-            ? "We'll text a 6-digit code to confirm it's you."
-            : `Code sent to ${phone}.`}
+          {step === 'code'
+            ? `We texted a 6-digit code to ${phone}. Enter it below.`
+            : updating
+              ? "Got a new number? Enter it and we'll text a code to confirm it. Your name, history and gear stay the same."
+              : "New this season: verify your number once so we know every player is real. It takes a few seconds — and you'll only ever do it this one time."}
         </p>
 
         {step === 'phone' ? (
@@ -175,15 +200,17 @@ export default function PhoneVerify({ playerName, onClose, onVerified }) {
           </form>
         )}
 
-        <button
-          type="button"
-          className="btn btn-ghost btn-full"
-          onClick={onClose}
-          style={{ marginTop: 8 }}
-          disabled={busy}
-        >
-          Cancel
-        </button>
+        {!onboarding && (
+          <button
+            type="button"
+            className="btn btn-ghost btn-full"
+            onClick={onClose}
+            style={{ marginTop: 8 }}
+            disabled={busy}
+          >
+            Cancel
+          </button>
+        )}
 
         <div id={RECAPTCHA_ID}></div>
 
