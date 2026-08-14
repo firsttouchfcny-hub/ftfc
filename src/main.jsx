@@ -1,3 +1,7 @@
+/* eslint-disable react-refresh/only-export-components --
+   This is the app entry point, not a component module: it has no exports, so
+   there is nothing for fast refresh to preserve. The lazy() components below
+   are route targets, not a component library. */
 import { StrictMode, Suspense, lazy } from 'react'
 import { createRoot } from 'react-dom/client'
 import '@fontsource-variable/plus-jakarta-sans' // self-hosted brand font
