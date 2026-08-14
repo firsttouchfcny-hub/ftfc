@@ -4,7 +4,9 @@
 
 import PlayerAvatar from './PlayerAvatar';
 
-export default function PlayerRow({ position, name, photoURL, admin, bringing, plusOne, gearPriority, you }) {
+export default function PlayerRow({
+  position, name, photoURL, admin, bringing, plusOne, gearPriority, you, time,
+}) {
   // Friday gear-priority badge — mirrors production (PlayerList.jsx): only shown
   // when the player isn't already distinguished as a bringer or an admin. Real
   // eligibility (took a set home Mon–Thu; Fridays only) comes from the gear ledger
@@ -82,6 +84,16 @@ export default function PlayerRow({ position, name, photoURL, admin, bringing, p
                   Priority
                 </span>
               </div>
+            )}
+
+            {/* Drops variant (2965:9199): the time sits where the badges do */}
+            {time && (
+              <span
+                className="type-caption-semibold"
+                style={{ color: 'var(--color-dark-gray)', whiteSpace: 'nowrap', flexShrink: 0 }}
+              >
+                {time}
+              </span>
             )}
           </div>
         </div>

@@ -6,6 +6,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import BottomActions from '../components/BottomActions';
 import Confirmation from '../components/Confirmation';
+import DropsCard from '../components/DropsCard';
 import GearTakers from '../components/GearTakers';
 import RosterSection from '../components/RosterSection';
 import TableCard from '../components/TableCard';
@@ -15,7 +16,7 @@ import {
 } from '../../utils/helpers';
 import { gearIcon, gearLabel, myCommitments } from '../../utils/gear';
 import {
-  mockPlayers, mockGearRoles, mockGearPriorityNames, mockCommitments, mockGameDate,
+  mockPlayers, mockGearRoles, mockGearPriorityNames, mockCommitments, mockGameDate, mockDrops,
 } from '../state/mockRoster';
 import { useCurrentUser } from '../identity/useCurrentUser';
 import alertIcon from '../assets/icons/alert.svg';
@@ -179,6 +180,9 @@ export default function GameScreen() {
             <RosterSection label="Bench" players={bench} youName={youName} />
           </TableCard>
         )}
+
+        {/* Drops sit last — below the bench when there is one, else below Match 2 */}
+        <DropsCard drops={mockDrops} />
       </div>
 
       <BottomActions

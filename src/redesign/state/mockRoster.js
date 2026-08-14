@@ -125,6 +125,26 @@ export const mockGearRoles = (() => {
 
 export const mockGameDate = GAME_DATE;
 
+// ── Drops today ────────────────────────────────────────────────────────────
+// People who signed up and then pulled out. Production records these on the
+// session as { name, deviceId, at, fromBench } and clears them at the 10 AM
+// rollover; `fromBench` marks whether the drop freed a playing spot.
+//
+// NOTE: the design shows an avatar, an admin crown and a "+1" badge on these
+// rows, but production's drop record carries none of that — only a name. Wiring
+// this for real needs the drop to carry the person's uid (now that identity is
+// uid-keyed) so the profile can be resolved at render, or the record extended.
+//
+// Fixed timestamps so the rendered times are deterministic (ET, so 22:25Z = 6:25 PM).
+const at = (iso) => Date.parse(iso);
+export const mockDrops = [
+  { id: 'd1', name: 'Priya Raman',  photoURL: sampleAvatar, at: at('2026-10-10T22:25:00Z'), fromBench: false },
+  { id: 'd2', name: 'Tom Alvarez',  photoURL: sampleAvatar, at: at('2026-10-10T21:40:00Z'), fromBench: false, plusOne: true },
+  { id: 'd3', name: 'Dana Whitlock', photoURL: sampleAvatar, at: at('2026-10-10T20:12:00Z'), fromBench: false, admin: true },
+  { id: 'd4', name: 'Jules Carver', photoURL: null,         at: at('2026-10-10T15:05:00Z'), fromBench: true },
+  { id: 'd5', name: 'Remy Ocampo',  photoURL: null,         at: at('2026-10-10T13:30:00Z'), fromBench: true },
+];
+
 // Friday reward: took a set home earlier this week (Mon–Thu). Production derives
 // this from the ledger via fridayGearPriorityNames() and it is empty except on
 // Fridays; here it's fixed so the badge + tier are always previewable.
