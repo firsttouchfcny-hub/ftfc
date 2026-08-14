@@ -7,38 +7,12 @@
 // It always shows near the top of the page.
 
 import { useEffect, useRef, useState } from 'react';
+import Button from './Button';
 
 // Don't start hiding until the user is meaningfully down the page, and ignore
 // jitter smaller than this (rubber-banding, trackpad noise).
 const REVEAL_ABOVE = 80;
 const JITTER = 6;
-
-function ActionButton({ label, variant = 'secondary', onClick, disabled, title }) {
-  const primary = variant === 'primary';
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      title={title}
-      style={{
-        // border-box so the secondary button's 1px border doesn't make it wider
-        // than the primary — the design has both exactly equal.
-        flex: '1 0 0', minWidth: 0, height: 56, padding: 16, borderRadius: 24, boxSizing: 'border-box',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: primary ? 'var(--color-dark-gray)' : 'var(--color-cream)',
-        // Transparent border on the primary keeps both buttons exactly the same
-        // width: with flex-basis 0, a border is added on top of the basis.
-        border: primary ? '1px solid transparent' : '1px solid var(--color-tan)',
-        color: primary ? 'var(--color-cream)' : 'var(--color-dark-gray)',
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        opacity: disabled ? 0.4 : 1,
-        transition: 'opacity 150ms ease',
-      }}
-    >
-      <span className="type-body-bold" style={{ whiteSpace: 'nowrap' }}>{label}</span>
-    </button>
-  );
-}
 
 export default function BottomActions({
   onAddPlusOne, onOut, addDisabled, outDisabled, outDisabledReason,
@@ -80,11 +54,8 @@ export default function BottomActions({
           filter: 'drop-shadow(0px 2px 20px rgba(0, 0, 0, 0.1))',
         }}
       >
-        <ActionButton label="Add a +1" onClick={onAddPlusOne} disabled={addDisabled} />
-        {/* INTERIM: while you're holding gear the drop is blocked, so the button
-            is disabled and carries the reason as a tooltip. Production explains
-            it in a dialog — that designed message is the next piece of work. */}
-        <ActionButton
+        <Button label="Add a +1" onClick={onAddPlusOne} disabled={addDisabled} />
+        <Button
           label="Out"
           variant="primary"
           onClick={onOut}

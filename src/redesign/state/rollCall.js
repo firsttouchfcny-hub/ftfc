@@ -34,6 +34,26 @@ export function countdownToOpen() {
   return `${pad(Math.floor(remaining / 3600))}:${pad(Math.floor((remaining % 3600) / 60))}:${pad(remaining % 60)}`;
 }
 
+// 9 PM ET the night before a game — drop after this and you earn a strike (the
+// rule stated on the Rules screen). Deliberately its own constant rather than
+// reusing GAME2_CUTOFF_HOUR_ET: that is the Match 2 go/no-go decision, which
+// merely happens to fall at the same hour. Production doesn't implement this
+// check at all today — strikes are issued by hand from the Admin panel — so
+// this drives the warning copy, not an automatic penalty.
+export const DROP_DEADLINE_HOUR_ET = 21;
+
+// Is a drop right now a late drop? True from 9 PM the night before, and all
+// through the morning of the game itself.
+export function isPastDropDeadline() {
+  const et = getEasternNow();
+  const game = getSessionDate();
+  if (et.dateKey === game) return true;                        // morning of the game
+  if (et.dateKey === addDaysToKey(game, -1)) {                 // the night before
+    return et.hour >= DROP_DEADLINE_HOUR_ET;
+  }
+  return false;                                                // more than a day out
+}
+
 // Short date without the year, e.g. "Aug 15" — for the suspension message.
 // (helpers.formatDateShort includes the year; suspensions are within the year.)
 export function formatDateNoYear(ms) {

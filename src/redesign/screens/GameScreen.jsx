@@ -6,6 +6,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import BottomActions from '../components/BottomActions';
 import Confirmation from '../components/Confirmation';
+import Dialog from '../components/Dialog';
 import DropsCard from '../components/DropsCard';
 import GearTakers from '../components/GearTakers';
 import RosterSection from '../components/RosterSection';
@@ -19,8 +20,10 @@ import {
   mockPlayers, mockGearRoles, mockGearPriorityNames, mockCommitments, mockGameDate, mockDrops,
 } from '../state/mockRoster';
 import { useCurrentUser } from '../identity/useCurrentUser';
+import { isPastDropDeadline } from '../state/rollCall';
 import alertIcon from '../assets/icons/alert.svg';
 import noGameIcon from '../assets/icons/no-game.svg';
+import warningIcon from '../assets/icons/warning.svg';
 
 // "1st", "2nd", "3rd", "4th"… for the bench standing headline.
 const ordinal = (n) => {
@@ -114,14 +117,26 @@ export default function GameScreen() {
   // and myCommitments matches `c.takerDeviceId === deviceId` — so passing
   // undefined would match every commitment that also lacks one.
   const myGear = myCommitments(mockCommitments, null, youName, user.uid, mockGameDate);
-  const holdingGear = myGear.length > 0;
-  const holdingLabel = myGear.map((g) => gearLabel(g.type)).join(' & ');
+  // "Goals 🥅", or "Goals 🥅 & Bibs 🧺" when holding more than one set.
+  const holdingLabel = myGear.map((g) => `${gearLabel(g.type)} ${gearIcon(g.type)}`).join(' & ');
+  // The demo user is a gear bringer, so the drop is always blocked. `?gear=none`
+  // previews the ordinary path where you're free to leave.
+  const holdingGear = params.get('gear') === 'none' ? false : myGear.length > 0;
+
+  // Dropping after the 9 PM deadline earns a strike, so it gets a sterner
+  // confirm. `?deadline=passed` previews it outside those hours.
+  const lateDrop = params.get('deadline') === 'passed' || isPastDropDeadline();
+
+  // Which dialog is open: null | 'confirm-out' | 'holding-gear'.
+  const [dialog, setDialog] = useState(null);
+
+  // Tapping Out either explains why you can't drop, or asks you to confirm.
+  const handleOut = () => setDialog(holdingGear ? 'holding-gear' : 'confirm-out');
 
   // Leaving drops you from the list, so the "You're in" screen no longer applies
-  // — back to roll call. The designed confirm step, the past-9 PM strike warning,
-  // and the "you're holding gear" blocker are all still pending frames.
-  const handleOut = () => {
-    if (holdingGear) return; // guarded; the explanatory dialog is next up
+  // — back to roll call.
+  const confirmOut = () => {
+    setDialog(null);
     setPlayers((ps) => ps.filter((p) => p.name !== youName));
     navigate('/');
   };
@@ -189,10 +204,41 @@ export default function GameScreen() {
         onAddPlusOne={handleAddPlusOne}
         onOut={handleOut}
         addDisabled={hasPlusOne}
-        outDisabled={holdingGear}
-        outDisabledReason={holdingGear
-          ? `You're holding ${holdingLabel} — you can't drop while you have gear. Bring it back on game day, or ask an admin to reassign it.`
-          : undefined}
+      />
+
+      {/* Dropping out. Past the 9 PM deadline it costs a strike, so the copy is
+          sterner (Figma 3159:9446); before that it's the ordinary confirm
+          (3050:5354 / 3155:9414). */}
+      <Dialog
+        open={dialog === 'confirm-out'}
+        headline={lateDrop
+          ? 'Are you sure? If you drop, you’ll receive a strike.'
+          : 'Are you sure?'}
+        body={lateDrop
+          ? 'Dropping out after the 9 PM deadline will result in a strike. You’ll lose your current spot, and will not be allowed to sign up again.'
+          : 'If you drop out you will lose your current spot and signing up again might not guarantee a spot'}
+        cancelLabel="Cancel"
+        onCancel={() => setDialog(null)}
+        confirmLabel="Yes, I’m out"
+        onConfirm={confirmOut}
+      />
+
+      {/* Holding gear blocks the drop entirely, so there is nothing to decline —
+          the icon-only, single-primary-button variant (Figma 3159:9425). */}
+      <Dialog
+        open={dialog === 'holding-gear'}
+        icon={warningIcon}
+        body={
+          <>
+            <strong style={{ fontWeight: 'var(--font-weight-bold)' }}>
+              You’re holding {holdingLabel}
+            </strong>
+            {' — you can’t drop while you have gear. Ask an admin to reassign it '}
+            {'to another player and then come back to drop out.'}
+          </>
+        }
+        confirmLabel="Got it"
+        onConfirm={() => setDialog(null)}
       />
     </div>
   );
