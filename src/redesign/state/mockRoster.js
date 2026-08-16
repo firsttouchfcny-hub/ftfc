@@ -20,6 +20,9 @@ const P = (name, opts = {}) => {
   seq += 1;
   return {
     id: `p-${seq}`,
+    // Identity is uid-keyed on main; only the current user needs one here, so
+    // their roster row survives a rename.
+    uid: opts.uid,
     name,
     photoURL: opts.photo ? sampleAvatar : null,
     isAdmin: !!opts.admin,
@@ -36,7 +39,7 @@ const P = (name, opts = {}) => {
 // real tiering: gear bringers → gear takers → admins/pinned → Friday gear
 // priority → everyone else (then by signup time).
 export const mockPlayers = [
-  P('Cristian Lugo', { photo: true, admin: true }),   // brings a goal · the "you" row
+  P('Cristian Lugo', { photo: true, admin: true, uid: 'mock-uid-001' }), // brings a goal · the "you" row
   P('Dave Rappaport', { photo: true, admin: true }),  // brings a goal
   P('This is a really long name', { admin: true }),   // brings balls
   P('Marco Silva', { photo: true }),                  // brings bibs

@@ -13,7 +13,7 @@ import RosterSection from '../components/RosterSection';
 import TableCard from '../components/TableCard';
 import {
   MATCH1_MAX, MATCH2_MAX, MATCH2_MIN_CONFIRM,
-  buildFlatList, getMatch2State,
+  buildFlatList, getMatch2State, isSamePerson,
 } from '../../utils/helpers';
 import { gearIcon, gearLabel, myCommitments } from '../../utils/gear';
 import {
@@ -37,16 +37,21 @@ const nameKey = (n) => (n || '').toLowerCase().trim();
 // Map one flat entry onto PlayerRow's props. Guests repeat their host's avatar
 // and name (the "+1" badge carries the distinction), so we look the host up by
 // parentId rather than using buildFlatList's generated "Name +1" string.
-function toRow(entry, index, byId) {
+function toRow(entry, index, byId, me) {
   const host = entry.isMainEntry ? entry : byId.get(entry.parentId);
   const role = entry.isMainEntry ? mockGearRoles[nameKey(entry.name)] : null;
   const hasGear = !!(role && (role.bring.length || role.take.length));
 
+  // Rows store the name captured at signup, but production resolves display
+  // names by uid at render so a rename propagates everywhere. Only the current
+  // user carries a uid in this mock, so resolving theirs is the whole job here.
+  const isSelf = !!host?.uid && host.uid === me.uid;
+
   return {
     id: entry.id,
     position: String(index + 1).padStart(2, '0'),
-    name: host?.name ?? entry.name,
-    photoURL: host?.photoURL ?? null,
+    name: isSelf ? me.displayName : (host?.name ?? entry.name),
+    photoURL: isSelf ? me.photoURL : (host?.photoURL ?? null),
     admin: !!entry.isAdmin,
     // Only bringers get a row badge; takers are shown in the gear-takers strip.
     bringing: role?.bring.length ? gearIcon(role.bring[0]) : null,
@@ -55,6 +60,10 @@ function toRow(entry, index, byId) {
     gearPriority: entry.isMainEntry && !hasGear && !entry.isAdmin
       && mockGearPriorityNames.has(nameKey(entry.name)),
     plusOne: !entry.isMainEntry,
+    // Matched with production's isSamePerson (uid first, name as the fallback
+    // for rows without one), so renaming yourself doesn't lose the highlight.
+    // Never a guest row — it repeats the host's name by design.
+    isYou: entry.isMainEntry && isSamePerson(entry, { uid: me.uid, name: me.displayName }),
   };
 }
 
@@ -62,7 +71,10 @@ export default function GameScreen() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const user = useCurrentUser();
-  const youName = user.displayName; // highlights the current user's row in the roster
+  const youName = user.displayName;
+  // One matcher for "is this row me?", mirroring production: uid wins, name is
+  // the fallback for rows created before an account was resolved.
+  const isMe = (p) => isSamePerson(p, { uid: user.uid, name: youName });
   const preview = params.get('match2'); // 'onhold' | 'cancelled' | null
 
   // The signup list is local state so "Out" and "Add a +1" actually mutate the
@@ -90,13 +102,13 @@ export default function GameScreen() {
   const needed = Math.max(0, MATCH2_MIN_CONFIRM - total);
 
   // Same slicing as production: 18 / 18 / overflow.
-  const match1 = entries.slice(0, MATCH1_MAX).map((e, i) => toRow(e, i, byId));
-  const match2 = entries.slice(MATCH1_MAX, MATCH2_MAX).map((e, i) => toRow(e, MATCH1_MAX + i, byId));
-  const bench = entries.slice(MATCH2_MAX).map((e, i) => toRow(e, MATCH2_MAX + i, byId));
+  const match1 = entries.slice(0, MATCH1_MAX).map((e, i) => toRow(e, i, byId, user));
+  const match2 = entries.slice(MATCH1_MAX, MATCH2_MAX).map((e, i) => toRow(e, MATCH1_MAX + i, byId, user));
+  const bench = entries.slice(MATCH2_MAX).map((e, i) => toRow(e, MATCH2_MAX + i, byId, user));
 
   // Actions. "Add a +1" is a redesign addition — production only sets plusOnes at
   // sign-up time. Capped at one guest, since the row badge reads a literal "+1".
-  const me = players.find((p) => p.name === youName);
+  const me = players.find(isMe);
   const hasPlusOne = (me?.plusOnes ?? 0) > 0;
 
   // `plusOnesAt` records WHEN the guest was added. buildFlatList reads it: a +1
@@ -106,7 +118,7 @@ export default function GameScreen() {
   const handleAddPlusOne = () => {
     const at = Date.now();
     setPlayers((ps) => ps.map((p) => (
-      p.name === youName ? { ...p, plusOnes: 1, plusOnesAt: [at] } : p
+      isMe(p) ? { ...p, plusOnes: 1, plusOnesAt: [at] } : p
     )));
   };
 
@@ -137,7 +149,7 @@ export default function GameScreen() {
   // — back to roll call.
   const confirmOut = () => {
     setDialog(null);
-    setPlayers((ps) => ps.filter((p) => p.name !== youName));
+    setPlayers((ps) => ps.filter((p) => !isMe(p)));
     navigate('/');
   };
 
@@ -174,7 +186,7 @@ export default function GameScreen() {
       {/* Roster: the two matches share one card; the bench is its own card. */}
       <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 16 }}>
         <TableCard>
-          <RosterSection label="Match 1" players={match1} youName={youName} />
+          <RosterSection label="Match 1" players={match1} />
           <div style={{ height: 1, background: 'var(--color-light-olive)', margin: '0 9px' }} />
           <RosterSection
             label={cancelled ? 'Match 2 — NO GAME' : onHold ? 'Match 2 on hold' : 'Match 2'}
@@ -186,13 +198,12 @@ export default function GameScreen() {
             icon={cancelled ? noGameIcon : onHold ? alertIcon : undefined}
             dimmed={onHold || cancelled}
             players={match2}
-            youName={youName}
           />
         </TableCard>
 
         {bench.length > 0 && (
           <TableCard>
-            <RosterSection label="Bench" players={bench} youName={youName} />
+            <RosterSection label="Bench" players={bench} />
           </TableCard>
         )}
 

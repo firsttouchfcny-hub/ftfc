@@ -1,16 +1,20 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Mock identity seam.
 //
-// Screens read the current user ONLY through this hook. Today it returns a fixed
-// mock account so the redesign can be built and clicked through without the real
-// backend. When the team approves the identity model (see
-// docs/data-model-proposal.md), the real phone-auth account swaps in HERE — the
-// screens don't change.
+// Screens read the current user ONLY through this hook, and write through
+// `updateCurrentUser`. Today it is a small in-memory store so the prototype can
+// actually be used — editing your name or photo updates the nav, the roster and
+// the profile together. When the team's identity model is wired (uid-keyed,
+// phone-first — already on main), the real account swaps in HERE and the screens
+// don't change.
+//
+// In-memory means per-visit: a reload resets it, exactly like the roster mock.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { useSyncExternalStore } from 'react';
 import sampleAvatar from '../assets/sample-avatar-lg.jpg';
 
-const MOCK_USER = {
+let user = {
   uid: 'mock-uid-001',
   phone: '+15555550100',
   firstName: 'Cristian',
@@ -24,6 +28,20 @@ const MOCK_USER = {
   suspendedUntil: null, // ms timestamp when a suspension ends, or null if not suspended
 };
 
+const listeners = new Set();
+
 export function useCurrentUser() {
-  return MOCK_USER;
+  return useSyncExternalStore(
+    (onChange) => { listeners.add(onChange); return () => listeners.delete(onChange); },
+    () => user,
+  );
+}
+
+// Apply a partial update and notify every subscribed screen. `displayName` is
+// derived, never passed in, so it can't drift from the name parts.
+export function updateCurrentUser(patch) {
+  const next = { ...user, ...patch };
+  next.displayName = `${next.firstName || ''} ${next.lastName || ''}`.trim();
+  user = next;
+  listeners.forEach((l) => l());
 }

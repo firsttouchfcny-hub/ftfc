@@ -1,0 +1,15 @@
+/* ============================================================================
+   Redesign-only styles.
+
+   Everything in the redesign is written as inline styles + the shared type
+   tokens. This file exists for the handful of rules that inline styles cannot
+   express — pseudo-elements, mainly. It is imported by RedesignApp, so it never
+   loads for the production app at "/".
+   ============================================================================ */
+
+/* Input placeholders (Figma 2666:7754): Dark Gray 90% at 50% opacity. Inline
+   styles can't target ::placeholder, so it lives here. */
+.type-body-regular-tall::placeholder {
+  color: var(--color-dark-gray-90);
+  opacity: 0.5;
+}

@@ -8,11 +8,13 @@
 // Standalone (no nav):         /create-account
 
 import { BrowserRouter, Routes, Route, Outlet } from 'react-router-dom';
+import './styles.css';
 import TopNav from './components/TopNav';
 import HomeScreen from './screens/HomeScreen';
 import GameScreen from './screens/GameScreen';
 import CreateAccountScreen from './screens/CreateAccountScreen';
 import ProfileScreen from './screens/ProfileScreen';
+import EditProfileScreen from './screens/EditProfileScreen';
 import RulesScreen from './screens/RulesScreen';
 import GearScreen from './screens/GearScreen';
 
@@ -44,6 +46,7 @@ export default function RedesignApp() {
           <Route index element={<HomeScreen />} />
           <Route path="game" element={<GameScreen />} />
           <Route path="profile" element={<ProfileScreen />} />
+          <Route path="profile/edit" element={<EditProfileScreen />} />
           <Route path="rules" element={<RulesScreen />} />
           <Route path="gear" element={<GearScreen />} />
         </Route>

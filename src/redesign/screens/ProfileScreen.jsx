@@ -10,10 +10,10 @@
 // Deliberately NOT on this screen — gear commitments live on the Gear surface,
 // and the suspension banner lives on the roll-call screen, matching production.
 
-import { useEffect, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useRef } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import Button from '../components/Button';
-import { useCurrentUser } from '../identity/useCurrentUser';
+import { useCurrentUser, updateCurrentUser } from '../identity/useCurrentUser';
 import cameraIcon from '../assets/icons/camera.svg';
 
 const AVATAR = 200;
@@ -33,20 +33,28 @@ function formatPhone(e164) {
 
 export default function ProfileScreen() {
   const user = useCurrentUser();
+  const navigate = useNavigate();
   const [params] = useSearchParams();
   const fileRef = useRef(null);
 
-  // A locally picked photo previews immediately; `?photo=none` forces the
-  // initials fallback so that state stays reviewable.
-  const [picked, setPicked] = useState(null);
-  const photoURL = params.get('photo') === 'none' ? null : (picked || user.photoURL);
+  // `?photo=none` forces the initials fallback so that state stays reviewable.
+  const photoURL = params.get('photo') === 'none' ? null : user.photoURL;
 
-  // Release the object URL when it's replaced or the screen unmounts.
-  useEffect(() => () => { if (picked) URL.revokeObjectURL(picked); }, [picked]);
+  // Object URLs we minted, so the previous one can be released on replace. Not
+  // revoked on unmount — the photo lives on in the shared user, and revoking
+  // would blank the nav avatar and the roster row.
+  const objectUrl = useRef(null);
 
   const onPick = (e) => {
     const file = e.target.files?.[0];
-    if (file) setPicked(URL.createObjectURL(file));
+    if (file) {
+      const url = URL.createObjectURL(file);
+      if (objectUrl.current) URL.revokeObjectURL(objectUrl.current);
+      objectUrl.current = url;
+      // Write through the identity seam so the nav avatar and the roster's
+      // "you" row pick it up too, not just this screen.
+      updateCurrentUser({ photoURL: url });
+    }
     e.target.value = ''; // let the same file be picked again
   };
 
@@ -114,8 +122,7 @@ export default function ProfileScreen() {
           <p className="type-body-regular" style={{ color: 'var(--color-dark-gray-90)' }}>{formatPhone(user.phone)}</p>
         </div>
 
-        {/* The edit screen (name / last name / number) is the next piece of work. */}
-        <Button label="Edit profile" hug />
+        <Button label="Edit profile" hug onClick={() => navigate('/profile/edit')} />
       </div>
     </div>
   );
