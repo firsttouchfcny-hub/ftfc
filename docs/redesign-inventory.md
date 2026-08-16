@@ -160,12 +160,14 @@ see at a glance what's designed and what still needs a mockup before we build.
 
 | Element / state | Status | Notes |
 |---|---|---|
-| Profile settings (name, photo, phone, verified) | ⬜ | |
-| Edit name / photo | ⬜ | |
-| My gear commitments (+ cancel) | ⬜ | "You're bringing X back Y" |
-| Suspension status | ⬜ | If suspended |
-| Admin panel entry (admins only) | ⬜ | → section 8 |
-| Log out | ⬜ | |
+| Profile — view (non-admin) | ✅ 🔨 | Built (frame 3159:9458) · back-nav; vertically centred 200px avatar + camera button, name, formatted phone, "Edit profile". Uses the nav's back variant |
+| ↳ Profile photo — upload | ✅ 🔨 | Built · the camera button opens the OS picker via `<input type="file" accept="image/*">`. **No `capture` attribute on purpose** — that would force the camera; without it iOS offers Take Photo / Photo Library / Browse. The pick previews immediately (object URL, revoked on replace/unmount) |
+| ↳ Profile photo — none uploaded | ✅ 🔨 | Built · falls back to the initials avatar (72px "CL" on Tan); preview with `?photo=none` |
+| Edit name / last name / phone | ⬜ | **Next.** Carried over from production: editing the number re-triggers verification. The "Edit profile" button is currently a no-op until this exists |
+| My gear commitments (+ cancel) | ➖ | **Not a profile feature** (confirmed). It exists in production but lives on the **Gear** surface (`GearManager.jsx`) — "🥅 You're bringing **Goals** back Tuesday" + Cancel. Keeping it there; tracked under §6. Note the real rule: cancel is only allowed *before* you take the gear home |
+| Suspension status | ➖ | **Exists in production but not on the profile** — it's a banner on the roll-call screen (`App.jsx`: "🚫 You are suspended until … Contact an admin to appeal") and already built as the home suspended variant. Not in the profile frame, so not duplicated here |
+| Admin panel entry (admins only) | ⬜ | → section 8 · not in the non-admin frame; needs an admin variant of this screen |
+| Log out | ⬜ | Not in the current frame |
 
 ---
 

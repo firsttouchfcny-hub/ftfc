@@ -2,11 +2,12 @@
 // tall, 24px radius, bold 16px label. Shared by the floating action bar and the
 // dialog, which use the identical component in the design.
 //
-// Buttons default to filling their row (flex: 1 0 0) because both callers lay
-// them out in an equal-width set.
+// Buttons default to filling their row (flex: 1 0 0) because the action bar and
+// the dialog both lay them out in an equal-width set. Pass `hug` for a standalone
+// button that should size to its label instead (e.g. "Edit profile").
 
 export default function Button({
-  label, variant = 'secondary', onClick, disabled, title, autoFocus,
+  label, variant = 'secondary', onClick, disabled, title, autoFocus, hug = false,
 }) {
   const primary = variant === 'primary';
   return (
@@ -16,7 +17,7 @@ export default function Button({
       title={title}
       autoFocus={autoFocus}
       style={{
-        flex: '1 0 0', minWidth: 0, height: 56, padding: 16, borderRadius: 24,
+        flex: hug ? '0 0 auto' : '1 0 0', minWidth: 0, height: 56, padding: 16, borderRadius: 24,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         background: primary ? 'var(--color-dark-gray)' : 'var(--color-cream)',
         // The primary carries a TRANSPARENT border so both buttons stay exactly

@@ -8,13 +8,18 @@
 // screens don't change.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import sampleAvatar from '../assets/sample-avatar-lg.jpg';
+
 const MOCK_USER = {
   uid: 'mock-uid-001',
   phone: '+15555550100',
   firstName: 'Cristian',
   lastName: 'Lugo',
   displayName: 'Cristian Lugo',
-  photoURL: null, // null → initials fallback in <Avatar>
+  // A photo by default, so the nav avatar, the roster's "you" row and the
+  // profile all show the same person. The initials fallback (photoURL: null)
+  // is previewable on the profile with `?photo=none`.
+  photoURL: sampleAvatar,
   isAdmin: true,
   suspendedUntil: null, // ms timestamp when a suspension ends, or null if not suspended
 };
