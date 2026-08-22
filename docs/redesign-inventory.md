@@ -67,10 +67,10 @@ see at a glance what's designed and what still needs a mockup before we build.
 | State | Status | Notes |
 |---|---|---|
 | Available (`+`) | ✅ | |
-| Taken → shows **taker's avatar** in place of `+` | ⬜ | Per design decision — indicates who grabbed it |
-| Locked (balls-gate) | ⬜ | Balls disabled until Goals & Bibs exhausted; needs a clear locked look |
-| None left / fully covered | ⬜ | Slot count hit (2 goals / 1 balls / 1 bibs) |
-| Yours (you took it) | ⬜ | Your avatar + cancel affordance |
+| Taken → shows **taker's avatar** in place of `+` | ⬜ 🎨 | **Next up — needs a Figma frame.** Per design decision, indicates who grabbed it |
+| Locked (balls-gate) | ⬜ 🎨 | **Needs a frame.** Balls disabled until Goals & Bibs are actually taken |
+| None left / fully covered | ⬜ 🎨 | **Needs a frame.** Slot count hit (2 goals / 1 balls / 1 bibs) |
+| Yours (you took it) | ⬜ 🎨 | **Needs a frame.** Your avatar + cancel affordance — this is also where **cancelling a commitment** lands, since it leaves the gear page |
 
 ---
 
@@ -149,10 +149,25 @@ see at a glance what's designed and what still needs a mockup before we build.
 
 | Screen / state | Status | Notes |
 |---|---|---|
-| Who has gear now (current holders / out) | ⬜ | |
-| Gear schedule (upcoming mornings) | ⬜ | Per-day coverage chips (🥅 2/2 etc.), bringing-in vs taking-home |
+**Decided (2026-08-14):** like the admin tools, this surface renders the **real production `GearManager`** as-is for now — no redesign of it yet, just the redesign's back navigation. Scope is the screenshot Cristian marked up:
+
+| Region of today's `GearManager` | In the redesign's gear page? |
+|---|---|
+| ⏳ / 📥 gear alerts | ✅ yes |
+| 📥 Bringing gear (day-by-day cards) | ✅ yes |
+| 🎒 **Gear for {date}** — take tiles, your commitment, Cancel | ❌ **no** — moves to the home screen's gear tiles |
+| 🧭 Who has the gear | ✅ yes |
+| 📅 Gear schedule (next days) | ✅ yes |
+| ⚙️ Gear admin — mark returned / reassign / remove / add | ✅ yes, **stays here** (decided), admin-gated as today |
+
+| Element / state | Status | Notes |
+|---|---|---|
+| Who has gear now (current holders / out) | ⬜ | Comes with the port |
+| Gear schedule (upcoming mornings) | ⬜ | Comes with the port · per-day coverage chips |
 | ↳ day covered / short | ⬜ | |
-| Take / return actions here | ⬜ | If gear can be claimed from this surface too |
+| Take / return actions here | ➖ | **Dropped from this surface** — taking gear happens on the home screen's gear tiles |
+| ⚠️ Blocked on: gear tiles | 🚧 | **Sequencing decision:** the gear tiles are built *before* this page, so taking gear is never missing from the redesign. Taking gear and cancelling a commitment currently exist **only** in the excluded red box |
+| ⚠️ Port is a bigger lift than the admin one | 🚧 | `GearManager` builds a Firestore doc ref at **module level** and holds a live `onSnapshot`, so importing it initializes Firebase. Needs the same actions-seam treatment as `adminActions.js`, plus abstracting the subscription |
 
 ---
 
