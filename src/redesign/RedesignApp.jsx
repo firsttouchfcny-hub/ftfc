@@ -15,6 +15,7 @@ import GameScreen from './screens/GameScreen';
 import CreateAccountScreen from './screens/CreateAccountScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import EditProfileScreen from './screens/EditProfileScreen';
+import AdminToolsScreen from './screens/AdminToolsScreen';
 import RulesScreen from './screens/RulesScreen';
 import GearScreen from './screens/GearScreen';
 
@@ -47,6 +48,7 @@ export default function RedesignApp() {
           <Route path="game" element={<GameScreen />} />
           <Route path="profile" element={<ProfileScreen />} />
           <Route path="profile/edit" element={<EditProfileScreen />} />
+          <Route path="profile/admin" element={<AdminToolsScreen />} />
           <Route path="rules" element={<RulesScreen />} />
           <Route path="gear" element={<GearScreen />} />
         </Route>

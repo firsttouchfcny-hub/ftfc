@@ -15,6 +15,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import Button from '../components/Button';
 import { useCurrentUser, updateCurrentUser } from '../identity/useCurrentUser';
 import cameraIcon from '../assets/icons/camera.svg';
+import adminIcon from '../assets/icons/admin.svg';
 
 const AVATAR = 200;
 
@@ -37,8 +38,10 @@ export default function ProfileScreen() {
   const [params] = useSearchParams();
   const fileRef = useRef(null);
 
-  // `?photo=none` forces the initials fallback so that state stays reviewable.
+  // `?photo=none` forces the initials fallback so that state stays reviewable,
+  // and `?admin=none` previews the non-admin view (the mock user is an admin).
   const photoURL = params.get('photo') === 'none' ? null : user.photoURL;
+  const isAdmin = params.get('admin') === 'none' ? false : user.isAdmin;
 
   // Object URLs we minted, so the previous one can be released on replace. Not
   // revoked on unmount — the photo lives on in the shared user, and revoking
@@ -116,13 +119,29 @@ export default function ProfileScreen() {
           />
         </div>
 
-        {/* Name + phone */}
+        {/* Name (+ admin crown) + phone */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center', textAlign: 'center', width: '100%' }}>
-          <h1 className="type-heading-h2" style={{ color: 'var(--color-dark-gray)' }}>{user.displayName}</h1>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center', justifyContent: 'center', width: '100%' }}>
+            <h1 className="type-heading-h2" style={{ color: 'var(--color-dark-gray)' }}>{user.displayName}</h1>
+            {isAdmin && (
+              // Same crown as the roster rows, exported there at 20px; the
+              // viewBox is square so 28px scales it without distortion.
+              <img src={adminIcon} alt="Admin" title="Admin" style={{ width: 28, height: 28, flexShrink: 0, display: 'block' }} />
+            )}
+          </div>
           <p className="type-body-regular" style={{ color: 'var(--color-dark-gray-90)' }}>{formatPhone(user.phone)}</p>
         </div>
 
-        <Button label="Edit profile" hug onClick={() => navigate('/profile/edit')} />
+        {/* Admins get a second action, so the pair shares the row equally;
+            everyone else keeps a single button sized to its label. */}
+        {isAdmin ? (
+          <div style={{ display: 'flex', gap: 12, alignItems: 'stretch', width: '100%' }}>
+            <Button label="Edit profile" onClick={() => navigate('/profile/edit')} />
+            <Button label="Admin tools" onClick={() => navigate('/profile/admin')} />
+          </div>
+        ) : (
+          <Button label="Edit profile" hug onClick={() => navigate('/profile/edit')} />
+        )}
       </div>
     </div>
   );

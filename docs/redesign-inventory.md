@@ -171,7 +171,8 @@ see at a glance what's designed and what still needs a mockup before we build.
 | **`InputField`** (shared component) | ✅ 🔨 | Built (frame 2666:7754) for reuse by the account-creation screens · four states — default (Tan), focused (Dark Gray + glow), error (Red + message), disabled — plus label, helper text, optional left icon and optional up/down chevron. All four verified in-browser |
 | My gear commitments (+ cancel) | ➖ | **Not a profile feature** (confirmed). It exists in production but lives on the **Gear** surface (`GearManager.jsx`) — "🥅 You're bringing **Goals** back Tuesday" + Cancel. Keeping it there; tracked under §6. Note the real rule: cancel is only allowed *before* you take the gear home |
 | Suspension status | ➖ | **Exists in production but not on the profile** — it's a banner on the roll-call screen (`App.jsx`: "🚫 You are suspended until … Contact an admin to appeal") and already built as the home suspended variant. Not in the profile frame, so not duplicated here |
-| Admin panel entry (admins only) | ⬜ | → section 8 · not in the non-admin frame; needs an admin variant of this screen |
+| Profile — admin variant | ✅ 🔨 | Built (frame 3233:12618) · a 28px crown sits beside the name, and the single "Edit profile" becomes a two-button set with **Admin tools**. Preview the non-admin view with `?admin=none` |
+| Admin panel entry (admins only) | ✅ 🔨 | Built · "Admin tools" → `/r/profile/admin` |
 | Log out | ⬜ | Not in the current frame |
 
 ---
@@ -180,13 +181,19 @@ see at a glance what's designed and what still needs a mockup before we build.
 
 | Function / state | Status | Notes |
 |---|---|---|
-| Roll call open/close override | ⬜ | Phase-scoped override |
-| Manage players (add / remove / drop) | ⬜ | |
-| Suspensions (suspend / unsuspend / strikes) | ⬜ | Escalating durations |
-| Admin badge grant / revoke | ⬜ | |
-| Gear ledger — assign / reassign | ⬜ | |
-| Gear ledger — mark returned / late / remove | ⬜ | |
+**Deliberately not redesigned.** The admin tools render the **real production `AdminPanel`** inside the redesign shell, so the settings and mechanisms are exactly what admins use today; the only addition is the back navigation. It runs on mock actions, so it's safe to click and works on the preview deploy. See `docs/admin-actions-seam.md`.
+
+| Function / state | Status | Notes |
+|---|---|---|
+| Roll call open/close override | ✅ 🔨 | Real panel · phase-scoped override |
+| Manage players (add / remove / drop) | ✅ 🔨 | Real panel · incl. bulk add, +1s, priority |
+| Suspensions (suspend / unsuspend / strikes) | ✅ 🔨 | Real panel · escalating durations, undo |
+| Admin badge grant / revoke | ✅ 🔨 | Real panel · by name, account-keyed |
+| Verification override | ✅ 🔨 | Real panel · "Mark verified" safety valve |
+| Gear ledger — assign / reassign | ⬜ | Lives in `GearManager`, not `AdminPanel` — comes with the Gear surface |
+| Gear ledger — mark returned / late / remove | ⬜ | As above |
 | "Someone already has it" onboarding | ⬜ | Held-gear entry |
+| ↳ Admin tools — live data on merge | 🟡 | Runs on `createMockAdminActions` today; the route swaps to `createFirestoreAdminActions()` when the redesign merges |
 
 ---
 

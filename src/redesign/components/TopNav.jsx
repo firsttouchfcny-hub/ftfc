@@ -15,7 +15,7 @@ import gearIcon from '../assets/icons/gear.svg';
 import backIcon from '../assets/icons/back.svg';
 
 // Detail surfaces that show the back variant instead of the default nav.
-const BACK_ROUTES = ['/rules', '/profile', '/profile/edit'];
+const BACK_ROUTES = ['/rules', '/profile', '/profile/edit', '/profile/admin'];
 
 const ICONS = {
   rules: { src: rulesIcon, inset: { top: '8.33%', right: '10.33%', bottom: '8.51%', left: '8.33%' } },
