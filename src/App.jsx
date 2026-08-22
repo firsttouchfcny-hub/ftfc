@@ -7,6 +7,7 @@ import {
 import NameEntry   from './components/NameEntry';
 import PlayerList  from './components/PlayerList';
 import AdminPanel  from './components/AdminPanel';
+import { createFirestoreAdminActions } from './utils/adminActions';
 import Rules       from './components/Rules';
 import PhoneVerify from './components/PhoneVerify';
 import GearManager from './components/GearManager';
@@ -799,8 +800,10 @@ export default function App() {
                   <AdminPanel
                     session={session}
                     players={displayPlayers}
-                    today={adminDate}
-                    adminName={displayName}
+                    // The panel is store-agnostic; production wires it to
+                    // Firestore here. `today` and `adminName` now belong to the
+                    // actions factory, which is what needs them.
+                    actions={createFirestoreAdminActions({ today: adminDate, adminName: displayName })}
                   />
                 )}
               </div>
