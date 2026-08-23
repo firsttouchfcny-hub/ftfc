@@ -3,6 +3,7 @@ import {
   isGameDay, addDaysToKey, nextGameDay, addGameDays,
   getSessionDate, getRollCallPhase,
   isSamePerson, rosterDocId, toE164US, buildFlatList,
+  splitName, joinName,
 } from './helpers.js';
 
 // Reference weekdays: 2026-07-25 Sat, -26 Sun, -27 Mon, -28 Tue, -31 Fri, 08-03 Mon.
@@ -210,5 +211,47 @@ describe('buildFlatList — roster ordering + gear roles + +1 expansion', () => 
     ];
     // Jeremy keeps his spot; his guest lands after everyone who signed up before 999
     expect(names(buildFlatList(players))).toEqual(['Jeremy', 'Bob', 'Cara', 'Jeremy +1']);
+  });
+});
+
+describe('splitName', () => {
+  it('takes the first word as the first name and the rest as the last', () => {
+    expect(splitName('Cristian Lugo')).toEqual({
+      firstName: 'Cristian', lastName: 'Lugo', needsLastName: false,
+    });
+  });
+
+  it('keeps compound surnames together', () => {
+    expect(splitName('Felipe Di Carli')).toEqual({
+      firstName: 'Felipe', lastName: 'Di Carli', needsLastName: false,
+    });
+  });
+
+  it('treats a single initial as the last name', () => {
+    expect(splitName('Eric J')).toEqual({
+      firstName: 'Eric', lastName: 'J', needsLastName: false,
+    });
+  });
+
+  it('flags one-word names so the app can ask for a last name', () => {
+    expect(splitName('Elle')).toEqual({
+      firstName: 'Elle', lastName: '', needsLastName: true,
+    });
+    expect(splitName('Shimon').needsLastName).toBe(true);
+  });
+
+  it('tolerates messy spacing and empty input', () => {
+    expect(splitName('  Sam   Boylan  ')).toEqual({
+      firstName: 'Sam', lastName: 'Boylan', needsLastName: false,
+    });
+    expect(splitName('')).toEqual({ firstName: '', lastName: '', needsLastName: false });
+    expect(splitName(null).needsLastName).toBe(false);
+  });
+
+  it('round-trips through joinName', () => {
+    for (const n of ['Cristian Lugo', 'Felipe Di Carli', 'Eric J', 'Elle']) {
+      const { firstName, lastName } = splitName(n);
+      expect(joinName(firstName, lastName)).toBe(n);
+    }
   });
 });
