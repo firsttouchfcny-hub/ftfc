@@ -15,7 +15,7 @@ import IconButton from './IconButton';
 import PlayerAvatar from './PlayerAvatar';
 import plusIcon from '../assets/icons/plus.svg';
 
-export default function GearTile({ icon, label, onAdd, takenBy, locked }) {
+export default function GearTile({ icon, label, onAdd, onOpenTaken, takenBy, locked }) {
   return (
     <div style={{ width: 48, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
       {/* gear icon circle (48px), pulled -8px so the control overlaps it */}
@@ -35,13 +35,19 @@ export default function GearTile({ icon, label, onAdd, takenBy, locked }) {
         // luminosity blend and leaving the photo in full colour while every other
         // avatar is desaturated. DOM order handles the overlap — this sits after
         // the gear circle and both are positioned.
-        <div
+        <button
+          type="button"
+          onClick={onOpenTaken}
           title={`${takenBy.name} is taking ${label} home`}
           aria-label={`${takenBy.name} is taking ${label} home`}
-          style={{ position: 'relative' }}
+          style={{
+            position: 'relative', padding: 0, border: 'none',
+            background: 'transparent', cursor: 'pointer', display: 'block',
+            borderRadius: 1000,
+          }}
         >
           <PlayerAvatar name={takenBy.name} photoURL={takenBy.photoURL} />
-        </div>
+        </button>
       ) : (
         // free / locked → the "+" icon button (disabled when locked).
         // Wrapped in a positioned box so it paints ON TOP of the gear circle:

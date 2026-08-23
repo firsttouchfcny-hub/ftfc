@@ -105,6 +105,9 @@ export const mockCommitments = [
   // short of full coverage so the alert states are previewable.
   { id: 'c5', takerName: 'Nico Bruno', type: 'goal', takeDate: GAME_DATE, returnDate: '2026-10-16', status: 'committed' },
   { id: 'c6', takerName: 'Kofi Mensah', type: 'bibs', takeDate: GAME_DATE, returnDate: '2026-10-16', status: 'committed' },
+  // The current user takes the second goal, so the "yours" tile + its cancel
+  // dialog are reachable in the demo alongside someone else's commitment.
+  { id: 'c7', takerName: 'Cristian Lugo', type: 'goal', takeDate: GAME_DATE, returnDate: '2026-10-16', status: 'committed' },
 ];
 
 // Derive name → { bring: [], take: [] } for the game-day morning, the same way

@@ -86,7 +86,8 @@ see at a glance what's designed and what still needs a mockup before we build.
 | Taken → shows **taker's avatar** in place of `+` | ✅ 🔨 | Built (frame 2756:2786) · the `+` becomes the taker's `PlayerAvatar` (photo or initials, same as the roster). Takers resolved from the ledger via `takersFor()` — the same source as coverage/alerts; two goal tiles fill independently. Taken tiles are non-interactive |
 | Locked (balls-gate) | ✅ 🔨 | Built (2026-08-15) · the balls tile shows the **disabled icon button** (frame 2754:3164) until goals & bibs are fully taken. Uses production's `takeBlockedByPriority`; the disabled `+` can't open the dialog |
 | None left / fully covered | ✅ 🔨 | **No separate state needed** (decided): because each set is its own tile, "fully covered" is just every tile in the **taken** state (avatar). Differs from production, which used a single tile with a count |
-| Yours (you took it) | ⬜ 🎨 | **Needs a frame.** Your avatar + cancel affordance — this is also where **cancelling a commitment** lands, since it leaves the gear page |
+| Yours (you took it) | ✅ 🔨 | Built (frames 3323:21876 / 3323:21901) · tapping any **claimed** tile opens a commitment dialog: yours reads "**You** are taking [gear] to bring back {date}" with **Stop taking {gear}**; someone else's reads "{name} **is** taking …" with **Close**. Grammar switches per variant — the frame's "{name} are taking" only works for "You". Built on new `GearCommitmentLine` + `GearChip`, and `Dialog`'s new `content` slot |
+| ↳ Cancel behaviour — game spot | 🟡 | **Verified same as production**, keyed on the `signedUp` flag not the screen: gear-only rows are deleted on cancel, real sign-ups keep their spot. So taking gear pre-signup → cancel removes you from **both** games; taking it after signing up → only the **return** game is dropped. The button is wired to close only — the actual cancel needs the data layer |
 
 ---
 

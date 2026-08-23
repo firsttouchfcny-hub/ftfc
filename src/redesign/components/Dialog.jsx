@@ -27,8 +27,12 @@ export default function Dialog({
   icon,
   headline,
   body,
+  content,          // raw node in place of headline/body, for laid-out content
+                    // (the gear dialogs read as one sentence with inline chips,
+                    // which can't live inside a <p>)
   confirmLabel,
   onConfirm,
+  confirmVariant = 'primary',
   secondaryLabel,   // a second real choice → switches the buttons to stacked
   onSecondary,
   cancelLabel,
@@ -58,8 +62,8 @@ export default function Dialog({
 
   if (!open) return null;
 
-  if (import.meta.env.DEV && !icon && !headline) {
-    console.warn('[Dialog] needs an icon or a headline — see Figma 3155:9399.');
+  if (import.meta.env.DEV && !icon && !headline && !content) {
+    console.warn('[Dialog] needs an icon, a headline, or content — see Figma 3155:9399.');
   }
 
   return (
@@ -87,6 +91,7 @@ export default function Dialog({
           }}
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'flex-start', width: '100%', color: 'var(--color-dark-gray)' }}>
+            {content}
             {icon && <img src={icon} alt="" style={{ width: 48, height: 48, display: 'block', flexShrink: 0 }} />}
             {headline && (
               <h2 id={headlineId} style={{ fontFamily: 'var(--font-family-base)', fontWeight: 'var(--font-weight-bold)', fontSize: 24, lineHeight: 'normal', margin: 0 }}>
@@ -108,7 +113,7 @@ export default function Dialog({
           ) : (
             <div style={{ display: 'flex', gap: 12, alignItems: 'stretch', width: '100%' }}>
               {hasCancel && <Button label={cancelLabel} onClick={onCancel} />}
-              <Button label={confirmLabel} variant="primary" onClick={onConfirm} autoFocus />
+              <Button label={confirmLabel} variant={confirmVariant} onClick={onConfirm} autoFocus />
             </div>
           )}
         </div>

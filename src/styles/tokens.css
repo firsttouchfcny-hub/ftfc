@@ -64,6 +64,7 @@
      named tokens). Values are px per the Figma spec. */
   --font-size-h1:      36px;
   --font-size-h2:      28px;
+  --font-size-subheading: 22px;
   --font-size-body:    16px;
   --font-size-small:   14px;
   --font-size-caption: 13px;
@@ -79,6 +80,8 @@
 
 .type-heading-h1,
 .type-heading-h2,
+.type-subheading-bold,
+.type-subheading-regular,
 .type-body-regular,
 .type-body-regular-tall,
 .type-body-semibold,
@@ -98,6 +101,10 @@
 /* Heading */
 .type-heading-h1        { font-weight: var(--font-weight-medium);   font-size: var(--font-size-h1);      line-height: normal; }
 .type-heading-h2        { font-weight: var(--font-weight-bold);     font-size: var(--font-size-h2);      line-height: 36px;   }
+
+/* Subheading (spec v1.2.0) */
+.type-subheading-bold    { font-weight: var(--font-weight-bold);    font-size: var(--font-size-subheading); line-height: 32px;   }
+.type-subheading-regular { font-weight: var(--font-weight-regular); font-size: var(--font-size-subheading); line-height: 32px;   }
 
 /* Body */
 .type-body-regular      { font-weight: var(--font-weight-regular);  font-size: var(--font-size-body);    line-height: normal; }

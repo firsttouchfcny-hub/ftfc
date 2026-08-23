@@ -9,9 +9,12 @@
 
 import { useState } from 'react';
 import Dialog from './Dialog';
+import GearCommitmentLine from './GearCommitmentLine';
 import GearTile from './GearTile';
 import { gearIcon, gearLabel, playerReturnDates, takersFor, takeBlockedByPriority } from '../../utils/gear';
 import { formatWeekday, formatGameDate } from '../state/rollCall';
+import { useCurrentUser } from '../identity/useCurrentUser';
+import { isSamePerson } from '../../utils/helpers';
 import { mockCommitments, mockGameDate, mockPlayers } from '../state/mockRoster';
 import goalIcon from '../assets/gear/goal.png';
 import ballsIcon from '../assets/gear/balls.png';
@@ -32,7 +35,9 @@ export default function GearTakers({
   players = mockPlayers,
   onTake,
 }) {
-  const [taking, setTaking] = useState(null); // gear type mid-confirmation
+  const [taking, setTaking] = useState(null);   // gear type mid-take-confirmation
+  const [viewing, setViewing] = useState(null); // a claimed commitment being viewed
+  const me = useCurrentUser();
 
   // Who is taking each set home after this game, straight from the ledger — the
   // same source the coverage figures and alerts read, so the tiles can't
@@ -50,7 +55,9 @@ export default function GearTakers({
   const ballsLocked = takeBlockedByPriority(commitments, 'balls', takeDate);
   const assigned = TILES.map(({ type, ...rest }) => {
     const c = queues[type].shift();
-    const takenBy = c ? { name: c.takerName, photoURL: photoOf(c.takerName) } : null;
+    const takenBy = c
+      ? { name: c.takerName, photoURL: photoOf(c.takerName), type, returnDate: c.returnDate }
+      : null;
     return { type, ...rest, takenBy, locked: !takenBy && type === 'balls' && ballsLocked };
   });
 
@@ -80,6 +87,7 @@ export default function GearTakers({
             takenBy={takenBy}
             locked={locked}
             onAdd={() => setTaking(type)}
+            onOpenTaken={() => setViewing(takenBy)}
           />
         ))}
       </div>
@@ -103,6 +111,29 @@ export default function GearTakers({
         onSecondary={() => take(false)}
         cancelLabel="Cancel"
         onCancel={close}
+      />
+
+      {/* Tapping a claimed tile shows who has it. It's your own commitment when
+          the taker matches you — then the button cancels it; otherwise the
+          dialog is informational and just closes (Figma 3323:21876 / 21901). */}
+      <Dialog
+        open={!!viewing}
+        content={viewing ? (
+          <GearCommitmentLine
+            name={viewing.name}
+            photoURL={viewing.photoURL}
+            isYou={isSamePerson({ name: viewing.name }, { uid: me.uid, name: me.displayName })}
+            type={viewing.type}
+            returnLabel={formatGameDate(viewing.returnDate)}
+          />
+        ) : null}
+        confirmLabel={
+          viewing && isSamePerson({ name: viewing.name }, { uid: me.uid, name: me.displayName })
+            ? `Stop taking ${gearLabel(viewing.type)}`
+            : 'Close'
+        }
+        confirmVariant="secondary"
+        onConfirm={() => setViewing(null)}
       />
     </div>
   );

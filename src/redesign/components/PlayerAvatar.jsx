@@ -10,18 +10,22 @@ function initialsOf(name) {
   return ((parts[0]?.[0] || '') + (parts[1]?.[0] || '')).toUpperCase() || '?';
 }
 
-export default function PlayerAvatar({ name, photoURL, admin }) {
+// `size` defaults to the roster's 32px; the gear dialogs use 28px inline.
+export default function PlayerAvatar({ name, photoURL, admin, size = 32 }) {
   return (
-    <div style={{ position: 'relative', width: 32, height: 32, flexShrink: 0 }}>
+    <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
       {photoURL ? (
         <img
           src={photoURL}
           alt=""
-          style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', mixBlendMode: 'luminosity' }}
+          style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', mixBlendMode: 'luminosity', display: 'block' }}
         />
       ) : (
-        <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--color-tan)', display: 'grid', placeItems: 'center' }}>
-          <span className="type-small-semibold" style={{ color: 'var(--color-dark-gray)', lineHeight: '16px' }}>
+        <div style={{ width: size, height: size, borderRadius: '50%', background: 'var(--color-tan)', display: 'grid', placeItems: 'center' }}>
+          <span
+            className="type-small-semibold"
+            style={{ color: 'var(--color-dark-gray)', lineHeight: 1, fontSize: Math.round(size * 0.44) }}
+          >
             {initialsOf(name)}
           </span>
         </div>
