@@ -18,6 +18,15 @@ see at a glance what's designed and what still needs a mockup before we build.
 
 ---
 
+## ⚠️ Open actions (not code — someone has to go do these)
+
+| Action | Owner | Why it matters |
+|---|---|---|
+| **Set `VITE_ENABLE_REDESIGN=true` on Vercel → Preview only.** Leave Production unset. | Cristian | Until it's set, `/r` will **not load on the preview link**, so the team can't review on their phones. And if it were ever set on Production, players could reach an unfinished experience showing mock data and think they're signed up. |
+| Set the same var in local `.env.local` (optional) | anyone | Local dev already enables it automatically; only needed to test the *disabled* path. |
+
+---
+
 ## 0. Cross-cutting states (apply across screens)
 
 | State | Status | Notes |
