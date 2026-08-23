@@ -120,7 +120,8 @@ see at a glance what's designed and what still needs a mockup before we build.
 
 | Element | Status | Notes |
 |---|---|---|
-| Gear takers strip ("Tomorrow's gear takers") | ✅ 🔨 | Built · shared `GearTakers` component |
+| Gear takers strip ("Tomorrow's gear takers") | 🟡 🔨 | Built · shared `GearTakers` component. ⚠️ **The word "Tomorrow" is wrong for much of the week** — see below |
+| ↳ **"Tomorrow" is often not tomorrow** | ⬜ | `gearTakeDate()` returns the next **game day**, not tomorrow. On a Friday, Saturday or Sunday the next game is **Monday**, so the shipped headline misstates the day. Same root cause as the home screen's multi-hour countdown. Needs a copy decision: the weekday name, or "tomorrow" only when it genuinely is. Applies to this headline **and** the take-gear dialog body |
 | **Floating action bar** (Add a +1 · Out) | ✅ 🔨 | Built · `BottomActions`, 32px above the viewport bottom; slides down on scroll-down and back up on scroll-up (frame 3024:5347) |
 | ↳ "Add a +1" action | ✅ 🔨 | Built · wired to state; sets `plusOnesAt` so a late guest takes a **back-of-line** spot (matches main `3db7b27`). Production has this too (`21b59ae`) — it is *not* redesign-only |
 | ↳ "Add a +1" — already have one | 🟡 | Capped at 1; button disabled as an interim. **Needs a designed state** — production supports **remove** as well (`21b59ae` "add/remove a +1 … no drop, keeps your spot"), so this most likely wants to become a "Remove +1" affordance |
