@@ -68,3 +68,44 @@
 .rd-btn-tertiary { color: var(--color-dark-gray); }
 .rd-btn-tertiary:hover:not(:disabled) { background: var(--color-tan-40); }
 .rd-btn-tertiary:active:not(:disabled) { background: var(--color-tan-60); }
+
+/* ── Icon button (Figma 2754:3164) ─────────────────────────────────────────
+   A circular icon button in two sizes (sm 32 / md 40) with five states. Same
+   reasoning as the pill buttons: states are pseudo-classes, so they live here,
+   and the classes are namespaced rd- to avoid the global .btn theme in index.css. */
+
+.rd-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 1000px;
+  cursor: pointer;
+  background: var(--color-cream);
+  border: 1px solid var(--color-tan);
+  transition: background-color 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+}
+.rd-icon-btn--sm { width: 32px; height: 32px; }
+.rd-icon-btn--md { width: 40px; height: 40px; }
+
+.rd-icon-btn:hover:not(:disabled) {
+  background: #F5F2E8;
+  border-color: #B8B6AC;
+  box-shadow: 0 6px 6px rgba(20, 20, 20, 0.2);
+}
+.rd-icon-btn:active:not(:disabled) {
+  background: #F0EDE3;
+  border-color: #B8B6AC;
+  box-shadow: none;
+}
+.rd-icon-btn:focus-visible {
+  outline: none;
+  border: 2px solid #3366CC;
+}
+/* Disabled is also the balls-gate "locked" look: goals & bibs must be taken
+   before balls can be. */
+.rd-icon-btn:disabled {
+  background: #F2F1ED;
+  border-color: #E0DFDA;
+  opacity: 0.5;
+  cursor: not-allowed;
+}

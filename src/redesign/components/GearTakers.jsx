@@ -10,7 +10,7 @@
 import { useState } from 'react';
 import Dialog from './Dialog';
 import GearTile from './GearTile';
-import { gearIcon, gearLabel, playerReturnDates, takersFor } from '../../utils/gear';
+import { gearIcon, gearLabel, playerReturnDates, takersFor, takeBlockedByPriority } from '../../utils/gear';
 import { formatWeekday, formatGameDate } from '../state/rollCall';
 import { mockCommitments, mockGameDate, mockPlayers } from '../state/mockRoster';
 import goalIcon from '../assets/gear/goal.png';
@@ -45,9 +45,13 @@ export default function GearTakers({
   // taken claims the first tile and the second stays free.
   const queues = { goal: [], balls: [], bibs: [] };
   for (const c of takersFor(commitments, takeDate)) queues[c.type]?.push(c);
+  // Balls-gate: balls can't be taken until goals AND bibs are fully taken. When
+  // locked, a still-free balls tile shows the disabled icon button.
+  const ballsLocked = takeBlockedByPriority(commitments, 'balls', takeDate);
   const assigned = TILES.map(({ type, ...rest }) => {
     const c = queues[type].shift();
-    return { type, ...rest, takenBy: c ? { name: c.takerName, photoURL: photoOf(c.takerName) } : null };
+    const takenBy = c ? { name: c.takerName, photoURL: photoOf(c.takerName) } : null;
+    return { type, ...rest, takenBy, locked: !takenBy && type === 'balls' && ballsLocked };
   });
 
   // When the gear comes back. Production fixes this to the earliest open day for
@@ -68,12 +72,13 @@ export default function GearTakers({
       <p className="type-body-regular" style={{ color: 'var(--color-dark-gray)' }}>{headline}</p>
 
       <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', justifyContent: 'center', width: '100%' }}>
-        {assigned.map(({ key, type, icon, takenBy }) => (
+        {assigned.map(({ key, type, icon, takenBy, locked }) => (
           <GearTile
             key={key}
             icon={icon}
             label={gearLabel(type)}
             takenBy={takenBy}
+            locked={locked}
             onAdd={() => setTaking(type)}
           />
         ))}
