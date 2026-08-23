@@ -139,8 +139,10 @@ export default function GameScreen() {
   // confirm. `?deadline=passed` previews it outside those hours.
   const lateDrop = params.get('deadline') === 'passed' || isPastDropDeadline();
 
-  // Which dialog is open: null | 'confirm-out' | 'holding-gear'.
-  const [dialog, setDialog] = useState(null);
+  // Which dialog is open: null | 'confirm-out' | 'holding-gear' | 'take-gear'.
+  // `?dialog=takegear` previews the take-gear dialog: its copy and buttons are
+  // agreed, but the gear tile that will actually trigger it isn't designed yet.
+  const [dialog, setDialog] = useState(params.get('dialog') === 'takegear' ? 'take-gear' : null);
 
   // Tapping Out either explains why you can't drop, or asks you to confirm.
   const handleOut = () => setDialog(holdingGear ? 'holding-gear' : 'confirm-out');
@@ -232,6 +234,29 @@ export default function GameScreen() {
         onCancel={() => setDialog(null)}
         confirmLabel="Yes, I’m out"
         onConfirm={confirmOut}
+      />
+
+      {/* Taking gear home — the stacked variant. Both options take the gear and
+          bring it back; the choice is whether you're also playing, which is why
+          both labels turn on that and the body asks it outright. "Take gear only"
+          creates the commitment with no roster row on either day (gearOnly). */}
+      <Dialog
+        open={dialog === 'take-gear'}
+        headline={`Take home Bibs ${gearIcon('bibs')}`}
+        body={
+          <>
+            You’ll take them home after <strong style={{ fontWeight: 'var(--font-weight-bold)' }}>Monday</strong>’s
+            game and bring them back on <strong style={{ fontWeight: 'var(--font-weight-bold)' }}>Friday, Aug 31</strong>.
+            <br /><br />
+            Are you playing both days?
+          </>
+        }
+        confirmLabel="Take & play both days"
+        onConfirm={() => setDialog(null)}
+        secondaryLabel="Take gear only"
+        onSecondary={() => setDialog(null)}
+        cancelLabel="Cancel"
+        onCancel={() => setDialog(null)}
       />
 
       {/* Holding gear blocks the drop entirely, so there is nothing to decline —

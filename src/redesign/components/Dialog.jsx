@@ -6,8 +6,14 @@
 //
 // Content: an optional 48px icon and an optional headline sit above the body
 // copy — at least one of the two is required, so a dialog is never just loose
-// text. Buttons come in two shapes: a cancel + confirm pair, or a single primary
-// button when there is nothing to decline (an acknowledgement).
+// text.
+//
+// Buttons take three shapes, chosen by what you pass rather than a layout flag:
+//   · confirm only                → a single primary (an acknowledgement)
+//   · confirm + cancel            → a side-by-side pair
+//   · confirm + secondary + cancel → stacked full-width, cancel as tertiary
+// Stacking is not a style choice: two real options plus a way out don't fit
+// across one row, and their labels are sentences rather than words.
 //
 // Dismissing (Escape, or tapping the scrim) runs the cancel action, falling back
 // to the confirm action for single-button dialogs — so the dialog can always be
@@ -23,6 +29,8 @@ export default function Dialog({
   body,
   confirmLabel,
   onConfirm,
+  secondaryLabel,   // a second real choice → switches the buttons to stacked
+  onSecondary,
   cancelLabel,
   onCancel,
 }) {
@@ -32,6 +40,7 @@ export default function Dialog({
   // Single-button dialogs have nothing to decline; dismissing them is the same
   // as acknowledging.
   const hasCancel = !!(cancelLabel && onCancel);
+  const hasSecondary = !!(secondaryLabel && onSecondary);
   const dismiss = hasCancel ? onCancel : onConfirm;
 
   useEffect(() => {
@@ -87,10 +96,21 @@ export default function Dialog({
             {body && <p className="type-body-regular-tall" style={{ margin: 0 }}>{body}</p>}
           </div>
 
-          <div style={{ display: 'flex', gap: 12, alignItems: 'stretch', width: '100%' }}>
-            {hasCancel && <Button label={cancelLabel} onClick={onCancel} />}
-            <Button label={confirmLabel} variant="primary" onClick={onConfirm} autoFocus />
-          </div>
+          {hasSecondary ? (
+            // Stacked: primary first, then the alternative, then the way out.
+            // Cancel is tertiary because it is only the dismissal made visible —
+            // the same action as tapping the scrim or pressing Escape.
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%' }}>
+              <Button label={confirmLabel} variant="primary" onClick={onConfirm} autoFocus hug />
+              <Button label={secondaryLabel} variant="secondary" onClick={onSecondary} hug />
+              {hasCancel && <Button label={cancelLabel} variant="tertiary" onClick={onCancel} hug />}
+            </div>
+          ) : (
+            <div style={{ display: 'flex', gap: 12, alignItems: 'stretch', width: '100%' }}>
+              {hasCancel && <Button label={cancelLabel} onClick={onCancel} />}
+              <Button label={confirmLabel} variant="primary" onClick={onConfirm} autoFocus />
+            </div>
+          )}
         </div>
       </div>
     </div>

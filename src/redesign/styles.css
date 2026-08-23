@@ -13,3 +13,58 @@
   color: var(--color-dark-gray-90);
   opacity: 0.5;
 }
+
+/* ── Buttons (Figma 2673:7973) ─────────────────────────────────────────────
+   Three types × five states. These live in CSS rather than inline styles
+   because hover / active / focus-visible are pseudo-classes — inline styles
+   can't express them, and faking hover in JS misses keyboard focus entirely.
+
+   Namespaced `rd-` on purpose: the production theme in index.css already owns
+   .btn / .btn-primary / .btn-success, it is loaded globally, and the real
+   AdminPanel renders those classes inside the redesign at /r/profile/admin.
+   Sharing the names silently restyled that panel. */
+
+.rd-btn {
+  height: 56px;
+  padding: 16px;
+  border-radius: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  /* Every type carries a border so the focus ring can thicken it without
+     changing the button's size and nudging its neighbours. */
+  border: 2px solid transparent;
+  background: transparent;
+  transition: background-color 120ms ease, box-shadow 120ms ease, opacity 150ms ease;
+}
+
+.rd-btn:disabled { cursor: not-allowed; opacity: 0.4; }
+
+/* Focus ring is shared across all three types. */
+.rd-btn:focus-visible {
+  outline: none;
+  border-color: #645AC8;
+  box-shadow: 0 0 0 3px rgba(100, 90, 200, 0.4);
+}
+
+/* Primary — Dark Gray fill, Cream label */
+.rd-btn-primary { background: var(--color-dark-gray); color: var(--color-cream); }
+.rd-btn-primary:hover:not(:disabled) { box-shadow: 0 6px 6px rgba(20, 20, 20, 0.2); }
+.rd-btn-primary:active:not(:disabled) { background: #121016; box-shadow: none; }
+.rd-btn-primary:focus-visible { background: #1D1A22; }
+
+/* Secondary — Cream fill, Tan border */
+.rd-btn-secondary {
+  background: var(--color-cream);
+  color: var(--color-dark-gray);
+  border-color: var(--color-tan);
+}
+.rd-btn-secondary:hover:not(:disabled) { background: #F0EDE2; }
+.rd-btn-secondary:active:not(:disabled) { background: var(--color-light-olive); }
+.rd-btn-secondary:focus-visible { background: var(--color-cream); border-color: #645AC8; }
+
+/* Tertiary — no fill or border until you touch it */
+.rd-btn-tertiary { color: var(--color-dark-gray); }
+.rd-btn-tertiary:hover:not(:disabled) { background: var(--color-tan-40); }
+.rd-btn-tertiary:active:not(:disabled) { background: var(--color-tan-60); }
