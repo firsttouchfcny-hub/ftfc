@@ -86,7 +86,7 @@ export default function GearTakers({
 
       <Dialog
         open={!!taking}
-        headline={taking ? `Take home ${gearLabel(taking)} ${gearIcon(taking)}` : ''}
+        headline={taking ? `Take ${gearLabel(taking)} ${gearIcon(taking)}` : ''}
         body={taking ? (
           <>
             You’ll take them home after{' '}

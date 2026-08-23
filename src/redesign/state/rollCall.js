@@ -70,6 +70,22 @@ export function formatGameDate(dateKey) {
     : '';
 }
 
+// "October 15th, 2026" — full month + ordinal + year, no weekday. The game
+// header shows the weekday on its own line, so it wants the date without it.
+export function formatMonthDayYear(dateKey) {
+  if (!dateKey) return '';
+  const d = atNoon(dateKey);
+  const day = d.getDate();
+  const s = ['th', 'st', 'nd', 'rd'];
+  const v = day % 100;
+  const ord = `${day}${s[(v - 20) % 10] || s[v] || s[0]}`;
+  const { month, year } = Object.fromEntries(
+    new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' })
+      .formatToParts(d).filter((p) => p.type !== 'literal').map((p) => [p.type, p.value]),
+  );
+  return `${month} ${ord}, ${year}`;
+}
+
 // "Thursday, Oct 15th, 2026" — the game header's full form, ordinal and all.
 export function formatFullGameDate(dateKey) {
   if (!dateKey) return '';

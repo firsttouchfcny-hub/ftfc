@@ -4,10 +4,14 @@
 // can flow in later.
 
 import ballIcon from '../assets/icons/ball.svg';
+import { formatWeekday, formatMonthDayYear } from '../state/rollCall';
+import { mockGameDate } from '../state/mockRoster';
 
+// Weekday and date default from the mock game day, so the header can't drift
+// from the dates the gear dialog quotes. Real values override via props.
 export default function GameHeader({
-  weekday = 'Thursday',
-  date = 'October 11th, 2026',
+  weekday = formatWeekday(mockGameDate),
+  date = formatMonthDayYear(mockGameDate),
   time = '07:00 AM',
   location = 'McCarren Park',
 }) {
