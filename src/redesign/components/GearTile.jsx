@@ -43,25 +43,31 @@ export default function GearTile({ icon, label, onAdd, takenBy, locked }) {
           <PlayerAvatar name={takenBy.name} photoURL={takenBy.photoURL} />
         </div>
       ) : (
-        // free / locked → the "+" icon button (disabled when locked)
-        <IconButton
-          size="sm"
-          onClick={onAdd}
-          disabled={locked}
-          label={locked ? `${label} locked — goals & bibs first` : `Take ${label}`}
-          title={locked ? `${label} locked — goals & bibs first` : `Take ${label}`}
-        >
-          <span style={{ position: 'relative', display: 'block', width: 20, height: 20, overflow: 'hidden' }}>
-            <img
-              src={plusIcon}
-              alt=""
-              style={{
-                position: 'absolute', left: '50%', top: '50%', width: 12.1, height: 12.1,
-                transform: 'translate(-50%, -50%)', display: 'block', maxWidth: 'none',
-              }}
-            />
-          </span>
-        </IconButton>
+        // free / locked → the "+" icon button (disabled when locked).
+        // Wrapped in a positioned box so it paints ON TOP of the gear circle:
+        // the circle is position:relative, and a static button would otherwise
+        // render behind it regardless of DOM order. (No z-index — same reason as
+        // the avatar branch: it would create a stacking context.)
+        <div style={{ position: 'relative' }}>
+          <IconButton
+            size="sm"
+            onClick={onAdd}
+            disabled={locked}
+            label={locked ? `${label} locked — goals & bibs first` : `Take ${label}`}
+            title={locked ? `${label} locked — goals & bibs first` : `Take ${label}`}
+          >
+            <span style={{ position: 'relative', display: 'block', width: 20, height: 20, overflow: 'hidden' }}>
+              <img
+                src={plusIcon}
+                alt=""
+                style={{
+                  position: 'absolute', left: '50%', top: '50%', width: 12.1, height: 12.1,
+                  transform: 'translate(-50%, -50%)', display: 'block', maxWidth: 'none',
+                }}
+              />
+            </span>
+          </IconButton>
+        </div>
       )}
     </div>
   );
