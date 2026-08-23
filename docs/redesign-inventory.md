@@ -26,7 +26,9 @@ see at a glance what's designed and what still needs a mockup before we build.
 | Empty roster (0 signed up) | ⬜ | First person to sign up sees an empty list |
 | Offline / error | ⬜ | Firestore unreachable; read-only fallback |
 | Suspended user | 🟡 🔨 | Home suspended screen built; appeal path + other screens' suspended states TBD |
-| Admin vs non-admin | 🟡 | Admin sees early sign-up + admin panel entry; toggled everywhere |
+| Admin vs non-admin | 🟡 | Admin sees early sign-up + admin panel entry; toggled everywhere · `/r/profile/admin` now guards itself by `isAdmin` |
+| **Render error** | ✅ 🔨 | Built · `ErrorBoundary` wraps the whole app, so a thrown error shows a readable message + Reload instead of a white screen (stack shown in dev only) |
+| **Redesign visibility** | ✅ 🔨 | `/r` is off unless `VITE_ENABLE_REDESIGN=true` (or local dev). **Leave it unset in Production** — the redesign shows mock data a real player could mistake for the live roster. Set it on Preview so the team can review |
 | Weekend (Mon's game shown) | ⬜ | Sat/Sun display Monday, already open |
 
 ---
@@ -45,7 +47,10 @@ see at a glance what's designed and what still needs a mockup before we build.
 | ↳ capturing / uploading | ⬜ | Camera + upload-in-progress |
 | Add profile pic — filled | ✅ | Continue |
 | Skipped photo → initials fallback | 🟡 🔨 | Built in roster (`PlayerAvatar`); the account-flow step still TBD |
-| **Returning user sign-in** | ⬜ | Existing account: phone → OTP → home (distinct from "create") |
+| **Returning user sign-in** | ➖ | **Decided (2026-08-14): no special flow.** A returning verified user goes straight to the home / roll-call screen — the new root — where they join a game. Nothing to design. The *verification check itself* still has to be wired (see below) |
+| ↳ Verification gate | ⬜ | **Not wired.** No redesign screen reads `phoneVerified`, so the gate that keeps unverified people out doesn't exist in the new experience yet |
+| **Name split — existing accounts** | 🟡 | **Decided (2026-08-14):** production stores ONE `name`; the redesign splits it. Rule: **first word = first name, the rest = last name** — so "Eric J" → Eric / J, "Felipe Di Carli" → Felipe / Di Carli. One-word names are **not allowed** |
+| ↳ **Missing last name — prompt** | ⬜ 🎨 | **Needs a frame.** Real players today have one-word names (**Elle**, **Shimon**). The rule above leaves them with no last name, and edit-profile *requires* one — so they must be asked for it once, before they can continue. This screen does not exist |
 
 ---
 

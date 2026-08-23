@@ -10,6 +10,7 @@
 // this file — see utils/adminActions.js.
 
 import { useMemo, useState } from 'react';
+import { Navigate } from 'react-router-dom';
 import AdminPanel from '../../components/AdminPanel';
 import { createMockAdminActions } from '../state/mockAdminActions';
 import { mockPlayers, mockGameDate } from '../state/mockRoster';
@@ -34,6 +35,11 @@ export default function AdminToolsScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
+
+  // The profile only offers this to admins, but the route is reachable by URL —
+  // so it guards itself. Harmless today on mock actions; essential before this
+  // is ever pointed at the real store.
+  if (!user.isAdmin) return <Navigate to="/profile" replace />;
 
   return (
     // The panel carries the production app's own styling, so it sits in a plain

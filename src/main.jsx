@@ -7,32 +7,41 @@ import { createRoot } from 'react-dom/client'
 import '@fontsource-variable/plus-jakarta-sans' // self-hosted brand font
 import './index.css'
 import './styles/tokens.css'                     // design tokens (color + type)
-import RedesignApp from './redesign/RedesignApp.jsx'
+import ErrorBoundary from './components/ErrorBoundary.jsx'
 
-// The production app is loaded LAZILY on purpose. It initializes Firebase at
-// import time, which throws when the env vars are absent (e.g. a preview deploy
-// without secrets) — and a static import would take the redesign down with it.
-// Importing it only on the routes that need it keeps /r genuinely independent of
-// the backend, which is the whole point of the mock seam.
+// Both apps load lazily, so each visitor downloads only the one they'll see.
+// This matters in both directions:
+//   · the production app initializes Firebase at import time, which throws when
+//     the env vars are absent (a preview deploy) — importing it eagerly would
+//     take the redesign down with it;
+//   · the redesign is dead weight for real players, so it must not sit in the
+//     bundle everyone downloads.
 const App = lazy(() => import('./App.jsx'))
+const RedesignApp = lazy(() => import('./redesign/RedesignApp.jsx'))
 const TokenGallery = lazy(() => import('./components/TokenGallery.jsx'))
 
+// The redesign is UNFINISHED and shows mock data — a real player who stumbled
+// onto it could believe they're signed up when they aren't. So it is off unless
+// explicitly switched on: always available locally, and on deploys only where
+// VITE_ENABLE_REDESIGN is set (Preview, not Production).
+//
+// It deliberately is NOT gated on DEV alone: preview deploys are production
+// builds, so that would hide it from the very people reviewing it.
+const REDESIGN_ENABLED =
+  import.meta.env.DEV || import.meta.env.VITE_ENABLE_REDESIGN === 'true'
+
 // Routing:
-//   /r/*     → the redesign shell (isolated; production app untouched)
+//   /r/*     → the redesign shell, when enabled (falls through to the app if not)
 //   /?tokens → the living token specimen (dev only)
 //   /        → the current production app
 const path = window.location.pathname
-const showRedesign = path === '/r' || path.startsWith('/r/')
+const showRedesign = REDESIGN_ENABLED && (path === '/r' || path.startsWith('/r/'))
 const showTokens = import.meta.env.DEV &&
   new URLSearchParams(window.location.search).has('tokens')
 
 const root = showRedesign
   ? <RedesignApp />
-  : (
-    <Suspense fallback={null}>
-      {showTokens ? <TokenGallery /> : <App />}
-    </Suspense>
-  )
+  : showTokens ? <TokenGallery /> : <App />
 
 const rootEl = document.getElementById('root')
 // The redesign is full-bleed (its background fills the viewport), so lift the
@@ -40,5 +49,9 @@ const rootEl = document.getElementById('root')
 if (showRedesign) rootEl.style.maxWidth = 'none'
 
 createRoot(rootEl).render(
-  <StrictMode>{root}</StrictMode>,
+  <StrictMode>
+    <ErrorBoundary>
+      <Suspense fallback={null}>{root}</Suspense>
+    </ErrorBoundary>
+  </StrictMode>,
 )
