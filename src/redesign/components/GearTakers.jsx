@@ -10,9 +10,9 @@
 import { useState } from 'react';
 import Dialog from './Dialog';
 import GearTile from './GearTile';
-import { gearIcon, gearLabel, playerReturnDates } from '../../utils/gear';
+import { gearIcon, gearLabel, playerReturnDates, takersFor } from '../../utils/gear';
 import { formatWeekday, formatGameDate } from '../state/rollCall';
-import { mockCommitments, mockGameDate } from '../state/mockRoster';
+import { mockCommitments, mockGameDate, mockPlayers } from '../state/mockRoster';
 import goalIcon from '../assets/gear/goal.png';
 import ballsIcon from '../assets/gear/balls.png';
 import bibsIcon from '../assets/gear/bibs.png';
@@ -29,9 +29,26 @@ export default function GearTakers({
   headline,
   commitments = mockCommitments,
   takeDate = mockGameDate,
+  players = mockPlayers,
   onTake,
 }) {
   const [taking, setTaking] = useState(null); // gear type mid-confirmation
+
+  // Who is taking each set home after this game, straight from the ledger — the
+  // same source the coverage figures and alerts read, so the tiles can't
+  // disagree with them. Commitments carry a name; the photo is resolved from the
+  // roster, mirroring how production resolves display names by uid at render.
+  const photoOf = (name) =>
+    players.find((p) => p.name.toLowerCase() === (name || '').toLowerCase())?.photoURL ?? null;
+
+  // One queue per type, so two goal tiles fill independently: the first goal
+  // taken claims the first tile and the second stays free.
+  const queues = { goal: [], balls: [], bibs: [] };
+  for (const c of takersFor(commitments, takeDate)) queues[c.type]?.push(c);
+  const assigned = TILES.map(({ type, ...rest }) => {
+    const c = queues[type].shift();
+    return { type, ...rest, takenBy: c ? { name: c.takerName, photoURL: photoOf(c.takerName) } : null };
+  });
 
   // When the gear comes back. Production fixes this to the earliest open day for
   // goals and balls (so every game stays covered) and only lets you choose for
@@ -51,11 +68,12 @@ export default function GearTakers({
       <p className="type-body-regular" style={{ color: 'var(--color-dark-gray)' }}>{headline}</p>
 
       <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', justifyContent: 'center', width: '100%' }}>
-        {TILES.map(({ key, type, icon }) => (
+        {assigned.map(({ key, type, icon, takenBy }) => (
           <GearTile
             key={key}
             icon={icon}
             label={gearLabel(type)}
+            takenBy={takenBy}
             onAdd={() => setTaking(type)}
           />
         ))}

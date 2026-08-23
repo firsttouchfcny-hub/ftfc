@@ -47,7 +47,7 @@ export const mockPlayers = [
   P('Luis Gómez', { photo: true }),
   P('Theo Walsh', {}),                                // Friday gear priority
   P('Sam Okafor', { photo: true, plusOnes: 1 }),      // brings a +1 guest
-  P('Nico Bruno', {}),                                // takes a goal home
+  P('Nico Bruno', { photo: true }),                   // takes a goal home (photo avatar on the tile)
   P('Andre Costa', { photo: true }),
   P('Kofi Mensah', {}),                               // takes bibs home
   P('Omar Haddad', { photo: true }),
