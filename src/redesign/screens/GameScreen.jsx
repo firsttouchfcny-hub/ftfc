@@ -20,7 +20,7 @@ import {
   mockPlayers, mockGearRoles, mockGearPriorityNames, mockCommitments, mockGameDate, mockDrops,
 } from '../state/mockRoster';
 import { useCurrentUser } from '../identity/useCurrentUser';
-import { isPastDropDeadline } from '../state/rollCall';
+import { isPastDropDeadline, formatFullGameDate } from '../state/rollCall';
 import alertIcon from '../assets/icons/alert.svg';
 import noGameIcon from '../assets/icons/no-game.svg';
 import warningIcon from '../assets/icons/warning.svg';
@@ -139,10 +139,13 @@ export default function GameScreen() {
   // confirm. `?deadline=passed` previews it outside those hours.
   const lateDrop = params.get('deadline') === 'passed' || isPastDropDeadline();
 
-  // Which dialog is open: null | 'confirm-out' | 'holding-gear' | 'take-gear'.
-  // `?dialog=takegear` previews the take-gear dialog: its copy and buttons are
-  // agreed, but the gear tile that will actually trigger it isn't designed yet.
-  const [dialog, setDialog] = useState(params.get('dialog') === 'takegear' ? 'take-gear' : null);
+  // Derived from the mock so the header can't drift from the date the gear
+  // dialog quotes — they were previously set by hand and disagreed.
+  const gameDateLabel = formatFullGameDate(mockGameDate);
+
+  // Which dialog is open: null | 'confirm-out' | 'holding-gear'. The take-gear
+  // dialog belongs to GearTakers, since its tiles are what open it.
+  const [dialog, setDialog] = useState(null);
 
   // Tapping Out either explains why you can't drop, or asks you to confirm.
   const handleOut = () => setDialog(holdingGear ? 'holding-gear' : 'confirm-out');
@@ -182,7 +185,7 @@ export default function GameScreen() {
   return (
     // Bottom padding clears the floating action bar (56px pill + 32px offset).
     <div style={{ display: 'flex', flexDirection: 'column', gap: 32, alignItems: 'center', padding: '8px 16px 120px' }}>
-      <Confirmation headline={headline} badge={badge} />
+      <Confirmation headline={headline} badge={badge} date={gameDateLabel} />
       <GearTakers headline="Tomorrow’s gear takers" />
 
       {/* Roster: the two matches share one card; the bench is its own card. */}
@@ -236,28 +239,6 @@ export default function GameScreen() {
         onConfirm={confirmOut}
       />
 
-      {/* Taking gear home — the stacked variant. Both options take the gear and
-          bring it back; the choice is whether you're also playing, which is why
-          both labels turn on that and the body asks it outright. "Take gear only"
-          creates the commitment with no roster row on either day (gearOnly). */}
-      <Dialog
-        open={dialog === 'take-gear'}
-        headline={`Take home Bibs ${gearIcon('bibs')}`}
-        body={
-          <>
-            You’ll take them home after <strong style={{ fontWeight: 'var(--font-weight-bold)' }}>Monday</strong>’s
-            game and bring them back on <strong style={{ fontWeight: 'var(--font-weight-bold)' }}>Friday, Aug 31</strong>.
-            <br /><br />
-            Are you playing both days?
-          </>
-        }
-        confirmLabel="Take & play both days"
-        onConfirm={() => setDialog(null)}
-        secondaryLabel="Take gear only"
-        onSecondary={() => setDialog(null)}
-        cancelLabel="Cancel"
-        onCancel={() => setDialog(null)}
-      />
 
       {/* Holding gear blocks the drop entirely, so there is nothing to decline —
           the icon-only, single-primary-button variant (Figma 3159:9425). */}

@@ -54,6 +54,37 @@ export function isPastDropDeadline() {
   return false;                                                // more than a day out
 }
 
+// A date key parsed at midday, so a timezone offset can never slide it a day.
+const atNoon = (dateKey) => new Date(`${dateKey}T12:00:00`);
+
+// "Monday" — the day a game falls on. Used instead of the word "tomorrow",
+// which is wrong whenever the next game is more than a day away (Fri/Sat/Sun).
+export function formatWeekday(dateKey) {
+  return dateKey ? atNoon(dateKey).toLocaleDateString('en-US', { weekday: 'long' }) : '';
+}
+
+// "Monday, Oct 13" — a game day named in full, for commitments worth remembering.
+export function formatGameDate(dateKey) {
+  return dateKey
+    ? atNoon(dateKey).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
+    : '';
+}
+
+// "Thursday, Oct 15th, 2026" — the game header's full form, ordinal and all.
+export function formatFullGameDate(dateKey) {
+  if (!dateKey) return '';
+  const d = atNoon(dateKey);
+  const day = d.getDate();
+  const s = ['th', 'st', 'nd', 'rd'];
+  const v = day % 100;
+  const ord = `${day}${s[(v - 20) % 10] || s[v] || s[0]}`;
+  const { weekday, month, year } = Object.fromEntries(
+    new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'short', year: 'numeric' })
+      .formatToParts(d).filter((p) => p.type !== 'literal').map((p) => [p.type, p.value]),
+  );
+  return `${weekday}, ${month} ${ord}, ${year}`;
+}
+
 // Short date without the year, e.g. "Aug 15" — for the suspension message.
 // (helpers.formatDateShort includes the year; suspensions are within the year.)
 export function formatDateNoYear(ms) {

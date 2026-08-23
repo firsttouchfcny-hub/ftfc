@@ -80,7 +80,8 @@ see at a glance what's designed and what still needs a mockup before we build.
 
 | State | Status | Notes |
 |---|---|---|
-| Available (`+`) | ✅ | |
+| Available (`+`) | ✅ 🔨 | Built · the `+` opens the take-home dialog (stacked variant), with the gear name, the take day and the return date all computed by production's `playerReturnDates` |
+| ↳ **Return-date picker (bibs)** | ⬜ 🎨 | **Missing step.** Production asks *"When will you bring the {gear} back?"* before the confirm — but only when there's a choice. Goals and balls are always fixed to the earliest open day so every game stays covered, and bibs are fixed too when a near game is uncovered. Bibs have a 5-day window, so when the near games are already covered the player **can** choose, and that picker has no design. Today the dialog takes the earliest option, which silently removes that choice |
 | Taken → shows **taker's avatar** in place of `+` | ⬜ 🎨 | **Next up — needs a Figma frame.** Per design decision, indicates who grabbed it |
 | Locked (balls-gate) | ⬜ 🎨 | **Needs a frame.** Balls disabled until Goals & Bibs are actually taken |
 | None left / fully covered | ⬜ 🎨 | **Needs a frame.** Slot count hit (2 goals / 1 balls / 1 bibs) |

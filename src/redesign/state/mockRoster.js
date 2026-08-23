@@ -89,8 +89,10 @@ export const mockPlayers = [
 //
 // Dates are relative to GAME_DATE (tomorrow's game) so the mock stays coherent
 // no matter when it's viewed.
-const GAME_DATE = '2026-10-11';   // the morning this screen is about
-const PREV_GAME = '2026-10-10';
+// Real weekdays: games run Mon–Fri, so these must be too. Thu 15th is the game;
+// Wed 14th is the game before it, and Fri 16th the one after.
+const GAME_DATE = '2026-10-15';   // Thursday — the morning this screen is about
+const PREV_GAME = '2026-10-14';   // Wednesday
 
 export const mockCommitments = [
   // Taken home before → coming back IN on game day (these are the "bringers").
@@ -101,8 +103,8 @@ export const mockCommitments = [
 
   // Taking a set HOME after game day (these are the "takers"). Deliberately
   // short of full coverage so the alert states are previewable.
-  { id: 'c5', takerName: 'Nico Bruno', type: 'goal', takeDate: GAME_DATE, returnDate: '2026-10-12', status: 'committed' },
-  { id: 'c6', takerName: 'Kofi Mensah', type: 'bibs', takeDate: GAME_DATE, returnDate: '2026-10-12', status: 'committed' },
+  { id: 'c5', takerName: 'Nico Bruno', type: 'goal', takeDate: GAME_DATE, returnDate: '2026-10-16', status: 'committed' },
+  { id: 'c6', takerName: 'Kofi Mensah', type: 'bibs', takeDate: GAME_DATE, returnDate: '2026-10-16', status: 'committed' },
 ];
 
 // Derive name → { bring: [], take: [] } for the game-day morning, the same way
