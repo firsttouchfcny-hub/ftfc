@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { db } from './firebase/config';
 import {
   doc, onSnapshot, setDoc, updateDoc, deleteDoc, runTransaction,
@@ -11,6 +11,7 @@ import { createFirestoreAdminActions } from './utils/adminActions';
 import Rules       from './components/Rules';
 import PhoneVerify from './components/PhoneVerify';
 import GearManager from './components/GearManager';
+import { createFirestoreGearActions } from './utils/gearActions';
 import PushSetup   from './components/PushSetup';
 import { registerServiceWorker } from './utils/push';
 import { accountRef } from './utils/identity';
@@ -259,6 +260,13 @@ export default function App() {
   // name can be stale (e.g. renamed on another device). Fall back to it only
   // until the account loads.
   const displayName   = playerProfile?.name || playerName;
+  // The gear panel is store-agnostic; production wires it to Firestore here.
+  // Memoised because GearManager keys its live ledger subscription on this
+  // object — a fresh factory each render would resubscribe on every frame.
+  const gearActions = useMemo(
+    () => createFirestoreGearActions({ adminName: displayName }),
+    [displayName],
+  );
   // A roster entry is "me" if the stable uid matches, else fall back to device/name.
   const isMe = (p) => isSamePerson(p, { uid, deviceId, name: playerName });
   const myEntry       = players.find(isMe);
@@ -656,8 +664,8 @@ export default function App() {
               uid={uid}
               amAdmin={amAdmin}
               suspended={suspended}
-              adminName={displayName}
               namesByUid={namesByUid}
+              actions={gearActions}
             />
 
             {/* Signup buttons */}

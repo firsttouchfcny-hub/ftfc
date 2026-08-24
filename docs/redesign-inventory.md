@@ -179,14 +179,18 @@ see at a glance what's designed and what still needs a mockup before we build.
 | 📅 Gear schedule (next days) | ✅ yes |
 | ⚙️ Gear admin — mark returned / reassign / remove / add | ✅ yes, **stays here** (decided), admin-gated as today |
 
+**Built (2026-08-24)** at `/r/gear`, on the same actions-seam pattern as the admin tools — see `docs/gear-actions-seam.md`.
+
 | Element / state | Status | Notes |
 |---|---|---|
-| Who has gear now (current holders / out) | ⬜ | Comes with the port |
-| Gear schedule (upcoming mornings) | ⬜ | Comes with the port · per-day coverage chips |
-| ↳ day covered / short | ⬜ | |
-| Take / return actions here | ➖ | **Dropped from this surface** — taking gear happens on the home screen's gear tiles |
-| ⚠️ Blocked on: gear tiles | 🚧 | **Sequencing decision:** the gear tiles are built *before* this page, so taking gear is never missing from the redesign. Taking gear and cancelling a commitment currently exist **only** in the excluded red box |
-| ⚠️ Port is a bigger lift than the admin one | 🚧 | `GearManager` builds a Firestore doc ref at **module level** and holds a live `onSnapshot`, so importing it initializes Firebase. Needs the same actions-seam treatment as `adminActions.js`, plus abstracting the subscription |
+| ⏳ / 📥 gear alerts | ✅ 🔨 | Real `gearBringingAlert` / `gearTakingAlert`; show when a morning is uncovered |
+| 📥 Bringing gear (day-by-day cards) | ✅ 🔨 | Next 3 mornings, per-type names + "needed ×N" + ✓ Ready |
+| Who has gear now (current holders / out) | ✅ 🔨 | Per physical set: out / scheduled / at the field |
+| Gear schedule (upcoming mornings) | ✅ 🔨 | Next 6 mornings · per-day coverage chips |
+| ↳ day covered / short | ✅ 🔨 | Coverage chips read 🥅 2/2, ⚽ 0/1 … |
+| ⚙️ Gear admin — returned / reassign / remove / add | ✅ 🔨 | Admin-gated, as today. All five writes verified through the mock seam |
+| Take / return actions here | ➖ | **Dropped from this surface** (`showTake={false}`) — taking gear happens on the gear tiles |
+| ⚠️ Port was a bigger lift than the admin one | ✅ | Resolved: `GearManager` built its Firestore doc ref at **module level** and held a live `onSnapshot`. Both now live behind `createFirestoreGearActions()`; the subscription is a seam operation (`subscribe`) like any other write |
 
 ---
 
@@ -224,7 +228,7 @@ see at a glance what's designed and what still needs a mockup before we build.
 | Suspensions (suspend / unsuspend / strikes) | ✅ 🔨 | Real panel · escalating durations, undo |
 | Admin badge grant / revoke | ✅ 🔨 | Real panel · by name, account-keyed |
 | Verification override | ✅ 🔨 | Real panel · "Mark verified" safety valve |
-| Gear ledger — assign / reassign | ⬜ | Lives in `GearManager`, not `AdminPanel` — comes with the Gear surface |
+| Gear ledger — assign / reassign | ✅ 🔨 | Lives in `GearManager`, not `AdminPanel` — shipped with the Gear surface (§6) |
 | Gear ledger — mark returned / late / remove | ⬜ | As above |
 | "Someone already has it" onboarding | ⬜ | Held-gear entry |
 | ↳ Admin tools — live data on merge | 🟡 | Runs on `createMockAdminActions` today; the route swaps to `createFirestoreAdminActions()` when the redesign merges |

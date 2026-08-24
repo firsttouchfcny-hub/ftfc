@@ -74,7 +74,7 @@ On `/r/profile/edit`: clear the last name → **Save** shows the error state.
 | URL | Shows |
 |---|---|
 | `/r/rules` | Rules & code of conduct |
-| `/r/gear` | Scaffold — the gear detail page isn't built yet |
+| `/r/gear` | The real production gear panel on mock data — alerts, bringing-gear day cards, who has the gear, the schedule, and (as an admin) the gear admin tools. Taking gear is deliberately absent: that lives on the gear tiles |
 | `/r/create-account` | Scaffold — account flow isn't built yet |
 | `/?tokens` | Design token specimen — **local only** (dev build) |
 
