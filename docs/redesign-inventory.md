@@ -14,7 +14,7 @@ see at a glance what's designed and what still needs a mockup before we build.
 - A **+1 added after signup takes a back-of-line spot**, not the host's (`plusOnesAt`); a +1 taken *at* signup still sits with its host
 - Identity is **uid-keyed / phone-first** (`newUid`, `isSamePerson`, `rosterDocId`, one phone = one account)
 
-**🔨 Built so far** (redesign branch, at `/r`): design tokens — color (incl. the new **Expressive** set) + type · routing shell + 6 screens · the **frosted sticky top nav** (progressive blur + olive scrim) · the **home roll-call screen — all 4 variants** (waiting w/ live countdown, open, admin, suspended) · the **"You're in" game screen** — confirmation header, gear-takers, and the full **Match 1 / Match 2 / Bench roster table** with all three **Match 2 states** (confirmed · on-hold · cancelled — top message *and* section header, driven by `getMatch2State`). Reusable components: `GameHeader`, `Confirmation`, `GearTile`, `GearTakers`, `Fab`, `StatusBadge`, `ProgressiveBlur`, `Avatar`, `PlayerAvatar`, `PlayerRow`, `RosterSection`, `TableCard`, plus the mock-identity seam. Also built: the **Rules & code of conduct** content screen + the top-nav **back** variant it uses.
+**🔨 Built so far** (redesign branch, at `/r`): design tokens — color (incl. the new **Expressive** set) + type · routing shell + 6 screens · the **frosted sticky top nav** (progressive blur + olive scrim) · the **home roll-call screen — all 4 variants** (waiting w/ live countdown, open, admin, suspended) · the **"You're in" game screen** — confirmation header, gear-takers, and the full **Match 1 / Match 2 / Bench roster table** with all three **Match 2 states** (confirmed · on-hold · cancelled — top message *and* section header, driven by `getMatch2State`). Reusable components: `GameHeader`, `Confirmation`, `GearTile`, `GearTakers`, `Fab`, `StatusBadge`, `ProgressiveBlur`, `Avatar`, `PlayerAvatar`, `PlayerRow`, `RosterSection`, `TableCard`, plus the mock-identity seam. Also built: the **Rules & code of conduct** content screen + the top-nav **back** variant it uses. **Detail surfaces are now all in:** Profile + Edit profile, **Admin tools** (`/r/profile/admin`) and the **Gear panel** (`/r/gear`) — the last two render the *real production components* on an actions seam (`docs/admin-actions-seam.md`, `docs/gear-actions-seam.md`). Plus the shared **`Dialog`** pattern and its variants, the **`Button`**/**`IconButton`** state sets, and the **gear tile** sub-states (free / locked / taken-shows-avatar) with both commitment dialogs.
 
 ---
 
@@ -138,8 +138,8 @@ see at a glance what's designed and what still needs a mockup before we build.
 | Drops log ("Drops today") | ✅ 🔨 | Built · `DropsCard` (frames 3055:9097 / 3055:9199) · own Cream card below the Bench, or below Match 2 when there's no bench · newest first via `formatTimeET`, clears at the 10 AM rollover · rows are the shared `PlayerRow` with no position + a trailing time |
 | ↳ Drops — game vs bench split | ✅ 🔨 | **Kept** (confirmed) — the two mean different things, so they stay separate: "From the game (N) — opened a spot" and "From the bench (N) — no game impact", divided like the Match 1/2 card. 🎨 The Figma frame shows one flat list, so the grouping reuses the roster's muted-label + divider pattern as an interim — **the split's own visual treatment still needs a frame** |
 | ↳ Drops — row data requirements | 🟡 | **Confirmed intent:** an admin who drops shows the **admin flag**; rows use the **avatar**, falling back to **two-letter initials** when there's no photo; a dropping **+1 shows the "+1" badge**. Built and working on mock data. ⚠️ Production's drop record is only `{ name, deviceId, at, fromBench }` — to wire this for real the drop must carry the person's `uid` (identity is uid-keyed now) so the profile resolves at render |
-| ⚠️ Gear at risk alert | ⬜ | Kept — nobody bringing gear in · `gearBringingAlert()`, shows from the 10 AM reset until coverage is filled |
-| ⏳ Nobody taking gear home alert | ⬜ | Kept — from 6 PM · `gearTakingAlert()`, gated by `GEAR_ALERT_HOUR_ET` |
+| ⚠️ Gear at risk alert | ⬜ | Kept — nobody bringing gear in · `gearBringingAlert()`, shows from the 10 AM reset until coverage is filled. **Live on `/r/gear`** in production styling (§6); what's missing is this screen's own treatment of it |
+| ⏳ Nobody taking gear home alert | ⬜ | Kept — from 6 PM · `gearTakingAlert()`, gated by `GEAR_ALERT_HOUR_ET`. Same as above — exists on `/r/gear`, not yet on this screen |
 
 ---
 
@@ -149,7 +149,7 @@ see at a glance what's designed and what still needs a mockup before we build.
 |---|---|---|
 | Rules button (top-left) | ✅ 🔨 | Built · exact icon; frosted sticky nav |
 | ↳ Back variant (detail surfaces) | ✅ 🔨 | Built · single Cream back-arrow pill; shown on `/rules`; `navigate(-1)` returns to prior screen |
-| Gear detail icon(s) (top-left) | ✅ 🔨 | Built |
+| Gear detail icon(s) (top-left) | ✅ 🔨 | Built · opens `/r/gear`, which shows the **back** variant in its place (§6) |
 | Profile avatar (top-right) | ✅ 🔨 | Built · photo / initials fallback; opens profile + admin |
 | Admin-only affordances | ⬜ | Admin panel entry lives in profile |
 | Alert/unread indicators | ⬜ | Optional — surface gear-at-risk in nav? |
@@ -166,8 +166,6 @@ see at a glance what's designed and what still needs a mockup before we build.
 
 ## 6. Gear details (from top-nav)
 
-| Screen / state | Status | Notes |
-|---|---|---|
 **Decided (2026-08-14):** like the admin tools, this surface renders the **real production `GearManager`** as-is for now — no redesign of it yet, just the redesign's back navigation. Scope is the screenshot Cristian marked up:
 
 | Region of today's `GearManager` | In the redesign's gear page? |
@@ -237,8 +235,12 @@ see at a glance what's designed and what still needs a mockup before we build.
 
 ## Gap summary
 
-- **🔨 Built:** the home roll-call screen (4 variants) and the "You're in" game screen (roster table + all Match 2 states) are done on the mock seam; tokens + frosted nav in place.
-- **Biggest missing clusters:** gear tile sub-states (taken → avatar, locked) · the account-creation flow · two detail surfaces (Gear, Profile) · the entire Admin panel — the roster rows are now all built
+- **🔨 Built:** every *screen* in the app now exists. Home roll-call (4 variants), the "You're in" game screen (roster table + all Match 2 states), Rules, Profile + Edit, Admin tools, and the Gear panel — all on the mock seam.
+- **Biggest missing clusters**, in the order they matter:
+  1. **The account-creation flow** — phone entry, OTP, name, photo. 🎨 **Blocked: no Figma frames exist.** This is the only unbuilt *flow*, and it gates `phoneVerified`, which no redesign screen reads yet.
+  2. **System states** — loading, empty list, offline, and the genuinely-closed roll-call window (Fri evening/Sat for a Monday game, which today shows a multi-hour countdown).
+  3. **Wiring** (Phases 4–5) — identity and actions are still mock. Taking gear from a tile is inert; the two ported panels swap one line each.
+  - Not clusters, but tracked: the "Tomorrow's gear takers" copy decision, the one-word-name prompt (🎨 needs a frame), and the game screen's own gear-at-risk treatment.
 - **~~Design-the-data-model-first item~~ → RESOLVED on main (merged 2026-08-10).** Identity is now **uid-keyed and phone-first**: `newUid()` mints a stable per-person id, `isSamePerson()` is the single matcher (uid → deviceId → name), `rosterDocId()` makes "one person = one row" true by construction, `toE164US()` canonicalizes numbers, and one phone = one account. The redesign's mock identity seam (`useCurrentUser`) should now be pointed at this real model — the proposal in `docs/data-model-proposal.md` is effectively answered. Still open for the redesign: the **first/last name split** and **profile-photo storage**, which main did not add.
 - **Logic parity ledger** — what's real vs. still mocked:
   - ✅ Real: roster tiering + slicing + `+1` expansion (`buildFlatList`), Match 2 state (`getMatch2State`), roll-call windows/countdown/suspension, Friday-priority badge suppression.
@@ -247,4 +249,4 @@ see at a glance what's designed and what still needs a mockup before we build.
   - ⬜ Not built: `player.priority` (admin per-day pin) has no UI yet — it ranks correctly but is only settable from the Admin panel.
   - ⚠️ Intentional rule delta: redesign opens gear at **10 AM**; production opens at **11 AM** (`GEAR_OPEN_HOUR_ET`). Don't "fix" this when wiring.
 
-**Suggested build order:** (1) ✅ design tokens → (2) 🟡 identity/data model *(proposal open — awaiting team; screens built on a mock seam)* → (3) ✅ routing skeleton + top nav → (4) ✅ home roll-call screen (all variants) → (5) ✅ game + roster (table + Match 2 states) → (6) **← next: gear tile states** → (7) detail surfaces (Rules / Gear / Profile) → (8) admin panel.
+**Suggested build order:** (1) ✅ design tokens → (2) 🟡 identity/data model *(proposal open — awaiting team; screens built on a mock seam)* → (3) ✅ routing skeleton + top nav → (4) ✅ home roll-call screen (all variants) → (5) ✅ game + roster (table + Match 2 states) → (6) ✅ gear tile states → (7) ✅ detail surfaces (Rules / Gear / Profile) → (8) ✅ admin panel → (9) **← next: account creation** *(🎨 blocked on frames)* and **system states** → (10) wire identity + actions.
