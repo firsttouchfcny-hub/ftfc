@@ -55,25 +55,33 @@ export default function NameScreen() {
         </h1>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, width: '100%' }}>
+          {/* Each field is wrapped as an explicit flex item. InputField is
+              width:100% by design (it's normally the only thing in its row), so
+              two of them side by side each ask for the full width and overflow
+              the page. `flex: 1 1 0` replaces that basis with an equal share. */}
           <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', width: '100%' }}>
-            <InputField
-              label="First name"
-              placeholder="Mikey"
-              value={firstName}
-              onChange={setFirstName}
-              error={errors.firstName}
-              autoComplete="given-name"
-              name="firstName"
-            />
-            <InputField
-              label="Last name"
-              placeholder="Colver"
-              value={lastName}
-              onChange={setLastName}
-              error={errors.lastName}
-              autoComplete="family-name"
-              name="lastName"
-            />
+            <div style={{ flex: '1 1 0', minWidth: 0 }}>
+              <InputField
+                label="First name"
+                placeholder="Mikey"
+                value={firstName}
+                onChange={setFirstName}
+                error={errors.firstName}
+                autoComplete="given-name"
+                name="firstName"
+              />
+            </div>
+            <div style={{ flex: '1 1 0', minWidth: 0 }}>
+              <InputField
+                label="Last name"
+                placeholder="Colver"
+                value={lastName}
+                onChange={setLastName}
+                error={errors.lastName}
+                autoComplete="family-name"
+                name="lastName"
+              />
+            </div>
           </div>
           <Button label={completing ? 'Save' : 'Next'} variant="primary" type="submit" hug />
         </div>

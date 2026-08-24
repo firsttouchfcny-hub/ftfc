@@ -62,12 +62,15 @@ export default function InputField({
     : 'var(--color-tan)';
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%' }}>
+    // minWidth: 0 so that a field placed directly in a flex row can actually
+    // shrink — without it the automatic minimum is min-content and the row
+    // overflows rather than dividing.
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%', minWidth: 0 }}>
       {label && <label htmlFor={id} style={labelStyle}>{label}</label>}
 
       <div
         style={{
-          display: 'flex', gap: 8, alignItems: 'center', padding: 16,
+          display: 'flex', gap: 8, alignItems: 'center', padding: 16, minWidth: 0,
           borderRadius: 16, border: `2px solid ${borderColor}`,
           background: disabled ? '#F5F5F5' : 'var(--color-white)',
           // Focus glow from the design; suppressed once the field is in error.
