@@ -91,7 +91,6 @@ export default function Dialog({
           }}
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'flex-start', width: '100%', color: 'var(--color-dark-gray)' }}>
-            {content}
             {icon && <img src={icon} alt="" style={{ width: 48, height: 48, display: 'block', flexShrink: 0 }} />}
             {headline && (
               <h2 id={headlineId} style={{ fontFamily: 'var(--font-family-base)', fontWeight: 'var(--font-weight-bold)', fontSize: 24, lineHeight: 'normal', margin: 0 }}>
@@ -99,6 +98,7 @@ export default function Dialog({
               </h2>
             )}
             {body && <p className="type-body-regular-tall" style={{ margin: 0 }}>{body}</p>}
+            {content}
           </div>
 
           {hasSecondary ? (

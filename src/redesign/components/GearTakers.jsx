@@ -8,11 +8,12 @@
 // "Take gear only" is production's gearOnly: no roster row on either day.
 
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import Dialog from './Dialog';
 import GearCommitmentLine from './GearCommitmentLine';
 import GearTile from './GearTile';
 import { gearIcon, gearLabel, playerReturnDates, takersFor, takeBlockedByPriority } from '../../utils/gear';
-import { formatWeekday, formatGameDate } from '../state/rollCall';
+import { formatWeekday, formatGameDate, formatChipDate } from '../state/rollCall';
 import { useCurrentUser } from '../identity/useCurrentUser';
 import { isSamePerson } from '../../utils/helpers';
 import { mockCommitments, mockGameDate, mockPlayers } from '../state/mockRoster';
@@ -36,8 +37,21 @@ export default function GearTakers({
   onTake,
 }) {
   const [taking, setTaking] = useState(null);   // gear type mid-take-confirmation
+  const [pickedDate, setPickedDate] = useState(null); // chosen return day, when there's a choice
+  const [params] = useSearchParams();
   const [viewing, setViewing] = useState(null); // a claimed commitment being viewed
   const me = useCurrentUser();
+
+  // `?picker=1` previews the rare multi-option case (see below).
+  const ledger = params.get('picker') === '1'
+    ? [
+        // free the bibs tile so the take dialog is reachable…
+        ...commitments.filter((c) => !(c.type === 'bibs' && c.takeDate === takeDate)),
+        // …and cover the next two bibs mornings, which is what unlocks the choice
+        { id: 'preview-a', takerName: 'Preview', type: 'bibs', takeDate: '2026-10-14', returnDate: '2026-10-16', status: 'committed' },
+        { id: 'preview-b', takerName: 'Preview', type: 'bibs', takeDate: '2026-10-14', returnDate: '2026-10-19', status: 'committed' },
+      ]
+    : commitments;
 
   // Who is taking each set home after this game, straight from the ledger — the
   // same source the coverage figures and alerts read, so the tiles can't
@@ -49,10 +63,10 @@ export default function GearTakers({
   // One queue per type, so two goal tiles fill independently: the first goal
   // taken claims the first tile and the second stays free.
   const queues = { goal: [], balls: [], bibs: [] };
-  for (const c of takersFor(commitments, takeDate)) queues[c.type]?.push(c);
+  for (const c of takersFor(ledger, takeDate)) queues[c.type]?.push(c);
   // Balls-gate: balls can't be taken until goals AND bibs are fully taken. When
   // locked, a still-free balls tile shows the disabled icon button.
-  const ballsLocked = takeBlockedByPriority(commitments, 'balls', takeDate);
+  const ballsLocked = takeBlockedByPriority(ledger, 'balls', takeDate);
   const assigned = TILES.map(({ type, ...rest }) => {
     const c = queues[type].shift();
     const takenBy = c
@@ -67,11 +81,16 @@ export default function GearTakers({
   //
   // NOTE: when there IS a choice, production shows a date picker first. That step
   // has no design yet, so this takes the earliest option — see the inventory.
-  const returnDate = taking
-    ? playerReturnDates(commitments, taking, takeDate)[0]
-    : null;
+  // Production fixes this to the earliest open day for goals and balls, and for
+  // bibs too whenever a near game is uncovered — so most of the time there is
+  // exactly one option and no choice to present. Only bibs, only when the next
+  // games are already covered, yield several.
+  const returnOptions = taking ? playerReturnDates(ledger, taking, takeDate) : [];
+  const returnDate = pickedDate && returnOptions.includes(pickedDate)
+    ? pickedDate
+    : returnOptions[0] ?? null;
 
-  const close = () => setTaking(null);
+  const close = () => { setTaking(null); setPickedDate(null); };
   const take = (playing) => { onTake?.(taking, returnDate, playing); close(); };
 
   return (
@@ -95,15 +114,43 @@ export default function GearTakers({
       <Dialog
         open={!!taking}
         headline={taking ? `Take ${gearLabel(taking)} ${gearIcon(taking)}` : ''}
-        body={taking ? (
-          <>
-            You’ll take them home after{' '}
-            <strong style={{ fontWeight: 'var(--font-weight-bold)' }}>{formatWeekday(takeDate)}</strong>’s
-            game and bring them back on{' '}
-            <strong style={{ fontWeight: 'var(--font-weight-bold)' }}>{formatGameDate(returnDate)}</strong>.
-            <br /><br />
-            Are you playing both days?
-          </>
+        content={taking ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, width: '100%' }}>
+            <p className="type-body-regular-tall" style={{ margin: 0 }}>
+              You’ll take them home after{' '}
+              <strong style={{ fontWeight: 'var(--font-weight-bold)' }}>{formatWeekday(takeDate)}</strong>’s
+              game and bring them back on{' '}
+              <strong style={{ fontWeight: 'var(--font-weight-bold)' }}>{formatGameDate(returnDate)}</strong>.
+            </p>
+
+            {/* Only rendered when there is a real choice. Sits with the sentence
+                it changes, before the question the buttons answer. The chosen day
+                is already stated in full above, so these stay terse. */}
+            {returnOptions.length > 1 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
+                <span className="type-caption-semibold" style={{ color: 'var(--color-dark-gray-50)' }}>
+                  Bring back on
+                </span>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {returnOptions.map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      className="rd-chip type-small-semibold"
+                      aria-pressed={d === returnDate}
+                      onClick={() => setPickedDate(d)}
+                    >
+                      {formatChipDate(d)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <p className="type-body-regular-tall" style={{ margin: 0 }}>
+              Are you playing both days?
+            </p>
+          </div>
         ) : null}
         confirmLabel="Take & play both days"
         onConfirm={() => take(true)}

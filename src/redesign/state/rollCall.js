@@ -70,6 +70,14 @@ export function formatGameDate(dateKey) {
     : '';
 }
 
+// "Mon 19" — terse enough for a row of selectable day chips. The sentence above
+// them always states the chosen date in full, so the chips don't have to.
+export function formatChipDate(dateKey) {
+  if (!dateKey) return '';
+  const d = atNoon(dateKey);
+  return `${d.toLocaleDateString('en-US', { weekday: 'short' })} ${d.getDate()}`;
+}
+
 // "October 15th, 2026" — full month + ordinal + year, no weekday. The game
 // header shows the weekday on its own line, so it wants the date without it.
 export function formatMonthDayYear(dateKey) {
