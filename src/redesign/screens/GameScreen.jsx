@@ -186,7 +186,9 @@ export default function GameScreen() {
     // Bottom padding clears the floating action bar (56px pill + 32px offset).
     <div style={{ display: 'flex', flexDirection: 'column', gap: 32, alignItems: 'center', padding: '8px 16px 120px' }}>
       <Confirmation headline={headline} badge={badge} date={gameDateLabel} />
-      <GearTakers headline="Tomorrow’s gear takers" />
+      {/* `alreadyIn` comes from the roster, not from the fact that this is the
+          post-signup screen — see GearTakers. */}
+      <GearTakers headline="Tomorrow’s gear takers" alreadyIn={players.some(isMe)} />
 
       {/* Roster: the two matches share one card; the bench is its own card. */}
       <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 16 }}>

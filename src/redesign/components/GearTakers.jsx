@@ -34,6 +34,12 @@ export default function GearTakers({
   commitments = mockCommitments,
   takeDate = mockGameDate,
   players = mockPlayers,
+  // Whether you're ALREADY on the take-day roster. Deliberately a fact passed in
+  // rather than inferred from which screen this is: after 3 PM you can sign up
+  // on the roll-call screen and then take gear from that same screen, so the
+  // screen is not a reliable signal — the roster is. Same flag the cancel
+  // behaviour keys on.
+  alreadyIn = false,
   onTake,
 }) {
   const [taking, setTaking] = useState(null);   // gear type mid-take-confirmation
@@ -91,6 +97,17 @@ export default function GearTakers({
     : returnOptions[0] ?? null;
 
   const close = () => { setTaking(null); setPickedDate(null); };
+
+  // The question only makes sense for days that are still open. If you're
+  // already in for the take day, that one is settled — the only thing left to
+  // decide is the RETURN day, and "take gear only" would be false anyway (you'd
+  // still be playing the day you signed up for).
+  const returnDay = formatWeekday(returnDate);
+  const question = alreadyIn
+    ? `You’re already in for ${formatWeekday(takeDate)}. Playing ${returnDay} too?`
+    : 'Are you playing both days?';
+  const playLabel = alreadyIn ? `Take & play ${returnDay}` : 'Take & play both days';
+  const skipLabel = alreadyIn ? 'Just bringing it back' : 'Take gear only';
   const take = (playing) => { onTake?.(taking, returnDate, playing); close(); };
 
   return (
@@ -148,13 +165,13 @@ export default function GearTakers({
             )}
 
             <p className="type-body-regular-tall" style={{ margin: 0 }}>
-              Are you playing both days?
+              {question}
             </p>
           </div>
         ) : null}
-        confirmLabel="Take & play both days"
+        confirmLabel={playLabel}
         onConfirm={() => take(true)}
-        secondaryLabel="Take gear only"
+        secondaryLabel={skipLabel}
         onSecondary={() => take(false)}
         cancelLabel="Cancel"
         onCancel={close}
