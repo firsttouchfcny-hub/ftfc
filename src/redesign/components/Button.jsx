@@ -15,9 +15,14 @@
 
 export default function Button({
   label, variant = 'secondary', onClick, disabled, title, autoFocus, hug = false,
+  // Explicit, because an untyped <button> inside a <form> submits it. The
+  // account screens want that; a dialog that later lands inside a form must
+  // not inherit it by accident.
+  type = 'button',
 }) {
   return (
     <button
+      type={type}
       onClick={onClick}
       disabled={disabled}
       title={title}

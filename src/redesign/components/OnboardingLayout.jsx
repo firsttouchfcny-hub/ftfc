@@ -1,0 +1,48 @@
+// The frame every account-creation screen sits in (Figma 2670:11785 and its
+// siblings — all five steps share one page layout).
+//
+// Light Olive full-bleed, the 64px club badge at the top, then the step's own
+// content. No top nav: this flow runs before there is an account to navigate
+// with, which is why it lives outside the app's layout route.
+//
+// `badge={false}` is for the welcome screen, which drops the badge and centres
+// its content instead (Figma 2699:12983).
+
+import badge from '../assets/ftfc-badge.png';
+
+export default function OnboardingLayout({ badge: showBadge = true, children }) {
+  return (
+    <div
+      style={{
+        minHeight: '100dvh',
+        background: 'var(--color-light-olive)',
+        fontFamily: 'var(--font-family-base)',
+        color: 'var(--color-dark-gray)',
+      }}
+    >
+      <div
+        style={{
+          maxWidth: 430, margin: '0 auto', minHeight: '100dvh', boxSizing: 'border-box',
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+          // 72px between the badge and the content is the designed rhythm; the
+          // welcome screen has no badge, so the gap collapses on its own.
+          gap: 72, padding: '16px 24px 32px',
+          justifyContent: showBadge ? 'flex-start' : 'center',
+        }}
+      >
+        {showBadge && (
+          // Exported at 3376² and rendered at 64 — kept at 192 (3× retina) so a
+          // 4 MB PNG isn't shipped to every phone for a 64px mark.
+          <img
+            src={badge}
+            alt="First Touch Futebol Club"
+            style={{ width: 64, height: 64, objectFit: 'cover', flexShrink: 0 }}
+          />
+        )}
+        <div style={{ flex: '1 0 0', minHeight: 0, width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}

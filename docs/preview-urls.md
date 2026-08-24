@@ -74,6 +74,34 @@ On `/r/profile/edit`: clear the last name → **Save** shows the error state.
 | URL | Shows |
 |---|---|
 | `/r/rules` | Rules & code of conduct |
+## Account creation
+
+Five routes, one per step. Any of them opens directly; the flow's shared state
+lives in memory, so a step opened cold falls back to the start where it must.
+
+| URL | What you get |
+|---|---|
+| `/r/create-account` | Step 1 — phone entry |
+| `/r/create-account/verify` | Step 2 — 6-box SMS code (needs a number sent first, else it bounces to step 1) |
+| `/r/create-account/name` | Step 3 — first / last name |
+| `/r/create-account/photo` | Step 4 — profile pic, empty and filled |
+| `/r/create-account/welcome` | Step 5 — welcome, then auto-advances to roll call |
+
+**The code is always `123456`.** These numbers force a specific outcome, so
+every designed state has a way in:
+
+| Enter this number | What happens |
+|---|---|
+| any 10 digits | New player — the full flow through to Welcome |
+| `5555550100` | **Returning player** — number already has an account, skips to roll call |
+| `5555550188` | **One-word name (Elle)** — routes to "Add your last name" with the first name filled |
+| `5550000000` | **Send fails** — the error state under the phone field |
+| `5550000001` | **Expired code** — the code step's error, whatever you type |
+| `123` (or any short number) | "Enter a 10-digit US phone number." |
+| any number, wrong code | "That code isn't right" — the attempt stays live, correct it in place |
+
+---
+
 | `/r/gear` | The real production gear panel on mock data — alerts, bringing-gear day cards, who has the gear, the schedule, and (as an admin) the gear admin tools. Taking gear is deliberately absent: that lives on the gear tiles |
 | `/r/create-account` | Scaffold — account flow isn't built yet |
 | `/?tokens` | Design token specimen — **local only** (dev build) |

@@ -12,7 +12,11 @@ import './styles.css';
 import TopNav from './components/TopNav';
 import HomeScreen from './screens/HomeScreen';
 import GameScreen from './screens/GameScreen';
-import CreateAccountScreen from './screens/CreateAccountScreen';
+import PhoneScreen from './screens/onboarding/PhoneScreen';
+import VerifyScreen from './screens/onboarding/VerifyScreen';
+import NameScreen from './screens/onboarding/NameScreen';
+import PhotoScreen from './screens/onboarding/PhotoScreen';
+import WelcomeScreen from './screens/onboarding/WelcomeScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import EditProfileScreen from './screens/EditProfileScreen';
 import AdminToolsScreen from './screens/AdminToolsScreen';
@@ -52,7 +56,16 @@ export default function RedesignApp() {
           <Route path="rules" element={<RulesScreen />} />
           <Route path="gear" element={<GearScreen />} />
         </Route>
-        <Route path="create-account" element={<CreateAccountScreen />} />
+        {/* Account creation runs OUTSIDE the layout route — there is no top
+            nav until there's an account. One route per step so any screen can
+            be opened directly for review; shared state lives in joinFlow. */}
+        <Route path="create-account">
+          <Route index element={<PhoneScreen />} />
+          <Route path="verify" element={<VerifyScreen />} />
+          <Route path="name" element={<NameScreen />} />
+          <Route path="photo" element={<PhotoScreen />} />
+          <Route path="welcome" element={<WelcomeScreen />} />
+        </Route>
         <Route path="*" element={<HomeScreen />} />
       </Routes>
     </BrowserRouter>

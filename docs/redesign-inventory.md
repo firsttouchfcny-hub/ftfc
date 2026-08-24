@@ -14,7 +14,7 @@ see at a glance what's designed and what still needs a mockup before we build.
 - A **+1 added after signup takes a back-of-line spot**, not the host's (`plusOnesAt`); a +1 taken *at* signup still sits with its host
 - Identity is **uid-keyed / phone-first** (`newUid`, `isSamePerson`, `rosterDocId`, one phone = one account)
 
-**🔨 Built so far** (redesign branch, at `/r`): design tokens — color (incl. the new **Expressive** set) + type · routing shell + 6 screens · the **frosted sticky top nav** (progressive blur + olive scrim) · the **home roll-call screen — all 4 variants** (waiting w/ live countdown, open, admin, suspended) · the **"You're in" game screen** — confirmation header, gear-takers, and the full **Match 1 / Match 2 / Bench roster table** with all three **Match 2 states** (confirmed · on-hold · cancelled — top message *and* section header, driven by `getMatch2State`). Reusable components: `GameHeader`, `Confirmation`, `GearTile`, `GearTakers`, `Fab`, `StatusBadge`, `ProgressiveBlur`, `Avatar`, `PlayerAvatar`, `PlayerRow`, `RosterSection`, `TableCard`, plus the mock-identity seam. Also built: the **Rules & code of conduct** content screen + the top-nav **back** variant it uses. **Detail surfaces are now all in:** Profile + Edit profile, **Admin tools** (`/r/profile/admin`) and the **Gear panel** (`/r/gear`) — the last two render the *real production components* on an actions seam (`docs/admin-actions-seam.md`, `docs/gear-actions-seam.md`). Plus the shared **`Dialog`** pattern and its variants, the **`Button`**/**`IconButton`** state sets, and the **gear tile** sub-states (free / locked / taken-shows-avatar) with both commitment dialogs.
+**🔨 Built so far** (redesign branch, at `/r`): design tokens — color (incl. the new **Expressive** set) + type · routing shell (12 routes) · the **frosted sticky top nav** (progressive blur + olive scrim) · the **home roll-call screen — all 4 variants** (waiting w/ live countdown, open, admin, suspended) · the **"You're in" game screen** — confirmation header, gear-takers, and the full **Match 1 / Match 2 / Bench roster table** with all three **Match 2 states** (confirmed · on-hold · cancelled — top message *and* section header, driven by `getMatch2State`). Reusable components: `GameHeader`, `Confirmation`, `GearTile`, `GearTakers`, `Fab`, `StatusBadge`, `ProgressiveBlur`, `Avatar`, `PlayerAvatar`, `PlayerRow`, `RosterSection`, `TableCard`, plus the mock-identity seam. Also built: the **Rules & code of conduct** content screen + the top-nav **back** variant it uses. **Detail surfaces are now all in:** Profile + Edit profile, **Admin tools** (`/r/profile/admin`) and the **Gear panel** (`/r/gear`) — the last two render the *real production components* on an actions seam (`docs/admin-actions-seam.md`, `docs/gear-actions-seam.md`). Plus the shared **`Dialog`** pattern and its variants, the **`Button`**/**`IconButton`** state sets, and the **gear tile** sub-states (free / locked / taken-shows-avatar) with both commitment dialogs. **And the account-creation flow** (`/r/create-account`) — phone, OTP, name, photo, welcome — on a third actions seam, with new `CodeInput` and `OnboardingLayout` components.
 
 ---
 
@@ -44,22 +44,27 @@ see at a glance what's designed and what still needs a mockup before we build.
 
 ## 1. Account & identity flow
 
+**Built (2026-08-24)** at `/r/create-account` — five routes, one per step, so any screen opens directly. Runs on the third actions seam (`utils/authActions.js` + `redesign/state/mockAuthActions.js`); unlike the admin and gear seams this is **not** an extraction — the redesign replaces `components/PhoneVerify.jsx`, which is untouched and gets deleted at merge.
+
 | Screen / state | Status | Notes |
 |---|---|---|
-| Create account — phone entry | ✅ | +1 country code, "we'll send an SMS code" |
-| ↳ invalid phone / send error | ⬜ | Bad number, SMS failed to send |
-| Create account — OTP verify | ✅ | 6-box code, "Try again" resend |
-| ↳ wrong / expired code | ⬜ | Error + resend states |
-| Add your name (first / last) | ✅ | **Data-model change:** splits today's single `name` field |
-| ↳ validation / empty | ⬜ | |
-| Add profile pic — empty | ✅ | Selfie / Upload / Skip |
-| ↳ capturing / uploading | ⬜ | Camera + upload-in-progress |
-| Add profile pic — filled | ✅ | Continue |
-| Skipped photo → initials fallback | 🟡 🔨 | Built in roster (`PlayerAvatar`); the account-flow step still TBD |
+| **Secret code** (admin-generated invite) | ➖ | **Decided against (2026-08-24).** The frame exists (`2670:11821`) and would make the club invite-only — a rule production doesn't have. Not built; revisit as a product decision, not a UI one. Its footnote also carries the phone screen's copy ("We'll send you an SMS Verification code"), which it shouldn't |
+| Create account — phone entry | ✅ 🔨 | Built (`2670:11784`) · fixed "+1" (read-only: `toE164US` accepts US numbers only, so a country picker would promise what the stack can't keep) + `InputField` |
+| ↳ invalid phone / send error | ✅ 🔨 | `InputField`'s error state. Both seam implementations reject a bad number with the *same words* — asserted in the contract test, since that string is the design |
+| Create account — OTP verify | ✅ 🔨 | Built (`2670:11964`) · new `CodeInput` — 6 boxes, type-to-advance, backspace-to-retreat, paste/auto-fill fills the row, `autocomplete="one-time-code"` |
+| ↳ wrong / expired code | ✅ 🔨 | Red borders + message; the attempt stays live so the code can be corrected without starting over. "Try again" resends and reports it |
+| ↳ **Returning player — number already known** | ✅ 🔨 | **The important fork.** A verified number that already has an account is *adopted* — no name, no photo, straight to roll call. Asking again would fork the identity the uid-keyed model exists to unify |
+| Add your name (first / last) | ✅ 🔨 | Built (`2670:12326`) · **Data-model change:** splits today's single `name` field. 🎨 Figma labels it "Frist name" — typo, corrected (edit-profile already did) |
+| ↳ validation / empty | ✅ 🔨 | Both fields required, per-field messages |
+| Add profile pic — empty | ✅ 🔨 | Built (`2670:12560`) · 248px Tan circle · Selfie / Upload / Skip. Both buttons are one file input; Selfie adds `capture="user"`, ignored on desktop |
+| ↳ capturing / uploading | ➖ | **No in-between state needed:** the OS owns the camera and picker, and a local `objectURL` is instant — there is no upload to wait on until storage is wired |
+| Add profile pic — filled | ✅ 🔨 | Built (`2699:12884`) · Continue, plus a "Choose a different photo" escape the frame lacks |
+| **Welcome to the club {first-name}** | ✅ 🔨 | Built (`2699:12982`) · commits everything to the identity seam. 🎨 Two illustrations exist; the **first** is used (decided). ⚠️ The frame has **no CTA**, so it auto-advances after 2.6s and tap/Enter skips the wait — an invention worth confirming |
+| Skipped photo → initials fallback | ✅ 🔨 | Built end-to-end: skipping lands on roll call with initials in the nav |
 | **Returning user sign-in** | ➖ | **Decided (2026-08-14): no special flow.** A returning verified user goes straight to the home / roll-call screen — the new root — where they join a game. Nothing to design. The *verification check itself* still has to be wired (see below) |
-| ↳ Verification gate | ⬜ | **Not wired.** No redesign screen reads `phoneVerified`, so the gate that keeps unverified people out doesn't exist in the new experience yet |
+| ↳ Verification gate | 🟡 🔨 | The flow now *produces* a verified number, and the seam is the place the real check lands. **Still open:** no screen yet *refuses* an unverified user — the gate exists as a path, not a wall (Phase 4) |
 | **Name split — existing accounts** | 🟡 | **Decided (2026-08-14):** production stores ONE `name`; the redesign splits it. Rule: **first word = first name, the rest = last name** — so "Eric J" → Eric / J, "Felipe Di Carli" → Felipe / Di Carli. One-word names are **not allowed** |
-| ↳ **Missing last name — prompt** | ⬜ 🎨 | **Needs a frame.** Real players today have one-word names (**Elle**, **Shimon**). The rule above leaves them with no last name, and edit-profile *requires* one — so they must be asked for it once, before they can continue. This screen does not exist |
+| ↳ **Missing last name — prompt** | ✅ 🔨 | **No new frame needed** (resolved 2026-08-24). `splitName` already returns `needsLastName`, and "Add your name" *is* the form — so a one-word account lands there with the first name filled, the headline reading **"Add your last name"** and the button **Save**. Preview with `5555550188` (Elle) |
 
 ---
 
@@ -203,7 +208,7 @@ see at a glance what's designed and what still needs a mockup before we build.
 | ↳ Required-name validation | ✅ 🔨 | Built · clearing either name and saving puts that field in the **error variant** (Red border + message) and blocks the save; typing clears it |
 | ↳ Save actually persists | ✅ 🔨 | The identity seam is now a small **writable store** (`updateCurrentUser`): saving a name updates the profile, the nav avatar and the roster row together. Picking a photo writes through the same seam. In-memory, so a reload resets it — same as the roster mock |
 | ↳ Rename propagates to the roster | ✅ 🔨 | The roster row resolves the current user's name and photo **by uid at render**, mirroring production's `45e8813` "definitive rename fix", so a rename shows up in the list. The "you" highlight matches via production's `isSamePerson` (uid first), so it survives a rename too |
-| ↳ Phone change → verification | 🟡 🔨 | Change detected and surfaced ("You'll need to verify this number"). **The OTP step isn't built** — it belongs to the account-creation flow. The number is deliberately **not** written on save: in production it only takes effect once verified, so writing it early would show an unverified number as confirmed |
+| ↳ Phone change → verification | 🟡 🔨 | Change detected and surfaced ("You'll need to verify this number"). **The OTP step now exists** — `CodeInput` + the auth seam, built with the account flow (§1) — so what's left is routing the phone change into it. 🎨 It has its own frame, **`3315:12668`** ("Verify your new phone number"), which is the same screen with a different headline. The number is deliberately **not** written on save: in production it only takes effect once verified, so writing it early would show an unverified number as confirmed |
 | **`InputField`** (shared component) | ✅ 🔨 | Built (frame 2666:7754) for reuse by the account-creation screens · four states — default (Tan), focused (Dark Gray + glow), error (Red + message), disabled — plus label, helper text, optional left icon and optional up/down chevron. All four verified in-browser |
 | My gear commitments (+ cancel) | ➖ | **Not a profile feature** (confirmed). It exists in production but lives on the **Gear** surface (`GearManager.jsx`) — "🥅 You're bringing **Goals** back Tuesday" + Cancel. Keeping it there; tracked under §6. Note the real rule: cancel is only allowed *before* you take the gear home |
 | Suspension status | ➖ | **Exists in production but not on the profile** — it's a banner on the roll-call screen (`App.jsx`: "🚫 You are suspended until … Contact an admin to appeal") and already built as the home suspended variant. Not in the profile frame, so not duplicated here |
@@ -237,10 +242,10 @@ see at a glance what's designed and what still needs a mockup before we build.
 
 - **🔨 Built:** every *screen* in the app now exists. Home roll-call (4 variants), the "You're in" game screen (roster table + all Match 2 states), Rules, Profile + Edit, Admin tools, and the Gear panel — all on the mock seam.
 - **Biggest missing clusters**, in the order they matter:
-  1. **The account-creation flow** — phone entry, OTP, name, photo. 🎨 **Blocked: no Figma frames exist.** This is the only unbuilt *flow*, and it gates `phoneVerified`, which no redesign screen reads yet.
-  2. **System states** — loading, empty list, offline, and the genuinely-closed roll-call window (Fri evening/Sat for a Monday game, which today shows a multi-hour countdown).
-  3. **Wiring** (Phases 4–5) — identity and actions are still mock. Taking gear from a tile is inert; the two ported panels swap one line each.
-  - Not clusters, but tracked: the "Tomorrow's gear takers" copy decision, the one-word-name prompt (🎨 needs a frame), and the game screen's own gear-at-risk treatment.
+  1. **System states** — loading, empty list, offline, and the genuinely-closed roll-call window (Fri evening/Sat for a Monday game, which today shows a multi-hour countdown). Now the largest gap: every *flow* is built, so what's left is what happens when things are slow, empty, or shut.
+  2. **Wiring** (Phases 4–5) — identity and actions are still mock across all three seams. Taking gear from a tile is inert; each ported surface swaps one line.
+  3. **The verification wall** — the account flow now produces a verified number, but no screen yet *refuses* an unverified user.
+  - Not clusters, but tracked: the "Tomorrow's gear takers" copy decision, the welcome screen's auto-advance (no CTA in the frame), and the game screen's own gear-at-risk treatment.
 - **~~Design-the-data-model-first item~~ → RESOLVED on main (merged 2026-08-10).** Identity is now **uid-keyed and phone-first**: `newUid()` mints a stable per-person id, `isSamePerson()` is the single matcher (uid → deviceId → name), `rosterDocId()` makes "one person = one row" true by construction, `toE164US()` canonicalizes numbers, and one phone = one account. The redesign's mock identity seam (`useCurrentUser`) should now be pointed at this real model — the proposal in `docs/data-model-proposal.md` is effectively answered. Still open for the redesign: the **first/last name split** and **profile-photo storage**, which main did not add.
 - **Logic parity ledger** — what's real vs. still mocked:
   - ✅ Real: roster tiering + slicing + `+1` expansion (`buildFlatList`), Match 2 state (`getMatch2State`), roll-call windows/countdown/suspension, Friday-priority badge suppression.
@@ -249,4 +254,4 @@ see at a glance what's designed and what still needs a mockup before we build.
   - ⬜ Not built: `player.priority` (admin per-day pin) has no UI yet — it ranks correctly but is only settable from the Admin panel.
   - ⚠️ Intentional rule delta: redesign opens gear at **10 AM**; production opens at **11 AM** (`GEAR_OPEN_HOUR_ET`). Don't "fix" this when wiring.
 
-**Suggested build order:** (1) ✅ design tokens → (2) 🟡 identity/data model *(proposal open — awaiting team; screens built on a mock seam)* → (3) ✅ routing skeleton + top nav → (4) ✅ home roll-call screen (all variants) → (5) ✅ game + roster (table + Match 2 states) → (6) ✅ gear tile states → (7) ✅ detail surfaces (Rules / Gear / Profile) → (8) ✅ admin panel → (9) **← next: account creation** *(🎨 blocked on frames)* and **system states** → (10) wire identity + actions.
+**Suggested build order:** (1) ✅ design tokens → (2) 🟡 identity/data model *(proposal open — awaiting team; screens built on a mock seam)* → (3) ✅ routing skeleton + top nav → (4) ✅ home roll-call screen (all variants) → (5) ✅ game + roster (table + Match 2 states) → (6) ✅ gear tile states → (7) ✅ detail surfaces (Rules / Gear / Profile) → (8) ✅ admin panel → (9) ✅ account creation → (10) **← next: system states** (loading / empty / offline / closed) → (11) wire identity + actions.

@@ -40,6 +40,7 @@ const noteStyle = {
 
 export default function InputField({
   label,
+  ariaLabel,      // accessible name for a field with no visible label (the "+1")
   value,
   onChange,
   placeholder,
@@ -92,6 +93,7 @@ export default function InputField({
             onChange={(e) => onChange?.(e.target.value)}
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
+            aria-label={label ? undefined : ariaLabel}
             aria-invalid={!!error}
             className="type-body-regular-tall"
             style={{
