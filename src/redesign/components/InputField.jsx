@@ -26,9 +26,6 @@ const labelStyle = {
   fontSize: 14,
   lineHeight: 'normal',
   color: 'var(--color-dark-gray)',
-  // Labels stay on one line and may overhang a narrow control — the "+1" field
-  // is only 84px wide but still reads "Phone number" (Figma 3233:12569).
-  whiteSpace: 'nowrap',
 };
 
 const noteStyle = {

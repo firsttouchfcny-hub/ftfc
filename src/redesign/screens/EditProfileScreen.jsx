@@ -87,25 +87,22 @@ export default function EditProfileScreen() {
               error={errors.lastName}
             />
 
-            {/* Country code + number share a row, bottom-aligned so the labelled
-                and unlabelled fields line up. */}
-            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', width: '100%' }}>
-              <div style={{ width: 84, flexShrink: 0 }}>
-                <InputField label="Phone number" value="+1" readOnly chevron />
-              </div>
-              <div style={{ flex: '1 0 0', minWidth: 0 }}>
-                <InputField
-                  value={phone}
-                  onChange={(v) => { setPhone(v); setErrors((e) => ({ ...e, phone: undefined })); }}
-                  placeholder="000-000-0000"
-                  type="tel"
-                  inputMode="tel"
-                  autoComplete="tel-national"
-                  error={errors.phone}
-                  helper={phoneChanged ? 'You’ll need to verify this number' : undefined}
-                />
-              </div>
-            </div>
+            {/* One field, no country selector — matching the account flow. The
+                frame (3233:12568) pairs the number with a read-only "+1" whose
+                chevron promises a picker that can't open, since every phone
+                entry point funnels through `toE164US`. Validation here already
+                wanted 10 local digits, so nothing else changes. */}
+            <InputField
+              label="Phone number"
+              value={phone}
+              onChange={(v) => { setPhone(v); setErrors((e) => ({ ...e, phone: undefined })); }}
+              placeholder="000-000-0000"
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel-national"
+              error={errors.phone}
+              helper={phoneChanged ? 'You’ll need to verify this number' : undefined}
+            />
           </div>
 
           {/* `hug` keeps it 56px tall: the default flex:1 would grow it down the
