@@ -1,9 +1,17 @@
 // Step 1 — phone number (Figma 2670:11784).
 //
 // The country code is a fixed "+1" select. It carries the chevron because the
-// design shows one, but the club is Brooklyn-only and `toE164US` accepts US
-// numbers alone, so offering other countries would promise something the rest
-// of the stack can't keep. Read-only until that changes.
+// design shows one, but every phone entry point in the app funnels through
+// `toE164US`, which accepts only the +1 range — so offering other countries
+// would promise something the rest of the stack can't keep. Read-only until it
+// can.
+//
+// Worth being precise, because the function's name overstates its own limit:
+// +1 is the North American Numbering Plan, so Canada and the Caribbean already
+// work. What's excluded is +52, +55, +57, +44 — and since verification is
+// mandatory (App.jsx), an excluded number means no account at all. Production's
+// only answer today is an admin vouching by name (`markVerifiedByName`), which
+// this flow has no equivalent of.
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
