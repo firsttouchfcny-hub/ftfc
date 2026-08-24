@@ -1,17 +1,16 @@
 // Step 1 — phone number (Figma 2670:11784).
 //
-// The country code is a fixed "+1" select. It carries the chevron because the
-// design shows one, but every phone entry point in the app funnels through
-// `toE164US`, which accepts only the +1 range — so offering other countries
-// would promise something the rest of the stack can't keep. Read-only until it
-// can.
+// One field, no country selector.
 //
-// Worth being precise, because the function's name overstates its own limit:
-// +1 is the North American Numbering Plan, so Canada and the Caribbean already
-// work. What's excluded is +52, +55, +57, +44 — and since verification is
-// mandatory (App.jsx), an excluded number means no account at all. Production's
-// only answer today is an admin vouching by name (`markVerifiedByName`), which
-// this flow has no equivalent of.
+// The Figma frame (2670:11784) pairs the number with a "+1" select carrying a
+// chevron. Dropped deliberately: the chevron promises a choice, and every phone
+// entry point in the app funnels through `toE164US`, which accepts only the +1
+// range — so the picker could never open. A prefix box that can't be changed is
+// worse than no box, because it invites the tap that goes nowhere.
+//
+// `toE164US` already takes a bare 10-digit number and adds the +1 itself, so
+// this needs nothing from production. Widening the accepted range is a separate
+// product decision, logged in the inventory.
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -52,21 +51,19 @@ export default function PhoneScreen() {
         </h1>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, width: '100%' }}>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', width: '100%' }}>
-            <div style={{ width: 84, flexShrink: 0 }}>
-              <InputField value="+1" readOnly chevron ariaLabel="Country code" />
-            </div>
-            <InputField
-              value={phone}
-              onChange={setPhone}
-              placeholder="Phone number"
-              error={error}
-              type="tel"
-              inputMode="tel"
-              autoComplete="tel-national"
-              name="phone"
-            />
-          </div>
+          <InputField
+            value={phone}
+            onChange={setPhone}
+            placeholder="Phone number"
+            // The placeholder is the only visible cue, and a placeholder is not
+            // a label — it vanishes the moment you type.
+            ariaLabel="Phone number"
+            error={error}
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel-national"
+            name="phone"
+          />
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16, width: '100%' }}>
             <Button
