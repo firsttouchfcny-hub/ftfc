@@ -12,6 +12,7 @@ import GearTakers from '../components/GearTakers';
 import RosterSection from '../components/RosterSection';
 import TableCard from '../components/TableCard';
 import { RosterSkeleton } from '../components/Skeleton';
+import CouldNotLoad from '../components/CouldNotLoad';
 import {
   MATCH1_MAX, MATCH2_MAX, MATCH2_MIN_CONFIRM,
   buildFlatList, getMatch2State, isSamePerson,
@@ -79,6 +80,10 @@ export default function GameScreen() {
   const preview = params.get('match2'); // 'onhold' | 'cancelled' | null
   // `?loading=1` previews the pre-data state — roster and gear together.
   const loading = params.get('loading') === '1';
+  // `?error=1` / `?error=offline` fail the whole screen; `?error=gear` fails
+  // only the gear strip and is handled inside GearTakers.
+  const errorParam = params.get('error');
+  const failed = errorParam === '1' || errorParam === 'offline';
 
   // The signup list is local state so "Out" and "Add a +1" actually mutate the
   // roster and it re-sorts live. Swapping this for the Firestore session is the
@@ -192,6 +197,22 @@ export default function GameScreen() {
   } else if (onHold) {
     headline = 'In match 2 waitlist';
     badge = `${needed} more players needed for 2nd match`;
+  }
+
+  // Without the roster we know nothing about this screen — not your standing,
+  // not whether you're even on the list. Showing the frame around an apology
+  // would be dressing up a page that has no content, so the failure takes the
+  // whole screen rather than appearing twice inside it.
+  if (failed) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '8px 16px 120px', width: '100%' }}>
+        <CouldNotLoad
+          what="the game"
+          variant="page"
+          offline={errorParam === 'offline' ? true : undefined}
+        />
+      </div>
+    );
   }
 
   return (

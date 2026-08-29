@@ -13,6 +13,7 @@ import Dialog from './Dialog';
 import GearCommitmentLine from './GearCommitmentLine';
 import GearTile from './GearTile';
 import { GearSkeleton } from './Skeleton';
+import CouldNotLoad from './CouldNotLoad';
 import { gearIcon, gearLabel, playerReturnDates, takersFor, takeBlockedByPriority } from '../../utils/gear';
 import { formatWeekday, formatGameDate, formatChipDate, relativeDayName } from '../state/rollCall';
 import { useCurrentUser } from '../identity/useCurrentUser';
@@ -63,8 +64,13 @@ export default function GearTakers({
     : relativeDayName(takeDate);
   const heading = headline ?? `${dayName}’s gear takers`;
 
-  // `?loading=1` previews the pre-data state on every surface at once.
+  // `?loading=1` previews the pre-data state on every surface at once;
+  // `?error=1` / `?error=offline` preview the two ways it can fail.
   const loading = params.get('loading') === '1';
+  // `?error=gear` fails only this strip — a partial failure, where the rest of
+  // the page is still good. A total failure is handled by the screen, not here.
+  const errorParam = params.get('error');
+  const failed = errorParam === 'gear';
 
   // `?picker=1` previews the rare multi-option case (see below).
   const ledger = params.get('picker') === '1'
@@ -132,7 +138,11 @@ export default function GearTakers({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'center', width: '100%' }}>
       <p className="type-body-regular" style={{ color: 'var(--color-dark-gray)' }}>{heading}</p>
 
-      {loading ? (
+      {failed ? (
+        // Section-level: the gear ledger failing shouldn't take the roster with
+        // it, so this fills the strip and leaves the rest of the page alone.
+        <CouldNotLoad what="gear" offline={errorParam === 'offline' ? true : undefined} />
+      ) : loading ? (
         // Deliberately not the real tiles with empty slots: an unloaded tile and
         // an unclaimed one look identical, so showing "+" here would invite
         // someone to take a set that is already gone.
