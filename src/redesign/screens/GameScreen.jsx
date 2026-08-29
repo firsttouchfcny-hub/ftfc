@@ -11,6 +11,7 @@ import DropsCard from '../components/DropsCard';
 import GearTakers from '../components/GearTakers';
 import RosterSection from '../components/RosterSection';
 import TableCard from '../components/TableCard';
+import { RosterSkeleton } from '../components/Skeleton';
 import {
   MATCH1_MAX, MATCH2_MAX, MATCH2_MIN_CONFIRM,
   buildFlatList, getMatch2State, isSamePerson,
@@ -76,6 +77,8 @@ export default function GameScreen() {
   // the fallback for rows created before an account was resolved.
   const isMe = (p) => isSamePerson(p, { uid: user.uid, name: youName });
   const preview = params.get('match2'); // 'onhold' | 'cancelled' | null
+  // `?loading=1` previews the pre-data state — roster and gear together.
+  const loading = params.get('loading') === '1';
 
   // The signup list is local state so "Out" and "Add a +1" actually mutate the
   // roster and it re-sorts live. Swapping this for the Firestore session is the
@@ -204,6 +207,8 @@ export default function GameScreen() {
       {/* Roster: the two matches share one card; the bench is its own card. */}
       <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 16 }}>
         <TableCard>
+          {loading ? <RosterSkeleton rows={6} label="Match 1" /> : (
+          <>
           <RosterSection label="Match 1" players={match1} />
           <div style={{ height: 1, background: 'var(--color-light-olive)', margin: '0 9px' }} />
           <RosterSection
@@ -217,16 +222,20 @@ export default function GameScreen() {
             dimmed={onHold || cancelled}
             players={match2}
           />
+          </>
+          )}
         </TableCard>
 
-        {bench.length > 0 && (
+        {/* Bench and drops wait too — half a loaded screen reads as a bug, not
+            as progress. */}
+        {!loading && bench.length > 0 && (
           <TableCard>
             <RosterSection label="Bench" players={bench} />
           </TableCard>
         )}
 
         {/* Drops sit last — below the bench when there is one, else below Match 2 */}
-        <DropsCard drops={mockDrops} />
+        {!loading && <DropsCard drops={mockDrops} />}
       </div>
 
       <BottomActions

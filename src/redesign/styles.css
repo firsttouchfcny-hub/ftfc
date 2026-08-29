@@ -135,3 +135,28 @@
   color: var(--color-cream);
 }
 .rd-chip:focus-visible { outline: none; border-color: #645AC8; box-shadow: 0 0 0 3px rgba(100, 90, 200, 0.4); }
+
+/* ── Skeletons ─────────────────────────────────────────────────────────────
+   Placeholder shapes for content that hasn't arrived. Sized to match the real
+   thing exactly, so nothing shifts when it does.
+
+   A slow pulse rather than a shimmer sweep: the point is to say "waiting", and
+   a sweep animates a direction that means nothing here. Tan reads on both the
+   Cream cards and the Light Olive page, so one colour serves everywhere. */
+
+.rd-skeleton {
+  background: var(--color-tan);
+  border-radius: 6px;
+  animation: rd-skeleton-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes rd-skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.5; }
+}
+
+/* Someone who has asked for less motion still needs to see the placeholder —
+   drop the animation, keep the shape. */
+@media (prefers-reduced-motion: reduce) {
+  .rd-skeleton { animation: none; opacity: 0.75; }
+}

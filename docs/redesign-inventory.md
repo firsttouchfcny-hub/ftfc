@@ -31,7 +31,9 @@ see at a glance what's designed and what still needs a mockup before we build.
 
 | State | Status | Notes |
 |---|---|---|
-| Loading (session / gear ledger) | ⬜ | Skeleton vs spinner; avoid the false "gear at risk" flash |
+| Loading — roster & gear | ✅ 🔨 | **Built (2026-08-26):** skeletons, not spinners — the shape of what's coming is known, so placeholders reassure rather than just spin. Sized to the real elements (rows 325×48, gear tiles 48×72, 24px gap — measured against both) so nothing shifts on arrival. Gear deliberately shows **no "+"**: an unloaded tile and an unclaimed one are the same picture, so a plus would invite taking a set that's already gone. Pulse, not shimmer; `prefers-reduced-motion` keeps the shape and drops the animation. Preview: `?loading=1` |
+| ↳ Loading — the rest of the app | ⬜ | Still open: the **app-level** wait (production replaces the whole page with "Loading…" while the session doc arrives) and the **"couldn't load"** treatment, which is the same design as offline. ⚠️ Production's 5s/6s timeouts give up and present a *guess* as fact — "roll call is closed", "no gear" — so a bad connection can confidently misinform. The redesign should say it failed instead |
+| ↳ **Submitting — "Signing in…"** | ⬜ 🎨 | **Missed until 2026-08-26.** Not a loading state but a *writing* one, which is why it wasn't on this list. Production locks the buttons and shows "Signing in…"; **on failure it says nothing** — the error goes to the console, the buttons re-enable, and the player can't tell whether they're in the game. That is the highest-stakes moment in the app (6:50 AM, one bar of signal) and the only one with no feedback |
 | Empty roster (0 signed up) | ⬜ | First person to sign up sees an empty list |
 | Offline / error | ⬜ | Firestore unreachable; read-only fallback |
 | Suspended user | 🟡 🔨 | Home suspended screen built; appeal path + other screens' suspended states TBD |

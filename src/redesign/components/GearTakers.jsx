@@ -12,6 +12,7 @@ import { useSearchParams } from 'react-router-dom';
 import Dialog from './Dialog';
 import GearCommitmentLine from './GearCommitmentLine';
 import GearTile from './GearTile';
+import { GearSkeleton } from './Skeleton';
 import { gearIcon, gearLabel, playerReturnDates, takersFor, takeBlockedByPriority } from '../../utils/gear';
 import { formatWeekday, formatGameDate, formatChipDate, relativeDayName } from '../state/rollCall';
 import { useCurrentUser } from '../identity/useCurrentUser';
@@ -61,6 +62,9 @@ export default function GearTakers({
     : dayPreview === 'later' ? formatWeekday(takeDate)
     : relativeDayName(takeDate);
   const heading = headline ?? `${dayName}’s gear takers`;
+
+  // `?loading=1` previews the pre-data state on every surface at once.
+  const loading = params.get('loading') === '1';
 
   // `?picker=1` previews the rare multi-option case (see below).
   const ledger = params.get('picker') === '1'
@@ -128,19 +132,28 @@ export default function GearTakers({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'center', width: '100%' }}>
       <p className="type-body-regular" style={{ color: 'var(--color-dark-gray)' }}>{heading}</p>
 
-      <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', justifyContent: 'center', width: '100%' }}>
-        {assigned.map(({ key, type, icon, takenBy, locked }) => (
-          <GearTile
-            key={key}
-            icon={icon}
-            label={gearLabel(type)}
-            takenBy={takenBy}
-            locked={locked}
-            onAdd={() => setTaking(type)}
-            onOpenTaken={() => setViewing(takenBy)}
-          />
-        ))}
-      </div>
+      {loading ? (
+        // Deliberately not the real tiles with empty slots: an unloaded tile and
+        // an unclaimed one look identical, so showing "+" here would invite
+        // someone to take a set that is already gone.
+        <div style={{ display: 'flex', width: '100%', justifyContent: 'center' }}>
+          <GearSkeleton tiles={TILES.length} />
+        </div>
+      ) : (
+        <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', justifyContent: 'center', width: '100%' }}>
+          {assigned.map(({ key, type, icon, takenBy, locked }) => (
+            <GearTile
+              key={key}
+              icon={icon}
+              label={gearLabel(type)}
+              takenBy={takenBy}
+              locked={locked}
+              onAdd={() => setTaking(type)}
+              onOpenTaken={() => setViewing(takenBy)}
+            />
+          ))}
+        </div>
+      )}
 
       <Dialog
         open={!!taking}
