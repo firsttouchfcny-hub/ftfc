@@ -197,7 +197,7 @@ export default function GameScreen() {
   return (
     // Bottom padding clears the floating action bar (56px pill + 32px offset).
     <div style={{ display: 'flex', flexDirection: 'column', gap: 32, alignItems: 'center', padding: '8px 16px 120px' }}>
-      <Confirmation headline={headline} badge={badge} date={gameDateLabel} />
+      <Confirmation headline={headline} badge={badge} date={gameDateLabel} loading={loading} />
       {/* No headline passed: GearTakers names the take day itself, relative to
           now, so the heading can't disagree with the dates below it.
           `alreadyIn` comes from the roster, not from the fact that this is the
