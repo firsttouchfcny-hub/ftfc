@@ -234,8 +234,8 @@ see at a glance what's designed and what still needs a mockup before we build.
 | Admin badge grant / revoke | ✅ 🔨 | Real panel · by name, account-keyed |
 | Verification override | ✅ 🔨 | Real panel · "Mark verified" safety valve |
 | Gear ledger — assign / reassign | ✅ 🔨 | Lives in `GearManager`, not `AdminPanel` — shipped with the Gear surface (§6) |
-| Gear ledger — mark returned / late / remove | ⬜ | As above |
-| "Someone already has it" onboarding | ⬜ | Held-gear entry |
+| Gear ledger — mark returned / late / remove | ✅ 🔨 | Same as the row above — lives in `GearManager`, shipped with the Gear surface (§6). **Returned / Late / ✕ / Reassign** on every commitment row; all four verified against the running panel |
+| "Someone already has it" onboarding | ✅ 🔨 | Also §6 — the gear admin's **"Assign bring"** (vs "Assign take"), i.e. seeding a set that is *already out* with someone and only needs bringing back. This is how the ledger gets started from reality rather than from future commitments |
 | ↳ Admin tools — live data on merge | 🟡 | Runs on `createMockAdminActions` today; the route swaps to `createFirestoreAdminActions()` when the redesign merges |
 
 ---
