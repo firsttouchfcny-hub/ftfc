@@ -2,6 +2,13 @@
 // Two equal 56px pills — secondary "Add a +1" (Cream + Tan border) and primary
 // "Out" (Dark Gray) — pinned 32px above the bottom of the viewport.
 //
+// The first pill TOGGLES: once you have a guest it reads "Remove +1" and takes
+// them off again. It was previously disabled at that point, which left the only
+// way to undo a mis-tap as dropping out and signing up again — losing your spot
+// over a guest. Production has always allowed removing one
+// (`handleSetMyPlusOnes(0)`), and does it in place so your signup time and list
+// position are untouched.
+//
 // Scroll behavior: the bar slides down out of view while scrolling down and
 // slides back up on scroll up, so it never covers the roster you're reading.
 // It always shows near the top of the page.
@@ -15,7 +22,8 @@ const REVEAL_ABOVE = 80;
 const JITTER = 6;
 
 export default function BottomActions({
-  onAddPlusOne, onOut, addDisabled, outDisabled, outDisabledReason,
+  onAddPlusOne, onRemovePlusOne, hasPlusOne = false,
+  onOut, outDisabled, outDisabledReason,
 }) {
   const [hidden, setHidden] = useState(false);
   const lastY = useRef(0);
@@ -54,7 +62,10 @@ export default function BottomActions({
           filter: 'drop-shadow(0px 2px 20px rgba(0, 0, 0, 0.1))',
         }}
       >
-        <Button label="Add a +1" onClick={onAddPlusOne} disabled={addDisabled} />
+        <Button
+          label={hasPlusOne ? 'Remove +1' : 'Add a +1'}
+          onClick={hasPlusOne ? onRemovePlusOne : onAddPlusOne}
+        />
         <Button
           label="Out"
           variant="primary"

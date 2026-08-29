@@ -106,8 +106,8 @@ export default function GameScreen() {
   const match2 = entries.slice(MATCH1_MAX, MATCH2_MAX).map((e, i) => toRow(e, MATCH1_MAX + i, byId, user));
   const bench = entries.slice(MATCH2_MAX).map((e, i) => toRow(e, MATCH2_MAX + i, byId, user));
 
-  // Actions. "Add a +1" is a redesign addition — production only sets plusOnes at
-  // sign-up time. Capped at one guest, since the row badge reads a literal "+1".
+  // Actions. Capped at one guest, since the row badge reads a literal "+1" —
+  // production allows up to 20, but nothing in this design renders a second.
   const me = players.find(isMe);
   const hasPlusOne = (me?.plusOnes ?? 0) > 0;
 
@@ -119,6 +119,15 @@ export default function GameScreen() {
     const at = Date.now();
     setPlayers((ps) => ps.map((p) => (
       isMe(p) ? { ...p, plusOnes: 1, plusOnesAt: [at] } : p
+    )));
+  };
+
+  // Removing drops the guest and nothing else — your own row keeps its signup
+  // time, so your position in the line is unchanged. Mirrors production's
+  // handleSetMyPlusOnes(0), which updates the roster doc in place.
+  const handleRemovePlusOne = () => {
+    setPlayers((ps) => ps.map((p) => (
+      isMe(p) ? { ...p, plusOnes: 0, plusOnesAt: [] } : p
     )));
   };
 
@@ -222,8 +231,9 @@ export default function GameScreen() {
 
       <BottomActions
         onAddPlusOne={handleAddPlusOne}
+        onRemovePlusOne={handleRemovePlusOne}
+        hasPlusOne={hasPlusOne}
         onOut={handleOut}
-        addDisabled={hasPlusOne}
       />
 
       {/* Dropping out. Past the 9 PM deadline it costs a strike, so the copy is
