@@ -38,7 +38,7 @@ see at a glance what's designed and what still needs a mockup before we build.
 | Admin vs non-admin | 🟡 | Admin sees early sign-up + admin panel entry; toggled everywhere · `/r/profile/admin` now guards itself by `isAdmin` |
 | **Render error** | ✅ 🔨 | Built · `ErrorBoundary` wraps the whole app, so a thrown error shows a readable message + Reload instead of a white screen (stack shown in dev only) |
 | **Redesign visibility** | ✅ 🔨 | `/r` is off unless `VITE_ENABLE_REDESIGN=true` (or local dev). **Leave it unset in Production** — the redesign shows mock data a real player could mistake for the live roster. Set it on Preview so the team can review |
-| Weekend (Mon's game shown) | ⬜ | Sat/Sun display Monday, already open |
+| Weekend (Mon's game shown) | ✅ 🔨 | Same gap as §2's closed window, now built: Sat shows Monday's game with "Roll call opens Sun at 3 PM"; Sunday switches to the countdown |
 
 ---
 
@@ -75,7 +75,7 @@ see at a glance what's designed and what still needs a mockup before we build.
 
 | Variant | Status | Notes |
 |---|---|---|
-| Closed — before 10 AM, **or 2+ days out** | ⬜ | **Grew after the main merge.** Roll call now opens the day before the game, so Fri evening/Sat are genuinely closed for Monday's game. Today `useRollCallWindow` folds `closed` into `waiting`, which shows a multi-hour countdown — needs its own designed state |
+| Closed — roll call opens on a **later day** | ✅ 🔨 | **Built (2026-08-25).** From Friday's 10 AM reset until Sunday the next game is Monday, whose roll call opens Sunday — the countdown read **40+ hours for two days**, which looks broken. The badge now says **"Roll call opens Sun at 3 PM"** instead; Sunday returns to the countdown, which by then is under a day. Not a separate screen: taking gear on Saturday for Monday is still valid, so only the badge changes. `useRollCallWindow` now returns `'closed'` as its own window, and the hour comes from `OPEN_HOUR_ET` so the copy can't drift. Preview: `?state=closed` vs `?state=waiting` |
 | 10 AM–2:55 PM, non-admin — countdown + gear | ✅ 🔨 | Built · live countdown to 3 PM ET; gear available from 10 AM |
 | 3 PM–8:59 PM, everyone — I'm in / +1 | ✅ 🔨 | Built |
 | 10 AM–8:59 PM, admin — I'm in / +1 | ✅ 🔨 | Built · same screen as "open", shown early to admins |

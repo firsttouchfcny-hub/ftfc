@@ -5,8 +5,8 @@
 // would start failing on its own.
 
 import { describe, it, expect } from 'vitest';
-import { relativeDayName } from './rollCall';
-import { getEasternNow, addDaysToKey } from '../../utils/helpers';
+import { relativeDayName, rollCallOpenDay, rollCallOpensToday, rollCallOpensLabel } from './rollCall';
+import { getEasternNow, addDaysToKey, getSessionDate } from '../../utils/helpers';
 
 const today = () => getEasternNow().dateKey;
 const weekdayOf = (key) =>
@@ -40,5 +40,31 @@ describe('relativeDayName', () => {
   it('is empty for a missing date rather than guessing', () => {
     expect(relativeDayName(null)).toBe('');
     expect(relativeDayName(undefined)).toBe('');
+  });
+});
+
+describe('roll call open day', () => {
+  it('opens the day before the game', () => {
+    expect(rollCallOpenDay()).toBe(addDaysToKey(getSessionDate(), -1));
+  });
+
+  it('agrees with itself about whether that day is today', () => {
+    expect(rollCallOpensToday()).toBe(rollCallOpenDay() === getEasternNow().dateKey);
+  });
+
+  it('labels the open moment as a short weekday plus the hour', () => {
+    // e.g. "Sun at 3 PM" — the shape the weekend badge needs.
+    expect(rollCallOpensLabel()).toMatch(/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun) at \d{1,2} (AM|PM)$/);
+  });
+
+  it('takes the hour from OPEN_HOUR_ET rather than hardcoding it', () => {
+    // Guards the copy against drifting from the rule it describes.
+    expect(rollCallOpensLabel()).toContain('3 PM');
+  });
+
+  it('names the day roll call actually opens, not today', () => {
+    const expected = new Date(`${rollCallOpenDay()}T12:00:00`)
+      .toLocaleDateString('en-US', { weekday: 'short' });
+    expect(rollCallOpensLabel().startsWith(expected)).toBe(true);
   });
 });

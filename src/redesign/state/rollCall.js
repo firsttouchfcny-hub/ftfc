@@ -34,6 +34,35 @@ export function countdownToOpen() {
   return `${pad(Math.floor(remaining / 3600))}:${pad(Math.floor((remaining % 3600) / 60))}:${pad(remaining % 60)}`;
 }
 
+// When roll call opens: 3 PM ET the day before the game.
+export function rollCallOpenDay() {
+  return addDaysToKey(getSessionDate(), -1);
+}
+
+// Does it open TODAY? That is the whole test for whether a countdown is worth
+// showing.
+//
+// Sunday through Thursday it always does, and the countdown runs at most ~7
+// hours. But from Friday's 10 AM reset the next game is Monday, whose roll call
+// opens on Sunday — so a countdown would sit at 40-plus hours for two solid
+// days, which reads as broken rather than as information.
+//
+// Derived from the dates rather than from "is it the weekend", for the same
+// reason relativeDayName is: a weekday rule bakes the fixture list into the copy
+// and goes quietly wrong the first time the schedule doesn't.
+export function rollCallOpensToday() {
+  return rollCallOpenDay() === getEasternNow().dateKey;
+}
+
+// "Sun at 3 PM" — for the days when a countdown would be absurd. The hour comes
+// from OPEN_HOUR_ET so the copy can't drift from the rule it describes.
+export function rollCallOpensLabel() {
+  const day = rollCallOpenDay();
+  const weekday = atNoon(day).toLocaleDateString('en-US', { weekday: 'short' });
+  const hour12 = OPEN_HOUR_ET % 12 || 12;
+  return `${weekday} at ${hour12} ${OPEN_HOUR_ET < 12 ? 'AM' : 'PM'}`;
+}
+
 // 9 PM ET the night before a game — drop after this and you earn a strike (the
 // rule stated on the Rules screen). Deliberately its own constant rather than
 // reusing GAME2_CUTOFF_HOUR_ET: that is the Match 2 go/no-go decision, which

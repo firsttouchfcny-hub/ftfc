@@ -3,10 +3,16 @@
 //   · regular user → 'open' at 3pm+, else 'waiting'
 //   · admin        → 'open' from 10am (admins-only window), else 'waiting'
 //
+// 'waiting' and 'closed' are the same screen with different badges: 'waiting'
+// counts down to a 3 PM that arrives today, 'closed' names the day when it
+// doesn't. Splitting them here rather than inside the screen keeps one place
+// that decides which window we're in — and lets ?state= preview either.
+//
 // A `?state=waiting|open` query param still overrides it, for previews.
 
 import { useSearchParams } from 'react-router-dom';
 import { getRollCallPhase, isSuspended } from '../../utils/helpers';
+import { rollCallOpensToday } from './rollCall';
 import { useCurrentUser } from '../identity/useCurrentUser';
 
 export function useRollCallWindow() {
@@ -14,7 +20,7 @@ export function useRollCallWindow() {
   const [params] = useSearchParams();
 
   const override = params.get('state');
-  if (override === 'open' || override === 'waiting' || override === 'suspended') return override;
+  if (['open', 'waiting', 'closed', 'suspended'].includes(override)) return override;
 
   // A suspension overrides the time windows — no sign-up or gear while suspended.
   if (isSuspended(user.suspendedUntil)) return 'suspended';
@@ -22,5 +28,7 @@ export function useRollCallWindow() {
   const phase = getRollCallPhase(); // 'closed' | 'admins-only' | 'open'
   if (phase === 'open') return 'open';
   if (phase === 'admins-only' && user.isAdmin) return 'open';
-  return 'waiting';
+  // From Friday's 10 AM reset until Sunday, roll call opens on a LATER day, so
+  // a countdown would sit above 40 hours for two days.
+  return rollCallOpensToday() ? 'waiting' : 'closed';
 }

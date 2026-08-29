@@ -22,6 +22,7 @@ doesn't have to be reconstructed from memory each session.
 |---|---|
 | `/r` | Whatever the real Eastern-time window says right now |
 | `/r?state=waiting` | Before 3 PM — countdown + take-gear |
+| `/r?state=closed` | Fri 10 AM–Sun — **"Roll call opens Sun at 3 PM"** instead of a 40-hour countdown. Gear tiles still offered |
 | `/r?state=open` | Roll call open — I'm in / +1 |
 | `/r?state=suspended` | Suspended player — strike message, no actions |
 
