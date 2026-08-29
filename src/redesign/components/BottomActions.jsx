@@ -12,6 +12,9 @@
 // Scroll behavior: the bar slides down out of view while scrolling down and
 // slides back up on scroll up, so it never covers the roster you're reading.
 // It always shows near the top of the page.
+//
+// The screen mounts this only once its data has arrived, so it fades in on
+// arrival — "Out" must not be tappable before we know whether you're in.
 
 import { useEffect, useRef, useState } from 'react';
 import Button from './Button';
@@ -56,6 +59,7 @@ export default function BottomActions({
       }}
     >
       <div
+        className="rd-fade-in"
         style={{
           display: 'flex', gap: 12, alignItems: 'stretch', pointerEvents: 'auto',
           // Shadow follows the pill silhouettes rather than boxing the row.

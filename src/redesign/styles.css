@@ -160,3 +160,25 @@
 @media (prefers-reduced-motion: reduce) {
   .rd-skeleton { animation: none; opacity: 0.75; }
 }
+
+/* ── Fade in on arrival ────────────────────────────────────────────────────
+   For controls that must not exist until the data behind them does — the
+   action bar can't offer "Out" before we know whether you're in. Once the page
+   settles they fade in rather than snapping into place, so the arrival reads as
+   the page finishing rather than as something jumping.
+
+   Opacity only: the action bar already animates `transform` for its scroll
+   hide/show, and a second animation on that property would fight it. */
+
+.rd-fade-in {
+  animation: rd-fade-in 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes rd-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rd-fade-in { animation: none; }
+}

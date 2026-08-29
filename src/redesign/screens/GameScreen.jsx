@@ -238,12 +238,17 @@ export default function GameScreen() {
         {!loading && <DropsCard drops={mockDrops} />}
       </div>
 
-      <BottomActions
-        onAddPlusOne={handleAddPlusOne}
-        onRemovePlusOne={handleRemovePlusOne}
-        hasPlusOne={hasPlusOne}
-        onOut={handleOut}
-      />
+      {/* Not rendered until the roster has landed: both actions assume you're
+          on it, and "Out" tapped before we know that would act on a spot we
+          can't yet confirm exists. It fades in when it arrives. */}
+      {!loading && (
+        <BottomActions
+          onAddPlusOne={handleAddPlusOne}
+          onRemovePlusOne={handleRemovePlusOne}
+          hasPlusOne={hasPlusOne}
+          onOut={handleOut}
+        />
+      )}
 
       {/* Dropping out. Past the 9 PM deadline it costs a strike, so the copy is
           sterner (Figma 3159:9446); before that it's the ordinary confirm
