@@ -63,6 +63,29 @@ export function formatWeekday(dateKey) {
   return dateKey ? atNoon(dateKey).toLocaleDateString('en-US', { weekday: 'long' }) : '';
 }
 
+// How to NAME a game day, relative to right now: "Today", "Tomorrow", or the
+// weekday ("Monday").
+//
+// The headline used to say "Tomorrow" unconditionally, which is wrong in two
+// situations the schedule guarantees:
+//   · Friday after the 10 AM reset, and all Saturday — the next game is MONDAY,
+//     three days and two days out
+//   · every game morning before the 10 AM reset — the take day is TODAY, the
+//     game happening that morning. Five mornings a week, and exactly when
+//     someone checks their phone on the way to the pitch.
+//
+// Deliberately derived from the DATES rather than from a weekday rule. A rule
+// like "say Tomorrow Sunday-to-Thursday" encodes the fixture list into the copy,
+// so it silently goes wrong the first time the schedule does anything unusual —
+// a holiday, a cancelled Friday, a one-off Saturday game. Counting days can't.
+export function relativeDayName(dateKey) {
+  if (!dateKey) return '';
+  const days = daysBetween(getEasternNow().dateKey, dateKey);
+  if (days === 0) return 'Today';
+  if (days === 1) return 'Tomorrow';
+  return formatWeekday(dateKey);
+}
+
 // "Monday, Oct 13" — a game day named in full, for commitments worth remembering.
 export function formatGameDate(dateKey) {
   return dateKey

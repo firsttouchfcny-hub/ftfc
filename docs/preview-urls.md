@@ -38,6 +38,9 @@ doesn't have to be reconstructed from memory each session.
 
 | URL | Then | Shows |
 |---|---|---|
+| `/r/game?day=today` | — | Heading reads **"Today's gear takers"** (a game morning, before the 10 AM reset) |
+| `/r/game?day=tomorrow` | — | Heading reads **"Tomorrow's gear takers"** (the ordinary Sun–Thu case) |
+| `/r/game?day=later` | — | Heading reads **"Thursday's gear takers"** (Friday after the reset, or Saturday, pointing at Monday) |
 | `/r/game` | tap **Out** | "You're holding Goals" — blocked, you have gear |
 | `/r/game?gear=none` | tap **Out** | Ordinary drop confirm |
 | `/r/game?gear=none&deadline=passed` | tap **Out** | Late-drop strike warning |

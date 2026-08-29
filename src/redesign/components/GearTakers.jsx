@@ -13,7 +13,7 @@ import Dialog from './Dialog';
 import GearCommitmentLine from './GearCommitmentLine';
 import GearTile from './GearTile';
 import { gearIcon, gearLabel, playerReturnDates, takersFor, takeBlockedByPriority } from '../../utils/gear';
-import { formatWeekday, formatGameDate, formatChipDate } from '../state/rollCall';
+import { formatWeekday, formatGameDate, formatChipDate, relativeDayName } from '../state/rollCall';
 import { useCurrentUser } from '../identity/useCurrentUser';
 import { isSamePerson } from '../../utils/helpers';
 import { mockCommitments, mockGameDate, mockPlayers } from '../state/mockRoster';
@@ -30,6 +30,9 @@ const TILES = [
 ];
 
 export default function GearTakers({
+  // Optional. Left out, it names the take day relative to now — so the heading
+  // can't drift from the date the tiles and dialog below it are talking about.
+  // The roll-call screen passes its own, which isn't about a day at all.
   headline,
   commitments = mockCommitments,
   takeDate = mockGameDate,
@@ -47,6 +50,17 @@ export default function GearTakers({
   const [params] = useSearchParams();
   const [viewing, setViewing] = useState(null); // a claimed commitment being viewed
   const me = useCurrentUser();
+
+  // `?day=today|tomorrow|later` previews the three headline forms. Needed
+  // because the mock take date is pinned to October: left to itself the preview
+  // would only ever show the weekday form.
+  const dayPreview = params.get('day');
+  const dayName =
+    dayPreview === 'today' ? 'Today'
+    : dayPreview === 'tomorrow' ? 'Tomorrow'
+    : dayPreview === 'later' ? formatWeekday(takeDate)
+    : relativeDayName(takeDate);
+  const heading = headline ?? `${dayName}’s gear takers`;
 
   // `?picker=1` previews the rare multi-option case (see below).
   const ledger = params.get('picker') === '1'
@@ -112,7 +126,7 @@ export default function GearTakers({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'center', width: '100%' }}>
-      <p className="type-body-regular" style={{ color: 'var(--color-dark-gray)' }}>{headline}</p>
+      <p className="type-body-regular" style={{ color: 'var(--color-dark-gray)' }}>{heading}</p>
 
       <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', justifyContent: 'center', width: '100%' }}>
         {assigned.map(({ key, type, icon, takenBy, locked }) => (
