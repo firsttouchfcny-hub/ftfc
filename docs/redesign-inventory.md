@@ -79,7 +79,7 @@ see at a glance what's designed and what still needs a mockup before we build.
 | 10 AM–2:55 PM, non-admin — countdown + gear | ✅ 🔨 | Built · live countdown to 3 PM ET; gear available from 10 AM |
 | 3 PM–8:59 PM, everyone — I'm in / +1 | ✅ 🔨 | Built |
 | 10 AM–8:59 PM, admin — I'm in / +1 | ✅ 🔨 | Built · same screen as "open", shown early to admins |
-| After 9 PM / overnight | ⬜ | Post-Match-2-decision; does sign-up stay open until the game? |
+| After 9 PM / overnight | ➖ | **No separate state needed** (verified 2026-08-25). The question this row posed is already answered in code: sign-up runs **continuously from 3 PM the day before until 10 AM on game morning** — straight through midnight — and **9 PM is not a sign-up gate**. It is two unrelated things sharing an hour: `GAME2_CUTOFF_HOUR_ET` (Match 2's go/no-go, which only changes the *status message* — nothing blocks joining) and the drop-strike deadline. Both resulting states are already built: `?match2=cancelled` and the late-drop warning |
 | Suspended user variant | ✅ 🔨 | Built · strike message, no actions (frame 2934:3005) |
 
 **Gear tile sub-states** (4 tiles: Goals, Goals, Balls, Bibs)
@@ -94,6 +94,7 @@ see at a glance what's designed and what still needs a mockup before we build.
 | Locked (balls-gate) | ✅ 🔨 | Built (2026-08-15) · the balls tile shows the **disabled icon button** (frame 2754:3164) until goals & bibs are fully taken. Uses production's `takeBlockedByPriority`; the disabled `+` can't open the dialog |
 | None left / fully covered | ✅ 🔨 | **No separate state needed** (decided): because each set is its own tile, "fully covered" is just every tile in the **taken** state (avatar). Differs from production, which used a single tile with a count |
 | Yours (you took it) | ✅ 🔨 | Built (frames 3323:21876 / 3323:21901) · tapping any **claimed** tile opens a commitment dialog: yours reads "**You** are taking [gear] to bring back {date}" with **Stop taking {gear}**; someone else's reads "{name} **is** taking …" with **Close**. Grammar switches per variant — the frame's "{name} are taking" only works for "You". Built on new `GearCommitmentLine` + `GearChip`, and `Dialog`'s new `content` slot |
+| ↳ **Joining a cancelled Match 2** | ⬜ ❓ | **Open design question**, surfaced 2026-08-25. Production lets you sign up at 11 PM into a Match 2 that was cancelled at 9 PM — you're added, then immediately told *"NO MATCH 2 — NOT PLAYING"*. The post-signup screen handles this (`?match2=cancelled`), but the **roll-call screen says nothing before you tap "I'm in"** — it shows only the game header and the button. Decide whether it should warn first, or whether being added and told is fine |
 | ↳ Cancel behaviour — game spot | 🟡 | **Verified same as production**, keyed on the `signedUp` flag not the screen: gear-only rows are deleted on cancel, real sign-ups keep their spot. So taking gear pre-signup → cancel removes you from **both** games; taking it after signing up → only the **return** game is dropped. The button is wired to close only — the actual cancel needs the data layer |
 
 ---
