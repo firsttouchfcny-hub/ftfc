@@ -84,6 +84,11 @@ export default function GameScreen() {
   // only the gear strip and is handled inside GearTakers.
   const errorParam = params.get('error');
   const failed = errorParam === '1' || errorParam === 'offline';
+  // `?roster=empty` previews a roster with nobody on it. Genuinely rare — you
+  // reach this screen by signing up, which puts you on the list, and taking
+  // gear auto-adds you too. Worth saying plainly rather than rendering a card
+  // of empty section labels if it ever does happen.
+  const emptyRoster = params.get('roster') === 'empty';
 
   // The signup list is local state so "Out" and "Add a +1" actually mutate the
   // roster and it re-sorts live. Swapping this for the Firestore session is the
@@ -223,12 +228,25 @@ export default function GameScreen() {
           now, so the heading can't disagree with the dates below it.
           `alreadyIn` comes from the roster, not from the fact that this is the
           post-signup screen — see GearTakers. */}
-      <GearTakers alreadyIn={players.some(isMe)} />
+      <GearTakers
+        alreadyIn={players.some(isMe)}
+        // An empty roster means an empty gear strip too: taking gear auto-adds
+        // you to the list, so takers above "No players yet" is a state that
+        // cannot exist. Passing undefined keeps the component's own default.
+        commitments={emptyRoster ? [] : undefined}
+      />
 
       {/* Roster: the two matches share one card; the bench is its own card. */}
       <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 16 }}>
         <TableCard>
-          {loading ? <RosterSkeleton rows={6} label="Match 1" /> : (
+          {emptyRoster ? (
+            <p
+              className="type-body-regular"
+              style={{ margin: 0, padding: '32px 16px', textAlign: 'center', color: 'var(--color-dark-gray-90)' }}
+            >
+              No players yet
+            </p>
+          ) : loading ? <RosterSkeleton rows={6} label="Match 1" /> : (
           <>
           <RosterSection label="Match 1" players={match1} />
           <div style={{ height: 1, background: 'var(--color-light-olive)', margin: '0 9px' }} />
@@ -249,14 +267,14 @@ export default function GameScreen() {
 
         {/* Bench and drops wait too — half a loaded screen reads as a bug, not
             as progress. */}
-        {!loading && bench.length > 0 && (
+        {!loading && !emptyRoster && bench.length > 0 && (
           <TableCard>
             <RosterSection label="Bench" players={bench} />
           </TableCard>
         )}
 
         {/* Drops sit last — below the bench when there is one, else below Match 2 */}
-        {!loading && <DropsCard drops={mockDrops} />}
+        {!loading && !emptyRoster && <DropsCard drops={mockDrops} />}
       </div>
 
       {/* Not rendered until the roster has landed: both actions assume you're
