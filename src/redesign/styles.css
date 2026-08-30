@@ -199,3 +199,29 @@
 @media (prefers-reduced-motion: reduce) {
   .rd-sheet-in { animation: none; }
 }
+
+/* ── Spinner ───────────────────────────────────────────────────────────────
+   For the one wait where we can't honestly draw a placeholder: until the
+   session arrives we don't know whether this screen is a countdown or a pair of
+   sign-up buttons, so a skeleton would be guessing at a shape. A spinner claims
+   nothing except that we're waiting. */
+
+.rd-spinner {
+  border-radius: 50%;
+  border: 3px solid var(--color-tan);
+  border-top-color: var(--color-dark-gray);
+  animation: rd-spin 800ms linear infinite;
+}
+
+@keyframes rd-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Rotation is the thing some people can't tolerate, so swap it for the same
+   pulse the skeletons use rather than dropping the indicator entirely. */
+@media (prefers-reduced-motion: reduce) {
+  .rd-spinner {
+    animation: rd-skeleton-pulse 1.6s ease-in-out infinite;
+    border-top-color: var(--color-tan);
+  }
+}
