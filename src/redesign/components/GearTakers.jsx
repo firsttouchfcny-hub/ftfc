@@ -14,7 +14,11 @@ import GearCommitmentLine from './GearCommitmentLine';
 import GearTile from './GearTile';
 import { GearSkeleton } from './Skeleton';
 import CouldNotLoad from './CouldNotLoad';
-import { gearIcon, gearLabel, playerReturnDates, takersFor, takeBlockedByPriority } from '../../utils/gear';
+import GearAlert from './GearAlert';
+import {
+  gearIcon, gearLabel, playerReturnDates, takersFor, takeBlockedByPriority,
+  gearBringingAlert, gearTakingAlert,
+} from '../../utils/gear';
 import { formatWeekday, formatGameDate, formatChipDate, relativeDayName } from '../state/rollCall';
 import { useCurrentUser } from '../identity/useCurrentUser';
 import { isSamePerson } from '../../utils/helpers';
@@ -73,6 +77,10 @@ export default function GearTakers({
   const failed = errorParam === 'gear';
 
   // `?picker=1` previews the rare multi-option case (see below).
+  // `?alert=taking` clears the take-day takers so every tile is free and the
+  // badges are visible — otherwise the mock has them all claimed and there is
+  // nothing to warn about.
+  const previewTaking = params.get('alert') === 'taking' || params.get('alert') === 'both';
   const ledger = params.get('picker') === '1'
     ? [
         // free the bibs tile so the take dialog is reachable…
@@ -82,6 +90,28 @@ export default function GearTakers({
         { id: 'preview-b', takerName: 'Preview', type: 'bibs', takeDate: '2026-10-14', returnDate: '2026-10-19', status: 'committed' },
       ]
     : commitments;
+
+  // Nobody taking a set home — flagged ON the tile rather than in a paragraph
+  // above it (3317:13786). The tile is what needs tapping, so that is where the
+  // attention belongs, and no words are needed to say it.
+  //
+  // Gated to 6 PM ET by `gearTakingAlert`, which is production's rule: before
+  // the evening there is still plenty of time for someone to volunteer.
+  const visibleLedger = previewTaking
+    ? ledger.filter((c) => c.takeDate !== takeDate)
+    : ledger;
+
+  const takingAlert = previewTaking
+    ? { date: takeDate, missing: [{ type: 'goal', have: 0, need: 2 }, { type: 'balls', have: 0, need: 1 }, { type: 'bibs', have: 0, need: 1 }] }
+    : gearTakingAlert(ledger);
+  const needsTaker = new Set((takingAlert?.missing ?? []).map((m) => m.type));
+
+  // Still a card, for now — the bringing alert is about people carrying gear IN,
+  // which no tile on this screen represents, so it has nowhere else to live yet.
+  const alertParam = params.get('alert'); // bringing | taking | both
+  const bringingAlert = (alertParam === 'bringing' || alertParam === 'both')
+    ? { date: takeDate, missing: [{ type: 'goal', have: 1, need: 2 }, { type: 'bibs', have: 0, need: 1 }] }
+    : gearBringingAlert(ledger);
 
   // Who is taking each set home after this game, straight from the ledger — the
   // same source the coverage figures and alerts read, so the tiles can't
@@ -93,7 +123,7 @@ export default function GearTakers({
   // One queue per type, so two goal tiles fill independently: the first goal
   // taken claims the first tile and the second stays free.
   const queues = { goal: [], balls: [], bibs: [] };
-  for (const c of takersFor(ledger, takeDate)) queues[c.type]?.push(c);
+  for (const c of takersFor(visibleLedger, takeDate)) queues[c.type]?.push(c);
   // Balls-gate: balls can't be taken until goals AND bibs are fully taken. When
   // locked, a still-free balls tile shows the disabled icon button.
   const ballsLocked = takeBlockedByPriority(ledger, 'balls', takeDate);
@@ -102,7 +132,13 @@ export default function GearTakers({
     const takenBy = c
       ? { name: c.takerName, photoURL: photoOf(c.takerName), type, returnDate: c.returnDate }
       : null;
-    return { type, ...rest, takenBy, locked: !takenBy && type === 'balls' && ballsLocked };
+    const locked = !takenBy && type === 'balls' && ballsLocked;
+    return {
+      type, ...rest, takenBy, locked,
+      // Not on a locked tile: balls stays shut until goals and bibs are taken,
+      // and flagging a tile you can't tap only invites a tap that does nothing.
+      warning: !takenBy && !locked && needsTaker.has(type),
+    };
   });
 
   // When the gear comes back. Production fixes this to the earliest open day for
@@ -136,6 +172,11 @@ export default function GearTakers({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'center', width: '100%' }}>
+      {/* Above the heading, as production has them — and above the tiles the
+          taking alert is pointing at. Both can fire at once. */}
+      {!failed && !loading && bringingAlert && (
+        <GearAlert variant="bringing" date={bringingAlert.date} missing={bringingAlert.missing} />
+      )}
       <p className="type-body-regular" style={{ color: 'var(--color-dark-gray)' }}>{heading}</p>
 
       {failed ? (
@@ -151,13 +192,14 @@ export default function GearTakers({
         </div>
       ) : (
         <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', justifyContent: 'center', width: '100%' }}>
-          {assigned.map(({ key, type, icon, takenBy, locked }) => (
+          {assigned.map(({ key, type, icon, takenBy, locked, warning }) => (
             <GearTile
               key={key}
               icon={icon}
               label={gearLabel(type)}
               takenBy={takenBy}
               locked={locked}
+              warning={warning}
               onAdd={() => setTaking(type)}
               onOpenTaken={() => setViewing(takenBy)}
             />

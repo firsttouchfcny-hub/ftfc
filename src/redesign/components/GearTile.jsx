@@ -8,16 +8,33 @@
 //   · taken  → the taker's avatar in place of the button (2756:2786), reusing the
 //              roster avatar: their photo, or their initials
 //
+// Plus one overlay, not a state of its own: `warning` (3317:13786) marks a set
+// nobody has taken home when the 6 PM deadline has passed, so it won't reach the
+// next game. It replaces what used to be a paragraph of warning text — the tile
+// is the thing that needs tapping, so the alert belongs ON it. The badge carries
+// its own Light Olive disc, which is what separates it from the Cream circle.
+//
 // "Fully covered" isn't a separate state: because each set is its own tile, it's
 // just every tile in the taken state. The "yours" variant is still to come.
 
 import IconButton from './IconButton';
 import PlayerAvatar from './PlayerAvatar';
 import plusIcon from '../assets/icons/plus.svg';
+import gearWarningIcon from '../assets/icons/gear-warning.svg';
 
-export default function GearTile({ icon, label, onAdd, onOpenTaken, takenBy, locked }) {
+export default function GearTile({ icon, label, onAdd, onOpenTaken, takenBy, locked, warning }) {
   return (
-    <div style={{ width: 48, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+    <div style={{ width: 48, display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }}>
+      {warning && (
+        // Top-right of the tile, overlapping the gear circle (left 32 / top -8
+        // in the frame). Not a button: the tile beneath it is already the target,
+        // and a second hit area over the same action would just steal taps.
+        <img
+          src={gearWarningIcon}
+          alt=""
+          style={{ position: 'absolute', left: 32, top: -8, width: 24, height: 24, display: 'block', pointerEvents: 'none', zIndex: 1 }}
+        />
+      )}
       {/* gear icon circle (48px), pulled -8px so the control overlaps it */}
       <div
         style={{
@@ -59,8 +76,16 @@ export default function GearTile({ icon, label, onAdd, onOpenTaken, takenBy, loc
             size="sm"
             onClick={onAdd}
             disabled={locked}
-            label={locked ? `${label} locked — goals & bibs first` : `Take ${label}`}
-            title={locked ? `${label} locked — goals & bibs first` : `Take ${label}`}
+            label={
+              locked ? `${label} locked — goals & bibs first`
+              : warning ? `Take ${label} — nobody is taking this home, so it won't reach the next game`
+              : `Take ${label}`
+            }
+            title={
+              locked ? `${label} locked — goals & bibs first`
+              : warning ? `Nobody is taking ${label} home — it won't reach the next game`
+              : `Take ${label}`
+            }
           >
             <span style={{ position: 'relative', display: 'block', width: 20, height: 20, overflow: 'hidden' }}>
               <img
