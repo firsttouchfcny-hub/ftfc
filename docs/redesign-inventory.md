@@ -220,7 +220,7 @@ see at a glance what's designed and what still needs a mockup before we build.
 | Suspension status | ➖ | **Exists in production but not on the profile** — it's a banner on the roll-call screen (`App.jsx`: "🚫 You are suspended until … Contact an admin to appeal") and already built as the home suspended variant. Not in the profile frame, so not duplicated here |
 | Profile — admin variant | ✅ 🔨 | Built (frame 3233:12618) · a 28px crown sits beside the name, and the single "Edit profile" becomes a two-button set with **Admin tools**. Preview the non-admin view with `?admin=none` |
 | Admin panel entry (admins only) | ✅ 🔨 | Built · "Admin tools" → `/r/profile/admin` |
-| Log out | ⬜ | Not in the current frame |
+| Log out | ➖ | **Decided (2026-08-30): match production — none.** Identity is a verified phone number tied to the device, so there is nothing to log out *of*: no password, no session to end. Adding one would mean inventing what it does (forget the device? force re-verification by SMS to get back in?) — a new rule rather than a missing screen. Revisit only if shared devices become a real problem |
 
 ---
 
