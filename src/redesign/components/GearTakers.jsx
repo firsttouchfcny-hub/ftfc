@@ -14,10 +14,8 @@ import GearCommitmentLine from './GearCommitmentLine';
 import GearTile from './GearTile';
 import { GearSkeleton } from './Skeleton';
 import CouldNotLoad from './CouldNotLoad';
-import GearAlert from './GearAlert';
 import {
-  gearIcon, gearLabel, playerReturnDates, takersFor, takeBlockedByPriority,
-  gearBringingAlert, gearTakingAlert,
+  gearIcon, gearLabel, playerReturnDates, takersFor, takeBlockedByPriority, gearTakingAlert,
 } from '../../utils/gear';
 import { formatWeekday, formatGameDate, formatChipDate, relativeDayName } from '../state/rollCall';
 import { useCurrentUser } from '../identity/useCurrentUser';
@@ -106,13 +104,6 @@ export default function GearTakers({
     : gearTakingAlert(ledger);
   const needsTaker = new Set((takingAlert?.missing ?? []).map((m) => m.type));
 
-  // Still a card, for now — the bringing alert is about people carrying gear IN,
-  // which no tile on this screen represents, so it has nowhere else to live yet.
-  const alertParam = params.get('alert'); // bringing | taking | both
-  const bringingAlert = (alertParam === 'bringing' || alertParam === 'both')
-    ? { date: takeDate, missing: [{ type: 'goal', have: 1, need: 2 }, { type: 'bibs', have: 0, need: 1 }] }
-    : gearBringingAlert(ledger);
-
   // Who is taking each set home after this game, straight from the ledger — the
   // same source the coverage figures and alerts read, so the tiles can't
   // disagree with them. Commitments carry a name; the photo is resolved from the
@@ -172,11 +163,6 @@ export default function GearTakers({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'center', width: '100%' }}>
-      {/* Above the heading, as production has them — and above the tiles the
-          taking alert is pointing at. Both can fire at once. */}
-      {!failed && !loading && bringingAlert && (
-        <GearAlert variant="bringing" date={bringingAlert.date} missing={bringingAlert.missing} />
-      )}
       <p className="type-body-regular" style={{ color: 'var(--color-dark-gray)' }}>{heading}</p>
 
       {failed ? (

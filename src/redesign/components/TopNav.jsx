@@ -6,12 +6,15 @@
 // Icons are the exact exported SVGs; the 28px box + inner insets reproduce the
 // designed icon geometry. Tokens: Cream button, Tan avatar ring, Dark Gray icon.
 
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useCurrentUser } from '../identity/useCurrentUser';
+import { gearBringingAlert } from '../../utils/gear';
+import { buildMockGearLedger } from '../state/mockGearActions';
 import Avatar from './Avatar';
 import ProgressiveBlur from './ProgressiveBlur';
 import rulesIcon from '../assets/icons/rules.svg';
 import gearIcon from '../assets/icons/gear.svg';
+import navWarningIcon from '../assets/icons/nav-warning.svg';
 import backIcon from '../assets/icons/back.svg';
 
 // Detail surfaces that show the back variant instead of the default nav.
@@ -23,7 +26,7 @@ const ICONS = {
   back:  { src: backIcon,  inset: { top: 0, right: 0, bottom: 0, left: 0 } }, // 28px arrow fills the box
 };
 
-function NavIconButton({ icon, label, onClick }) {
+function NavIconButton({ icon, label, onClick, alert }) {
   const { src, inset } = ICONS[icon];
   return (
     <button
@@ -33,8 +36,18 @@ function NavIconButton({ icon, label, onClick }) {
       style={{
         display: 'flex', alignItems: 'center', padding: 8, flexShrink: 0,
         background: 'var(--color-cream)', borderRadius: 9999, border: 'none', cursor: 'pointer',
+        position: 'relative',
       }}
     >
+      {alert && (
+        // Same badge geometry as the gear tile's (left 32 / top -8), red rather
+        // than orange: this one says gear may not reach the field at all.
+        <img
+          src={navWarningIcon}
+          alt=""
+          style={{ position: 'absolute', left: 32, top: -8, width: 24, height: 24, display: 'block', pointerEvents: 'none' }}
+        />
+      )}
       {/* 28px icon box (preserves outer geometry) */}
       <span style={{ position: 'relative', display: 'block', width: 28, height: 28, overflow: 'hidden', flexShrink: 0 }}>
         {/* inner leaf, positioned by the exact Figma insets */}
@@ -50,6 +63,20 @@ export default function TopNav() {
   const navigate = useNavigate();
   const user = useCurrentUser();
   const { pathname } = useLocation();
+  const [params] = useSearchParams();
+
+  // Nobody carrying gear IN to the next game. Unlike "nobody taking it home",
+  // this has no tile of its own to sit on — it is about people who committed
+  // days ago — so the nav carries the flag and the gear page carries the words.
+  //
+  // Reads the same ledger the gear page does, on purpose: a badge that lights up
+  // over a page saying everything is fine is worse than no badge at all.
+  const gearAtRisk = !!gearBringingAlert(buildMockGearLedger({
+    playerName: user.displayName,
+    // `?alert=bringing` forces it — the seeded ledger covers the take day, so
+    // the honest state is "fine" and the badge would never be reviewable.
+    atRisk: params.get('alert') === 'bringing',
+  }));
   const showBack = BACK_ROUTES.includes(pathname);
 
   return (
@@ -78,7 +105,15 @@ export default function TopNav() {
           <>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <NavIconButton icon="rules" label="Rules" onClick={() => navigate('/rules')} />
-              <NavIconButton icon="gear" label="Gear" onClick={() => navigate('/gear')} />
+              <NavIconButton
+                icon="gear"
+                label={gearAtRisk ? 'Gear — nobody is bringing gear to the next game' : 'Gear'}
+                alert={gearAtRisk}
+                // Carries the ?alert= preview through, so tapping the badge
+                // lands on a page that agrees with it. Preview-only plumbing:
+                // with real data the ledger decides, not the URL.
+                onClick={() => navigate(params.get('alert') ? `/gear?alert=${params.get('alert')}` : '/gear')}
+              />
             </div>
             <Avatar user={user} size={44} title="Profile" onClick={() => navigate('/profile')} />
           </>

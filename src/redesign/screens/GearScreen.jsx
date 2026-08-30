@@ -17,12 +17,17 @@
 // this file — see utils/gearActions.js.
 
 import { useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import GearManager from '../../components/GearManager';
 import { createMockGearActions } from '../state/mockGearActions';
 import { useCurrentUser } from '../identity/useCurrentUser';
 
 export default function GearScreen() {
   const user = useCurrentUser();
+  // Kept in step with the nav badge: `?alert=bringing` seeds a ledger with
+  // nobody bringing gear in, so the badge and this panel's message agree.
+  const [params] = useSearchParams();
+  const atRisk = params.get('alert') === 'bringing';
 
   // Memoised for the same reason production is: GearManager keys its ledger
   // subscription on this object, so a new one per render would resubscribe on
@@ -31,6 +36,7 @@ export default function GearScreen() {
     () => createMockGearActions({
       playerName: user.displayName,
       adminName: user.displayName,
+      atRisk,
     }),
     // Built once. Renaming yourself mid-session would otherwise re-seed the
     // ledger and throw away anything you'd done to it.

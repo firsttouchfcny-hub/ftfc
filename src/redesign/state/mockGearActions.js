@@ -26,14 +26,17 @@ const acctFor = (name) => ({
   isAdmin: false,
 });
 
-export function createMockGearActions({ playerName = 'Cristian Lugo', adminName } = {}) {
+// The seeded ledger, exported because more than one thing needs to know what it
+// says. The nav's gear badge asks "is gear at risk?" and the gear panel answers
+// it in words — reading different ledgers would let the badge light up over a
+// page insisting everything is fine.
+export function buildMockGearLedger({ playerName = 'Cristian Lugo', atRisk = false } = {}) {
   const take = gearTakeDate();                  // the next game
   const [next, later] = gameDaysAfter(take, 2); // the two game days after it
-
   // Mirrors the composition of mockCommitments: the take day is fully covered
   // by people already holding sets, while the day after is deliberately SHORT
   // (no balls taker) so the risk banners are previewable.
-  let ledger = [
+  const ledger = [
     // Already out with someone → they carry it in on the take day (the bringers).
     { id: 'm1', type: 'goal',  setId: 'goal-1',  takerName: 'Dave Rappaport', takerUid: 'mock-dave', takerDeviceId: null, takeDate: todayKey(), returnDate: take, held: true, status: 'committed', returnedOnTime: null, createdAt: Date.now(), source: 'seed' },
     { id: 'm2', type: 'goal',  setId: 'goal-2',  takerName: 'Marco Silva',    takerUid: 'mock-marco', takerDeviceId: null, takeDate: todayKey(), returnDate: take, held: true, status: 'committed', returnedOnTime: null, createdAt: Date.now(), source: 'seed' },
@@ -46,6 +49,15 @@ export function createMockGearActions({ playerName = 'Cristian Lugo', adminName 
     // commitment you can recognise — and act on.
     { id: 'm6', type: 'bibs',  setId: 'bibs-2',  takerName: playerName, takerUid: 'mock-you', takerDeviceId: null, takeDate: take, returnDate: later, status: 'committed', returnedOnTime: null, createdAt: Date.now(), source: 'player' },
   ];
+
+  // `atRisk` drops the people carrying gear IN on the take day, which is what
+  // "GEAR AT RISK" means. Used by the ?alert=bringing preview so the nav badge
+  // and the gear panel's message can be seen agreeing with each other.
+  return atRisk ? ledger.filter((c) => c.returnDate !== take) : ledger;
+}
+
+export function createMockGearActions({ playerName = 'Cristian Lugo', adminName, atRisk = false } = {}) {
+  let ledger = buildMockGearLedger({ playerName, atRisk });
 
   const listeners = new Set();
   // Hand out a copy: the panel keeps it in state, and sharing the array would
