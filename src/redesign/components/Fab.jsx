@@ -8,13 +8,21 @@ const VARIANTS = {
   secondary: { background: 'var(--color-cream)', color: 'var(--color-dark-gray)', border: '2px solid var(--color-tan)' },
 };
 
-export default function Fab({ label, onClick, variant = 'primary' }) {
+export default function Fab({ label, onClick, variant = 'primary', disabled, busy }) {
   return (
     <button
+      type="button"
       onClick={onClick}
+      disabled={disabled}
+      // Tells a screen reader the press was received and is in flight, which is
+      // the whole point of the state.
+      aria-busy={busy || undefined}
       className="type-body-bold"
       style={{
-        width: 132, minHeight: 90, padding: 16, borderRadius: 100, cursor: 'pointer',
+        width: 132, minHeight: 90, padding: 16, borderRadius: 100,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        opacity: disabled ? 0.5 : 1,
+        transition: 'opacity 150ms ease',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         ...VARIANTS[variant],
       }}
