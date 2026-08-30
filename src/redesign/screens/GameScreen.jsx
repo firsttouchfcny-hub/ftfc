@@ -12,6 +12,7 @@ import GearTakers from '../components/GearTakers';
 import RosterSection from '../components/RosterSection';
 import TableCard from '../components/TableCard';
 import { RosterSkeleton } from '../components/Skeleton';
+import { buildRosterRows } from '../state/rosterRows';
 import CouldNotLoad from '../components/CouldNotLoad';
 import {
   MATCH1_MAX, MATCH2_MAX, MATCH2_MIN_CONFIRM,
@@ -33,41 +34,6 @@ const ordinal = (n) => {
   const v = n % 100;
   return `${n}${s[(v - 20) % 10] || s[v] || s[0]}`;
 };
-
-const nameKey = (n) => (n || '').toLowerCase().trim();
-
-// Map one flat entry onto PlayerRow's props. Guests repeat their host's avatar
-// and name (the "+1" badge carries the distinction), so we look the host up by
-// parentId rather than using buildFlatList's generated "Name +1" string.
-function toRow(entry, index, byId, me) {
-  const host = entry.isMainEntry ? entry : byId.get(entry.parentId);
-  const role = entry.isMainEntry ? mockGearRoles[nameKey(entry.name)] : null;
-  const hasGear = !!(role && (role.bring.length || role.take.length));
-
-  // Rows store the name captured at signup, but production resolves display
-  // names by uid at render so a rename propagates everywhere. Only the current
-  // user carries a uid in this mock, so resolving theirs is the whole job here.
-  const isSelf = !!host?.uid && host.uid === me.uid;
-
-  return {
-    id: entry.id,
-    position: String(index + 1).padStart(2, '0'),
-    name: isSelf ? me.displayName : (host?.name ?? entry.name),
-    photoURL: isSelf ? me.photoURL : (host?.photoURL ?? null),
-    admin: !!entry.isAdmin,
-    // Only bringers get a row badge; takers are shown in the gear-takers strip.
-    bringing: role?.bring.length ? gearIcon(role.bring[0]) : null,
-    // Same suppression as production: hidden when the player already reads as a
-    // gear bringer/taker or an admin.
-    gearPriority: entry.isMainEntry && !hasGear && !entry.isAdmin
-      && mockGearPriorityNames.has(nameKey(entry.name)),
-    plusOne: !entry.isMainEntry,
-    // Matched with production's isSamePerson (uid first, name as the fallback
-    // for rows without one), so renaming yourself doesn't lose the highlight.
-    // Never a guest row — it repeats the host's name by design.
-    isYou: entry.isMainEntry && isSamePerson(entry, { uid: me.uid, name: me.displayName }),
-  };
-}
 
 export default function GameScreen() {
   const [params] = useSearchParams();
@@ -94,7 +60,6 @@ export default function GameScreen() {
   // roster and it re-sorts live. Swapping this for the Firestore session is the
   // same seam as the read path.
   const [players, setPlayers] = useState(mockPlayers);
-  const byId = useMemo(() => new Map(players.map((p) => [p.id, p])), [players]);
 
   // The roster, built by the real production logic: buildFlatList applies the
   // tiering (bringers → takers → admins/pinned → Friday gear priority → rest,
@@ -111,13 +76,10 @@ export default function GameScreen() {
   // sits under the 30 needed to confirm).
   const short = preview === 'onhold' || preview === 'cancelled';
   const entries = short ? rosterEntries.slice(0, MATCH1_MAX + 6) : rosterEntries;
-  const total = entries.length;
+  // Slicing and row mapping are shared with the lineup sheet, so the two views
+  // can't disagree about who sits where.
+  const { total, match1, match2, bench } = buildRosterRows(players, user, entries);
   const needed = Math.max(0, MATCH2_MIN_CONFIRM - total);
-
-  // Same slicing as production: 18 / 18 / overflow.
-  const match1 = entries.slice(0, MATCH1_MAX).map((e, i) => toRow(e, i, byId, user));
-  const match2 = entries.slice(MATCH1_MAX, MATCH2_MAX).map((e, i) => toRow(e, MATCH1_MAX + i, byId, user));
-  const bench = entries.slice(MATCH2_MAX).map((e, i) => toRow(e, MATCH2_MAX + i, byId, user));
 
   // Actions. Capped at one guest, since the row badge reads a literal "+1" —
   // production allows up to 20, but nothing in this design renders a second.

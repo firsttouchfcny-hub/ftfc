@@ -5,6 +5,7 @@
 import { useNavigate } from 'react-router-dom';
 import GameHeader from '../../components/GameHeader';
 import Fab from '../../components/Fab';
+import LineupPeek from '../../components/LineupPeek';
 
 export default function HomeOpen() {
   const navigate = useNavigate();
@@ -18,6 +19,9 @@ export default function HomeOpen() {
           <Fab label="I’m in +1" variant="secondary" onClick={() => navigate('/game')} />
           <Fab label="I’m in" variant="primary" onClick={() => navigate('/game')} />
         </div>
+
+        {/* Who's already in, before you decide to join. */}
+        <LineupPeek />
       </div>
     </div>
   );

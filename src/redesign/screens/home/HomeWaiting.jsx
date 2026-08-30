@@ -14,6 +14,7 @@
 
 import GameHeader from '../../components/GameHeader';
 import GearTakers from '../../components/GearTakers';
+import LineupPeek from '../../components/LineupPeek';
 import StatusBadge from '../../components/StatusBadge';
 import { countdownToOpen, rollCallOpensLabel } from '../../state/rollCall';
 import dividerIcon from '../../assets/icons/divider.svg';
@@ -31,6 +32,10 @@ export default function HomeWaiting({ opensLater = false }) {
         <StatusBadge>
           {opensLater ? `Roll call opens ${rollCallOpensLabel()}` : `Roll call opens in ${countdown}`}
         </StatusBadge>
+
+        {/* The reason this exists: gear takers and admins are already in before
+            3 PM, and this is the only way to see them. */}
+        <LineupPeek />
       </div>
 
       {/* Asterisk divider */}

@@ -3,6 +3,7 @@
 // Built from Figma node 2934:3005.
 
 import GameHeader from '../../components/GameHeader';
+import LineupPeek from '../../components/LineupPeek';
 import StatusBadge from '../../components/StatusBadge';
 import { useCurrentUser } from '../../identity/useCurrentUser';
 import { formatDateNoYear } from '../../state/rollCall';
@@ -22,6 +23,9 @@ export default function HomeSuspended() {
         <StatusBadge width={268}>
           You have an active strike. Sign up again on {formatDateNoYear(until)}.
         </StatusBadge>
+
+        {/* Suspended means you can't join — not that you can't look. */}
+        <LineupPeek />
       </div>
     </div>
   );
