@@ -8,7 +8,7 @@
 // `badge={false}` is for the welcome screen, which drops the badge and centres
 // its content instead (Figma 2699:12983).
 
-import badge from '../assets/ftfc-badge.png';
+import badge from '../assets/ftfc-badge.svg';
 
 export default function OnboardingLayout({ badge: showBadge = true, children }) {
   return (
@@ -31,12 +31,11 @@ export default function OnboardingLayout({ badge: showBadge = true, children }) 
         }}
       >
         {showBadge && (
-          // Exported at 3376² and rendered at 64 — kept at 192 (3× retina) so a
-          // 4 MB PNG isn't shipped to every phone for a 64px mark.
+          // Vector, so it stays sharp at any size and on any screen density.
           <img
             src={badge}
             alt="First Touch Futebol Club"
-            style={{ width: 64, height: 64, objectFit: 'cover', flexShrink: 0 }}
+            style={{ width: 64, height: 64, flexShrink: 0, display: 'block' }}
           />
         )}
         <div style={{ flex: '1 0 0', minHeight: 0, width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>

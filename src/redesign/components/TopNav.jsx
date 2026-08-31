@@ -15,7 +15,7 @@ import ProgressiveBlur from './ProgressiveBlur';
 import rulesIcon from '../assets/icons/rules.svg';
 import gearIcon from '../assets/icons/gear.svg';
 import navWarningIcon from '../assets/icons/nav-warning.svg';
-import clubBadge from '../assets/ftfc-badge.png';
+import clubBadge from '../assets/ftfc-badge.svg';
 import backIcon from '../assets/icons/back.svg';
 
 // Detail surfaces that show the back variant instead of the default nav.
@@ -114,7 +114,7 @@ export default function TopNav() {
             <img
               src={clubBadge}
               alt="First Touch Futebol Club"
-              style={{ width: 44, height: 44, objectFit: 'cover', flexShrink: 0, display: 'block' }}
+              style={{ width: 44, height: 44, flexShrink: 0, display: 'block' }}
             />
 
             {/* Everything actionable now travels together on the right. */}
