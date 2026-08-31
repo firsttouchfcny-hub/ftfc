@@ -157,10 +157,11 @@ see at a glance what's designed and what still needs a mockup before we build.
 
 | Element | Status | Notes |
 |---|---|---|
-| Rules button (top-left) | ✅ 🔨 | Built · exact icon; frosted sticky nav |
+| Nav layout | ✅ 🔨 | **Updated (2026-08-30)** to frame `3652:10656`: the **club badge** anchors the far left at 44px, and Rules / Gear / avatar travel together on the right in one 8px group. Outside padding 20px (was 16). The badge is the same mark the onboarding screens use (`ftfc-badge.png`) — the frame exports it as ~80 vector fragments, which would be absurd to reassemble for an identical result. Rendered as a mark, not a button, as drawn |
+| Rules button (top-right) | ✅ 🔨 | Built · exact icon; frosted sticky nav |
 | ↳ Back variant (detail surfaces) | ✅ 🔨 | Built · single Cream back-arrow pill; shown on `/rules`; `navigate(-1)` returns to prior screen |
-| Gear detail icon(s) (top-left) | ✅ 🔨 | Built · opens `/r/gear`, which shows the **back** variant in its place (§6) |
-| Profile avatar (top-right) | ✅ 🔨 | Built · photo / initials fallback; opens profile + admin |
+| Gear detail icon(s) (top-right) | ✅ 🔨 | Built · opens `/r/gear`, which shows the **back** variant in its place (§6) |
+| Profile avatar (top-right, grouped) | ✅ 🔨 | Built · photo / initials fallback; opens profile + admin |
 | Admin-only affordances | ➖ | **Decided (2026-08-25): none needed.** The admin panel entry lives in the profile and that is sufficient; the nav stays the same for everyone. This row previously read as an open gap when it was really a question about whether to add something |
 | Alert/unread indicators | ✅ 🔨 | Answered by the gear-at-risk badge (§3): the nav's gear button carries a red warning when nobody is bringing gear in. No other unread concept exists in the app |
 

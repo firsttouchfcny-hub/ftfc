@@ -15,6 +15,7 @@ import ProgressiveBlur from './ProgressiveBlur';
 import rulesIcon from '../assets/icons/rules.svg';
 import gearIcon from '../assets/icons/gear.svg';
 import navWarningIcon from '../assets/icons/nav-warning.svg';
+import clubBadge from '../assets/ftfc-badge.png';
 import backIcon from '../assets/icons/back.svg';
 
 // Detail surfaces that show the back variant instead of the default nav.
@@ -42,6 +43,10 @@ function NavIconButton({ icon, label, onClick, alert }) {
       {alert && (
         // Same badge geometry as the gear tile's (left 32 / top -8), red rather
         // than orange: this one says gear may not reach the field at all.
+        //
+        // It overhangs ~4px into the avatar beside it, which is what the frame
+        // does too. No z-index needed: this is absolutely positioned and the
+        // avatar is entirely static, so it already paints on top.
         <img
           src={navWarningIcon}
           alt=""
@@ -96,13 +101,23 @@ export default function TopNav() {
         style={{
           position: 'relative', zIndex: 1,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '24px 16px', width: '100%',
+          padding: '24px 20px', width: '100%',
         }}
       >
         {showBack ? (
           <NavIconButton icon="back" label="Back" onClick={() => navigate(-1)} />
         ) : (
           <>
+            {/* The club badge anchors the left. Same 44px as the avatar at the
+                other end, so the bar is bracketed by two equal circles. Not a
+                button: the frame draws it as a mark, not a control. */}
+            <img
+              src={clubBadge}
+              alt="First Touch Futebol Club"
+              style={{ width: 44, height: 44, objectFit: 'cover', flexShrink: 0, display: 'block' }}
+            />
+
+            {/* Everything actionable now travels together on the right. */}
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <NavIconButton icon="rules" label="Rules" onClick={() => navigate('/rules')} />
               <NavIconButton
@@ -114,8 +129,8 @@ export default function TopNav() {
                 // with real data the ledger decides, not the URL.
                 onClick={() => navigate(params.get('alert') ? `/gear?alert=${params.get('alert')}` : '/gear')}
               />
+              <Avatar user={user} size={44} title="Profile" onClick={() => navigate('/profile')} />
             </div>
-            <Avatar user={user} size={44} title="Profile" onClick={() => navigate('/profile')} />
           </>
         )}
       </div>
