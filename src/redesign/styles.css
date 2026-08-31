@@ -1,0 +1,227 @@
+/* ============================================================================
+   Redesign-only styles.
+
+   Everything in the redesign is written as inline styles + the shared type
+   tokens. This file exists for the handful of rules that inline styles cannot
+   express — pseudo-elements, mainly. It is imported by RedesignApp, so it never
+   loads for the production app at "/".
+   ============================================================================ */
+
+/* Input placeholders (Figma 2666:7754): Dark Gray 90% at 50% opacity. Inline
+   styles can't target ::placeholder, so it lives here. */
+.type-body-regular-tall::placeholder {
+  color: var(--color-dark-gray-90);
+  opacity: 0.5;
+}
+
+/* ── Buttons (Figma 2673:7973) ─────────────────────────────────────────────
+   Three types × five states. These live in CSS rather than inline styles
+   because hover / active / focus-visible are pseudo-classes — inline styles
+   can't express them, and faking hover in JS misses keyboard focus entirely.
+
+   Namespaced `rd-` on purpose: the production theme in index.css already owns
+   .btn / .btn-primary / .btn-success, it is loaded globally, and the real
+   AdminPanel renders those classes inside the redesign at /r/profile/admin.
+   Sharing the names silently restyled that panel. */
+
+.rd-btn {
+  height: 56px;
+  padding: 16px;
+  border-radius: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  /* Every type carries a border so the focus ring can thicken it without
+     changing the button's size and nudging its neighbours. */
+  border: 2px solid transparent;
+  background: transparent;
+  transition: background-color 120ms ease, box-shadow 120ms ease, opacity 150ms ease;
+}
+
+.rd-btn:disabled { cursor: not-allowed; opacity: 0.4; }
+
+/* Focus ring is shared across all three types. */
+.rd-btn:focus-visible {
+  outline: none;
+  border-color: #645AC8;
+  box-shadow: 0 0 0 3px rgba(100, 90, 200, 0.4);
+}
+
+/* Primary — Dark Gray fill, Cream label */
+.rd-btn-primary { background: var(--color-dark-gray); color: var(--color-cream); }
+.rd-btn-primary:hover:not(:disabled) { box-shadow: 0 6px 6px rgba(20, 20, 20, 0.2); }
+.rd-btn-primary:active:not(:disabled) { background: #121016; box-shadow: none; }
+.rd-btn-primary:focus-visible { background: #1D1A22; }
+
+/* Secondary — Cream fill, Tan border */
+.rd-btn-secondary {
+  background: var(--color-cream);
+  color: var(--color-dark-gray);
+  border-color: var(--color-tan);
+}
+.rd-btn-secondary:hover:not(:disabled) { background: #F0EDE2; }
+.rd-btn-secondary:active:not(:disabled) { background: var(--color-light-olive); }
+.rd-btn-secondary:focus-visible { background: var(--color-cream); border-color: #645AC8; }
+
+/* Tertiary — no fill or border until you touch it */
+.rd-btn-tertiary { color: var(--color-dark-gray); }
+.rd-btn-tertiary:hover:not(:disabled) { background: var(--color-tan-40); }
+.rd-btn-tertiary:active:not(:disabled) { background: var(--color-tan-60); }
+
+/* ── Icon button (Figma 2754:3164) ─────────────────────────────────────────
+   A circular icon button in two sizes (sm 32 / md 40) with five states. Same
+   reasoning as the pill buttons: states are pseudo-classes, so they live here,
+   and the classes are namespaced rd- to avoid the global .btn theme in index.css. */
+
+.rd-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 1000px;
+  cursor: pointer;
+  background: var(--color-cream);
+  border: 1px solid var(--color-tan);
+  transition: background-color 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+}
+.rd-icon-btn--sm { width: 32px; height: 32px; }
+.rd-icon-btn--md { width: 40px; height: 40px; }
+
+.rd-icon-btn:hover:not(:disabled) {
+  background: #F5F2E8;
+  border-color: #B8B6AC;
+  box-shadow: 0 6px 6px rgba(20, 20, 20, 0.2);
+}
+.rd-icon-btn:active:not(:disabled) {
+  background: #F0EDE3;
+  border-color: #B8B6AC;
+  box-shadow: none;
+}
+.rd-icon-btn:focus-visible {
+  outline: none;
+  border: 2px solid #3366CC;
+}
+/* Disabled is also the balls-gate "locked" look: goals & bibs must be taken
+   before balls can be. */
+.rd-icon-btn:disabled {
+  background: #F2F1ED;
+  border-color: #E0DFDA;
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Day chips ─────────────────────────────────────────────────────────────
+   A small selectable pill used for the gear return-date choice. Deliberately
+   smaller than .rd-btn: these are a choice WITHIN a dialog, not one of its
+   actions, so they must not compete with the buttons below them. */
+
+.rd-chip {
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 100px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: var(--color-cream);
+  color: var(--color-dark-gray);
+  border: 1px solid var(--color-tan);
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+.rd-chip:hover:not([aria-pressed='true']) { background: #F0EDE2; }
+.rd-chip[aria-pressed='true'] {
+  background: var(--color-dark-gray);
+  border-color: var(--color-dark-gray);
+  color: var(--color-cream);
+}
+.rd-chip:focus-visible { outline: none; border-color: #645AC8; box-shadow: 0 0 0 3px rgba(100, 90, 200, 0.4); }
+
+/* ── Skeletons ─────────────────────────────────────────────────────────────
+   Placeholder shapes for content that hasn't arrived. Sized to match the real
+   thing exactly, so nothing shifts when it does.
+
+   A slow pulse rather than a shimmer sweep: the point is to say "waiting", and
+   a sweep animates a direction that means nothing here. Tan reads on both the
+   Cream cards and the Light Olive page, so one colour serves everywhere. */
+
+.rd-skeleton {
+  background: var(--color-tan);
+  border-radius: 6px;
+  animation: rd-skeleton-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes rd-skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.5; }
+}
+
+/* Someone who has asked for less motion still needs to see the placeholder —
+   drop the animation, keep the shape. */
+@media (prefers-reduced-motion: reduce) {
+  .rd-skeleton { animation: none; opacity: 0.75; }
+}
+
+/* ── Fade in on arrival ────────────────────────────────────────────────────
+   For controls that must not exist until the data behind them does — the
+   action bar can't offer "Out" before we know whether you're in. Once the page
+   settles they fade in rather than snapping into place, so the arrival reads as
+   the page finishing rather than as something jumping.
+
+   Opacity only: the action bar already animates `transform` for its scroll
+   hide/show, and a second animation on that property would fight it. */
+
+.rd-fade-in {
+  animation: rd-fade-in 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes rd-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rd-fade-in { animation: none; }
+}
+
+/* ── Bottom sheet ──────────────────────────────────────────────────────────
+   Slides up from the bottom edge, because that is where it came from and where
+   closing it sends it back. */
+
+.rd-sheet-in {
+  animation: rd-sheet-in 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes rd-sheet-in {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rd-sheet-in { animation: none; }
+}
+
+/* ── Spinner ───────────────────────────────────────────────────────────────
+   For the one wait where we can't honestly draw a placeholder: until the
+   session arrives we don't know whether this screen is a countdown or a pair of
+   sign-up buttons, so a skeleton would be guessing at a shape. A spinner claims
+   nothing except that we're waiting. */
+
+.rd-spinner {
+  border-radius: 50%;
+  border: 3px solid var(--color-tan);
+  border-top-color: var(--color-dark-gray);
+  animation: rd-spin 800ms linear infinite;
+}
+
+@keyframes rd-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Rotation is the thing some people can't tolerate, so swap it for the same
+   pulse the skeletons use rather than dropping the indicator entirely. */
+@media (prefers-reduced-motion: reduce) {
+  .rd-spinner {
+    animation: rd-skeleton-pulse 1.6s ease-in-out infinite;
+    border-top-color: var(--color-tan);
+  }
+}

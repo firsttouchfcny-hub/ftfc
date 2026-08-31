@@ -1,0 +1,169 @@
+// Redesign roll-call helpers — thin wrappers over the existing Eastern-time
+// logic in src/utils/helpers.js. We reuse the domain logic; only the countdown
+// formatting is new.
+
+import { OPEN_HOUR_ET, getEasternNow, getSessionDate, addDaysToKey } from '../../utils/helpers';
+
+// Seconds since midnight in Eastern time, including seconds (getEasternNow only
+// exposes hour/minute, so we read the second here for a per-second countdown).
+function etSecondsOfDay() {
+  const p = {};
+  for (const part of new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+  }).formatToParts(new Date())) {
+    if (part.type !== 'literal') p[part.type] = part.value;
+  }
+  let h = parseInt(p.hour, 10);
+  if (h === 24) h = 0; // some engines emit '24' at midnight
+  return h * 3600 + parseInt(p.minute, 10) * 60 + parseInt(p.second, 10);
+}
+
+// Whole days between two YYYY-MM-DD keys (parsed as UTC so DST can't shift it).
+const daysBetween = (from, to) =>
+  Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
+
+// "HH:MM:SS" until roll call opens. Roll call opens at 3 PM ET *the day before
+// the game* — not 3 PM today — so on a Saturday with a Monday game this counts
+// through to Sunday afternoon rather than expiring the same day.
+// "00:00:00" once it's open.
+export function countdownToOpen() {
+  const openDay = addDaysToKey(getSessionDate(), -1);
+  const days = Math.max(0, daysBetween(getEasternNow().dateKey, openDay));
+  const remaining = Math.max(0, days * 86_400 + OPEN_HOUR_ET * 3600 - etSecondsOfDay());
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${pad(Math.floor(remaining / 3600))}:${pad(Math.floor((remaining % 3600) / 60))}:${pad(remaining % 60)}`;
+}
+
+// When roll call opens: 3 PM ET the day before the game.
+export function rollCallOpenDay() {
+  return addDaysToKey(getSessionDate(), -1);
+}
+
+// Does it open TODAY? That is the whole test for whether a countdown is worth
+// showing.
+//
+// Sunday through Thursday it always does, and the countdown runs at most ~7
+// hours. But from Friday's 10 AM reset the next game is Monday, whose roll call
+// opens on Sunday — so a countdown would sit at 40-plus hours for two solid
+// days, which reads as broken rather than as information.
+//
+// Derived from the dates rather than from "is it the weekend", for the same
+// reason relativeDayName is: a weekday rule bakes the fixture list into the copy
+// and goes quietly wrong the first time the schedule doesn't.
+export function rollCallOpensToday() {
+  return rollCallOpenDay() === getEasternNow().dateKey;
+}
+
+// "Sun at 3 PM" — for the days when a countdown would be absurd. The hour comes
+// from OPEN_HOUR_ET so the copy can't drift from the rule it describes.
+export function rollCallOpensLabel() {
+  const day = rollCallOpenDay();
+  const weekday = atNoon(day).toLocaleDateString('en-US', { weekday: 'short' });
+  const hour12 = OPEN_HOUR_ET % 12 || 12;
+  return `${weekday} at ${hour12} ${OPEN_HOUR_ET < 12 ? 'AM' : 'PM'}`;
+}
+
+// 9 PM ET the night before a game — drop after this and you earn a strike (the
+// rule stated on the Rules screen). Deliberately its own constant rather than
+// reusing GAME2_CUTOFF_HOUR_ET: that is the Match 2 go/no-go decision, which
+// merely happens to fall at the same hour. Production doesn't implement this
+// check at all today — strikes are issued by hand from the Admin panel — so
+// this drives the warning copy, not an automatic penalty.
+export const DROP_DEADLINE_HOUR_ET = 21;
+
+// Is a drop right now a late drop? True from 9 PM the night before, and all
+// through the morning of the game itself.
+export function isPastDropDeadline() {
+  const et = getEasternNow();
+  const game = getSessionDate();
+  if (et.dateKey === game) return true;                        // morning of the game
+  if (et.dateKey === addDaysToKey(game, -1)) {                 // the night before
+    return et.hour >= DROP_DEADLINE_HOUR_ET;
+  }
+  return false;                                                // more than a day out
+}
+
+// A date key parsed at midday, so a timezone offset can never slide it a day.
+const atNoon = (dateKey) => new Date(`${dateKey}T12:00:00`);
+
+// "Monday" — the day a game falls on. Used instead of the word "tomorrow",
+// which is wrong whenever the next game is more than a day away (Fri/Sat/Sun).
+export function formatWeekday(dateKey) {
+  return dateKey ? atNoon(dateKey).toLocaleDateString('en-US', { weekday: 'long' }) : '';
+}
+
+// How to NAME a game day, relative to right now: "Today", "Tomorrow", or the
+// weekday ("Monday").
+//
+// The headline used to say "Tomorrow" unconditionally, which is wrong in two
+// situations the schedule guarantees:
+//   · Friday after the 10 AM reset, and all Saturday — the next game is MONDAY,
+//     three days and two days out
+//   · every game morning before the 10 AM reset — the take day is TODAY, the
+//     game happening that morning. Five mornings a week, and exactly when
+//     someone checks their phone on the way to the pitch.
+//
+// Deliberately derived from the DATES rather than from a weekday rule. A rule
+// like "say Tomorrow Sunday-to-Thursday" encodes the fixture list into the copy,
+// so it silently goes wrong the first time the schedule does anything unusual —
+// a holiday, a cancelled Friday, a one-off Saturday game. Counting days can't.
+export function relativeDayName(dateKey) {
+  if (!dateKey) return '';
+  const days = daysBetween(getEasternNow().dateKey, dateKey);
+  if (days === 0) return 'Today';
+  if (days === 1) return 'Tomorrow';
+  return formatWeekday(dateKey);
+}
+
+// "Monday, Oct 13" — a game day named in full, for commitments worth remembering.
+export function formatGameDate(dateKey) {
+  return dateKey
+    ? atNoon(dateKey).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
+    : '';
+}
+
+// "Mon 19" — terse enough for a row of selectable day chips. The sentence above
+// them always states the chosen date in full, so the chips don't have to.
+export function formatChipDate(dateKey) {
+  if (!dateKey) return '';
+  const d = atNoon(dateKey);
+  return `${d.toLocaleDateString('en-US', { weekday: 'short' })} ${d.getDate()}`;
+}
+
+// "October 15th, 2026" — full month + ordinal + year, no weekday. The game
+// header shows the weekday on its own line, so it wants the date without it.
+export function formatMonthDayYear(dateKey) {
+  if (!dateKey) return '';
+  const d = atNoon(dateKey);
+  const day = d.getDate();
+  const s = ['th', 'st', 'nd', 'rd'];
+  const v = day % 100;
+  const ord = `${day}${s[(v - 20) % 10] || s[v] || s[0]}`;
+  const { month, year } = Object.fromEntries(
+    new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' })
+      .formatToParts(d).filter((p) => p.type !== 'literal').map((p) => [p.type, p.value]),
+  );
+  return `${month} ${ord}, ${year}`;
+}
+
+// "Thursday, Oct 15th, 2026" — the game header's full form, ordinal and all.
+export function formatFullGameDate(dateKey) {
+  if (!dateKey) return '';
+  const d = atNoon(dateKey);
+  const day = d.getDate();
+  const s = ['th', 'st', 'nd', 'rd'];
+  const v = day % 100;
+  const ord = `${day}${s[(v - 20) % 10] || s[v] || s[0]}`;
+  const { weekday, month, year } = Object.fromEntries(
+    new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'short', year: 'numeric' })
+      .formatToParts(d).filter((p) => p.type !== 'literal').map((p) => [p.type, p.value]),
+  );
+  return `${weekday}, ${month} ${ord}, ${year}`;
+}
+
+// Short date without the year, e.g. "Aug 15" — for the suspension message.
+// (helpers.formatDateShort includes the year; suspensions are within the year.)
+export function formatDateNoYear(ms) {
+  if (!ms) return '';
+  return new Date(ms).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}

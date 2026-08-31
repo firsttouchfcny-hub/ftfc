@@ -1,0 +1,126 @@
+/* ============================================================================
+   FTFC Design Tokens
+   Single source of truth for color + typography, generated from Figma:
+   · Typography Tokens spec (v1.2.0) — node 2765:2555
+   · Color Styles spec              — node 2803:2100
+   Font (Plus Jakarta Sans Variable) is loaded in main.jsx via Fontsource.
+
+   Additive by design: this file only DEFINES tokens (variables + type classes).
+   It does not restyle existing elements, so the current app is untouched.
+   ============================================================================ */
+
+:root {
+  /* ---- Color · Dark Gray (base #1F1F1F, with opacity steps) --------------- */
+  --color-dark-gray:      #1F1F1F;
+  --color-dark-gray-90:   rgba(31, 31, 31, 0.90);
+  --color-dark-gray-50:   rgba(31, 31, 31, 0.50);
+  --color-dark-gray-25:   rgba(31, 31, 31, 0.25);
+
+  /* ---- Color · Neutrals --------------------------------------------------- */
+  --color-white:          #FFFFFF;
+  --color-cream:          #FBF9F0;
+  /* Light Olive is defined via RGB channels so opacity variants + gradients can
+     derive from the single base value (keeps them in sync if the color changes). */
+  --color-light-olive-rgb: 230 228 215;
+  --color-light-olive:     rgb(var(--color-light-olive-rgb));
+  --color-tan:            #D2CFBD;
+  --color-tan-20:         rgba(210, 207, 189, 0.20);
+  --color-tan-40:         rgba(210, 207, 189, 0.40);
+  --color-tan-60:         rgba(210, 207, 189, 0.60);
+
+  /* ---- Color · Accent ----------------------------------------------------- */
+  --color-red:            #D80505;
+
+  /* ---- Color · Expressive ------------------------------------------------- */
+  /* Namespaced to avoid colliding with the neutral --color-light-olive above
+     (the expressive set has its own "Olive Light" / "Olive Dark"). */
+  --color-expressive-olive-dark:  #434D36;
+  --color-expressive-olive-light: #9F9C7C;
+  --color-expressive-gold:        #EAAF61;
+  --color-expressive-orange:      #E68756;
+  --color-expressive-navy:        #2F4768;
+  --color-expressive-steel:       #808285;
+
+  /* ---- Gradients / effects ------------------------------------------------ */
+  /* Nav scrim (from Figma 2708:8602): Light Olive fading 40% (top) → 0% (bottom),
+     so content softly fades under the sticky top nav. */
+  --gradient-nav-scrim: linear-gradient(
+    to top,
+    rgb(var(--color-light-olive-rgb) / 0),
+    rgb(var(--color-light-olive-rgb) / 0.4)
+  );
+
+  /* ---- Typography · primitives ------------------------------------------- */
+  --font-family-base: 'Plus Jakarta Sans Variable', 'Plus Jakarta Sans',
+                      system-ui, -apple-system, sans-serif;
+
+  --font-weight-light:    300;
+  --font-weight-regular:  400;
+  --font-weight-medium:   500;
+  --font-weight-semibold: 600;
+  --font-weight-bold:     700;
+
+  /* Type scale sizes (exposed for custom composition; classes below cover the
+     named tokens). Values are px per the Figma spec. */
+  --font-size-h1:      36px;
+  --font-size-h2:      28px;
+  --font-size-subheading: 22px;
+  --font-size-body:    16px;
+  --font-size-small:   14px;
+  --font-size-caption: 13px;
+  --font-size-caption-sm: 12px;
+  --font-size-tag:     11px;
+}
+
+/* ============================================================================
+   Typography · named tokens (composite text styles)
+   Apply directly, e.g. <h1 className="type-heading-h1">. "LH: auto" in the
+   Figma spec maps to `line-height: normal`; explicit line-heights are in px.
+   ============================================================================ */
+
+.type-heading-h1,
+.type-heading-h2,
+.type-subheading-bold,
+.type-subheading-regular,
+.type-body-regular,
+.type-body-regular-tall,
+.type-body-semibold,
+.type-body-bold,
+.type-body-light,
+.type-small-regular,
+.type-small-semibold,
+.type-caption-medium,
+.type-caption-semibold,
+.type-caption-bold,
+.type-tag-bold {
+  font-family: var(--font-family-base);
+  letter-spacing: 0;
+  margin: 0;
+}
+
+/* Heading */
+.type-heading-h1        { font-weight: var(--font-weight-medium);   font-size: var(--font-size-h1);      line-height: normal; }
+.type-heading-h2        { font-weight: var(--font-weight-bold);     font-size: var(--font-size-h2);      line-height: 36px;   }
+
+/* Subheading (spec v1.2.0) */
+.type-subheading-bold    { font-weight: var(--font-weight-bold);    font-size: var(--font-size-subheading); line-height: 32px;   }
+.type-subheading-regular { font-weight: var(--font-weight-regular); font-size: var(--font-size-subheading); line-height: 32px;   }
+
+/* Body */
+.type-body-regular      { font-weight: var(--font-weight-regular);  font-size: var(--font-size-body);    line-height: normal; }
+.type-body-regular-tall { font-weight: var(--font-weight-regular);  font-size: var(--font-size-body);    line-height: 24px;   }
+.type-body-semibold     { font-weight: var(--font-weight-semibold); font-size: var(--font-size-body);    line-height: normal; }
+.type-body-bold         { font-weight: var(--font-weight-bold);     font-size: var(--font-size-body);    line-height: normal; }
+.type-body-light        { font-weight: var(--font-weight-light);    font-size: var(--font-size-body);    line-height: normal; }
+
+/* Small */
+.type-small-regular     { font-weight: var(--font-weight-regular);  font-size: var(--font-size-small);   line-height: normal; }
+.type-small-semibold    { font-weight: var(--font-weight-semibold); font-size: var(--font-size-small);   line-height: 16px;   }
+
+/* Caption */
+.type-caption-medium    { font-weight: var(--font-weight-medium);   font-size: var(--font-size-caption); line-height: 14px;   }
+.type-caption-semibold  { font-weight: var(--font-weight-semibold); font-size: var(--font-size-caption-sm); line-height: normal; }
+.type-caption-bold      { font-weight: var(--font-weight-bold);     font-size: var(--font-size-caption-sm); line-height: normal; }
+
+/* Tag */
+.type-tag-bold          { font-weight: var(--font-weight-bold);     font-size: var(--font-size-tag);     line-height: normal; }

@@ -191,6 +191,27 @@ export function rosterDocId({ existingId, uid, deviceId }) {
   return existingId || uid || deviceId || null;
 }
 
+// Split a stored single `name` into first/last for the redesign's profile.
+// Rule (decided 2026-08-14): the FIRST word is the first name, everything after
+// it is the last name — so "Eric J" → Eric / J and "Felipe Di Carli" → Felipe /
+// Di Carli, which reads correctly for compound surnames.
+//
+// One-word names are not allowed, but plenty exist on the current roster (Elle,
+// Shimon). Those come back with an empty `lastName` and `needsLastName: true`,
+// so the app can ask for one once rather than silently inventing it or letting
+// a required field block the person.
+export function splitName(name) {
+  const parts = (name || '').trim().split(/\s+/).filter(Boolean);
+  const firstName = parts[0] || '';
+  const lastName = parts.slice(1).join(' ');
+  return { firstName, lastName, needsLastName: !!firstName && !lastName };
+}
+
+// The inverse, for writing back to the single `name` field production stores.
+export function joinName(firstName, lastName) {
+  return [firstName, lastName].map((p) => (p || '').trim()).filter(Boolean).join(' ');
+}
+
 export function parseNames(input) {
   return input
     .split(/[,\n\r]+/)
